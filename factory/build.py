@@ -25,10 +25,9 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     content = generate_content(cfg, generate_fn=generate_fn)
     (out_dir / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
 
-    # ② interior
+    # ② interior (PDF + page count; EPUB built after art so it can embed the cover)
     html = render_interior_html(cfg, content, out_dir)
     _, pages = build_interior_pdf(html, out_dir, runner=runner)
-    build_epub(cfg, content, out_dir)
 
     # ③ art
     if comfy is None:
@@ -36,10 +35,16 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     if workflow is None:
         workflow = json.loads((Path(__file__).parent / "comfyui" / "workflow.template.json")
                               .read_text(encoding="utf-8"))
+    if "REPLACE_WITH_YOUR_CHECKPOINT" in json.dumps(workflow):
+        raise SystemExit(
+            "ComfyUI workflow still has the placeholder checkpoint. Edit "
+            "comfyui/workflow.template.json and set ckpt_name to a real checkpoint "
+            "from your ComfyUI install before running the factory.")
     art_path = comfy.generate(workflow, positive_node=positive_node, sampler_node=sampler_node,
                               prompt=cfg.art_prompt, seed=seed, out_path=out_dir / "art.png")
 
-    # ④ cover
+    # ④ EPUB (with embedded cover) + cover
+    build_epub(cfg, content, out_dir, art_path=art_path)
     build_cover(cfg, pages, art_path, out_dir, runner=runner)
 
     # ⑤ checklist

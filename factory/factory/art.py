@@ -58,8 +58,12 @@ class ComfyClient:
         hist = None
         for _ in range(self.max_polls):
             hist = self.http_get(f"{self.base}/history/{pid}")
-            if isinstance(hist, dict) and pid in hist and hist[pid].get("outputs"):
-                break
+            if isinstance(hist, dict) and pid in hist:
+                rec = hist[pid]
+                if rec.get("status", {}).get("status_str") == "error":
+                    raise ArtError(f"ComfyUI error: {rec.get('status', {}).get('messages')}")
+                if rec.get("outputs"):
+                    break
             time.sleep(self.poll_interval)
         else:
             raise ArtError("ComfyUI generation timed out")

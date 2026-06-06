@@ -13,12 +13,13 @@ def test_cover_dimensions():
 
 
 def test_printing_cost():
-    assert specs.printing_cost_usd(120) == pytest.approx(2.44)
+    # 0.85 fixed + 120 * 0.012 = 2.29
+    assert specs.printing_cost_usd(120) == pytest.approx(2.29)
 
 
 def test_royalty():
-    # 9.99 * 0.60 - 2.44 = 3.554, rounded to cents = 3.55
-    assert specs.royalty_usd(9.99, 120) == pytest.approx(3.55)
+    # 9.99 * 0.60 - 2.29 = 3.704, rounded to cents = 3.70
+    assert specs.royalty_usd(9.99, 120) == pytest.approx(3.70)
 
 
 def test_trim_constants():

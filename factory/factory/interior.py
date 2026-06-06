@@ -35,12 +35,15 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None) -> tuple[Pat
     return pdf, count_pages(html_path)
 
 
-def build_epub(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
+def build_epub(cfg: BookConfig, content: dict, out_dir: Path, art_path: Path | None = None) -> Path:
     book = epub.EpubBook()
     book.set_identifier(f"petloss-{cfg.slug}")
     book.set_title(cfg.title)
     book.set_language("en")
     book.add_author(cfg.author)
+
+    if art_path is not None and Path(art_path).exists():
+        book.set_cover("cover.png", Path(art_path).read_bytes())
 
     def chapter(title, body_html, fname):
         c = epub.EpubHtml(title=title, file_name=fname, lang="en")

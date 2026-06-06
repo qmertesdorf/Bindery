@@ -5,7 +5,7 @@ TRIM_H_IN = 9.0
 BLEED_IN = 0.125
 SPINE_PER_PAGE_IN = 0.0025          # cream paper
 ROYALTY_RATE = 0.60                 # 60% for >= $9.99 paperback
-PRINT_FIXED_USD = 1.00              # US B&W fixed charge
+PRINT_FIXED_USD = 0.85              # US B&W fixed charge (KDP US, 110+ pages)
 PRINT_PER_PAGE_USD = 0.012          # US B&W per-page
 
 # Interior margins (no-bleed interior). Inside (gutter) larger for binding.

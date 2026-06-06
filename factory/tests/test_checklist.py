@@ -16,4 +16,4 @@ def test_make_checklist_has_disclosure_and_royalty(tmp_path):
     assert "Images: AI-generated" in text
     assert "$9.99" in text
     assert "Death & Grief" in text
-    assert "3.55" in text  # royalty 9.99*0.6 - 2.44
+    assert "3.70" in text  # royalty 9.99*0.6 - 2.29
