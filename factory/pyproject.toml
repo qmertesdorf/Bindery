@@ -1,0 +1,17 @@
+[project]
+name = "petloss-factory"
+version = "0.1.0"
+description = "KDP pet-loss grief journal production factory"
+requires-python = ">=3.11"
+dependencies = [
+    "Jinja2>=3.1",
+    "EbookLib>=0.18",
+    "requests>=2.31",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

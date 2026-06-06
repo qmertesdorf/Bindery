@@ -1,0 +1,5 @@
+factory/.venv/
+factory/out/
+factory/__pycache__/
+**/__pycache__/
+*.pyc
