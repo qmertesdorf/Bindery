@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="interior.css"></head><body>
+
+<section class="page"><h1 class="book-title">{{ cfg.title }}</h1>
+<p class="book-sub">{{ cfg.subtitle }}</p>
+<p class="byline">{{ cfg.author }}</p></section>
+
+<section class="page"><div class="intro-body"><p>{{ content.intro }}</p>
+<p>{{ content.how_to_use }}</p></div></section>
+
+<section class="page"><h2 class="section-head">About {{ cfg.pet_kind|capitalize }}</h2>
+{% for f in content.pet_profile_fields %}
+<div class="profile-field"><span class="lead">{{ f }}:</span><div class="lines"></div></div>
+{% endfor %}</section>
+
+<section class="page"><h2 class="section-head">Memories</h2>
+<p class="microcopy">{{ content.section_microcopy.prompts }}</p></section>
+{% for p in content.prompts %}
+<section class="page"><p class="prompt">{{ p }}</p>
+{% for _ in range(8) %}<div class="lines"></div>{% endfor %}</section>
+{% endfor %}
+
+<section class="page"><h2 class="section-head">Milestones</h2>
+<p class="microcopy">{{ content.section_microcopy.milestones }}</p></section>
+{% for m in content.milestones %}
+<section class="page"><p class="prompt">{{ m }}</p>
+{% for _ in range(8) %}<div class="lines"></div>{% endfor %}</section>
+{% endfor %}
+
+{% for l in content.letter_pages %}
+<section class="page"><h2 class="section-head">{{ l }}</h2>
+{% for _ in range(9) %}<div class="lines"></div>{% endfor %}</section>
+{% endfor %}
+
+</body></html>
