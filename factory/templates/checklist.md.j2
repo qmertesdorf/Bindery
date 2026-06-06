@@ -1,0 +1,32 @@
+# KDP Upload Checklist — {{ cfg.title }}
+
+## Files to upload
+- Paperback interior: `interior.pdf` ({{ pages }} pages, 6x9", cream)
+- Paperback cover (wraparound): `cover-paperback.pdf` (spine {{ spine }}in)
+- Ebook manuscript: `interior.epub`
+- Ebook cover: `cover-ebook.jpg`
+
+## Listing metadata
+- **Title:** {{ cfg.title }}
+- **Subtitle:** {{ cfg.subtitle }}
+- **Author:** {{ cfg.author }}
+- **Description:** (paste)
+  <p>A gentle, guided journal to help you grieve and remember your beloved {{ cfg.pet_kind }}.
+  Undated reflective prompts, memory pages, and milestone reflections give you a private
+  space to process loss at your own pace. A comforting keepsake and a thoughtful gift.</p>
+- **Price:** ${{ "%.2f"|format(cfg.price_usd) }} (paperback)
+- **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale (60% − ${{ "%.2f"|format(print_cost) }} print)
+
+## Categories (choose 2)
+1. Self-Help › Death & Grief
+2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)
+
+## 7 backend keywords
+{{ keywords }}
+
+## AI Content Disclosure (KDP asks at publish — answer privately)
+- **Text: AI-generated** (AI-assisted prompts/copy, human-reviewed)
+- **Images: AI-generated** (cover art via local ComfyUI)
+- Translations: None
+
+> Disclosure is private to Amazon and is NOT shown to buyers. Required — do not skip.
