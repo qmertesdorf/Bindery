@@ -66,10 +66,19 @@ def generate_content(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict
 
 
 def claude_generate(prompt: str) -> str:
-    """Real adapter: shell out to the installed Claude Code CLI in print mode."""
+    """Real adapter: shell out to the installed Claude Code CLI in print mode.
+
+    Uses shell=True so the Windows `claude.cmd`/Unix shim resolves, and pipes the
+    prompt via stdin so the multi-line text never needs shell quoting. The shell
+    string is the constant "claude -p" (no interpolated data), so there is no
+    injection surface.
+    """
     proc = subprocess.run(
-        ["claude", "-p", prompt],
+        "claude -p",
+        input=prompt,
         capture_output=True, text=True, timeout=300,
+        shell=True,
+        encoding="utf-8", errors="replace",
     )
     if proc.returncode != 0:
         raise ContentError(f"claude CLI failed (exit {proc.returncode}): {proc.stderr[:500]}")

@@ -4,4 +4,5 @@ factory/__pycache__/
 **/__pycache__/
 *.pyc
 factory/*.egg-info/
+factory/out_build.log
 .gstack/
