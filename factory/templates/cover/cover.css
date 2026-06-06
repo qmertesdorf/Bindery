@@ -1,0 +1,20 @@
+@page { margin: 0; }
+html, body { margin: 0; padding: 0; }
+.wrap {
+  position: relative; box-sizing: border-box;
+  width: {{ width_in }}in; height: {{ height_in }}in;
+  background-image: url("{{ art_file }}");
+  background-size: cover; background-position: center;
+  font-family: Georgia, serif; color: #fff;
+}
+.front {
+  position: absolute; top: 0; height: 100%;
+  right: {{ bleed }}in; width: {{ trim_w }}in;
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: flex-start; text-align: center;
+  padding-top: 1in;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.55);
+}
+.front h1 { font-size: 38pt; margin: 0 0.4in; }
+.front .sub { font-size: 15pt; font-style: italic; margin: 0.3in 0.4in 0; }
+.front .author { position: absolute; bottom: 0.8in; font-variant: small-caps; font-size: 14pt; }
