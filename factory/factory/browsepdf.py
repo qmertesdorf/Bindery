@@ -13,6 +13,10 @@ class BrowseError(RuntimeError):
 
 
 def browse_binary() -> str:
+    # Explicit override wins, then the gstack default install location, then PATH.
+    env = os.environ.get("BROWSE_BIN")
+    if env:
+        return env
     candidates = [
         Path(os.path.expanduser("~/.claude/skills/gstack/browse/dist/browse")),
         Path(os.path.expanduser("~/.claude/skills/gstack/browse/dist/browse.exe")),

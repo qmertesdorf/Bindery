@@ -2,7 +2,6 @@
 
 **Date:** 2026-06-05
 **Status:** Approved design, pre-implementation
-**Owner:** quint
 
 ## 1. Purpose
 
@@ -151,7 +150,7 @@ book-gen/factory/
 ## 8. Compliance & economics
 
 - **AI disclosure (mandatory):** KDP requires private disclosure of AI-generated
-  text and images at publish time. Stage ⑥ pre-fills these answers. Disclosure is
+  text and images at publish time. Stage ⑤ pre-fills these answers. Disclosure is
   private to Amazon, not shown to buyers.
 - **Velocity:** ≤3 new titles/day cap is irrelevant at our 3-title series pace.
 - **Royalty math (launch target):** 6×9", ~120pp B&W paperback, print cost ~$2.30;
@@ -176,7 +175,7 @@ Extending to other genres = writing a **new stage-① content engine** and reusi
   bet. Treated as a **later, separate project**, not this build.
 
 **Design implication honored now:** keep stages isolated and the content stage a
-clean swappable module so a future content engine plugs in without touching ②–⑥.
+clean swappable module so a future content engine plugs in without touching ②–⑤.
 We do **not** build that generality speculatively in this iteration.
 
 ## 10. Success criteria

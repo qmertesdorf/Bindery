@@ -2,16 +2,28 @@
 
 One command turns a book config into a KDP-ready bundle.
 
+## External dependencies
+The factory orchestrates three external tools (it does not bundle them):
+
+1. **Claude Code CLI** (`claude`) — generates the journal copy. Stage ① shells out to
+   `claude -p`, so the CLI must be installed and on your `PATH`. See
+   https://docs.claude.com/en/docs/claude-code. No separate API key is needed.
+2. **A headless-Chromium PDF renderer** (`browse`) — renders the HTML/CSS interior and
+   cover to print-spec PDF. Any CLI exposing `goto <url>`, `pdf`, `viewport`, and
+   `screenshot` subcommands works (see `factory/browsepdf.py` for the exact calls). This
+   project was built against the gstack `browse` binary. Point the factory at yours with
+   the `BROWSE_BIN` env var, or put `browse` on your `PATH`.
+3. **ComfyUI** — generates the cover art locally via its HTTP API. Start your ComfyUI
+   instance (e.g. `run_comfyui.bat`) so `http://127.0.0.1:8188` is live.
+
 ## Setup (once)
 ```powershell
 cd factory
 python -m venv .venv ; .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 ```
-- Ensure the `claude` CLI is on PATH (content generation).
-- Ensure the gstack `browse` binary exists (PDF render) — it does at
-  `~/.claude/skills/gstack/browse/dist/browse`.
-- Start ComfyUI (`run_comfyui.bat`) so `http://127.0.0.1:8188` is live.
+- Confirm the `claude` CLI and `browse` binary resolve (see above).
+- Start ComfyUI so `http://127.0.0.1:8188` is reachable.
 - Edit `comfyui/workflow.template.json`: set your checkpoint name.
 
 ## Build a title
@@ -45,23 +57,3 @@ print previewer before publishing.
 ```powershell
 pytest -v
 ```
-
-## After all files are written:
-1. Validate the JSON files parse and load: run
-   `cd C:\Users\quint\git\book-gen\factory ; .\.venv\Scripts\python.exe -c "from factory.config import load_config; [print(load_config('books/'+s+'.config.json').title) for s in ['dog-loss','cat-loss','pet-loss']]"`
-   Expected: prints the three titles with no error (proves configs are valid against the real loader).
-   Also confirm workflow.template.json parses: `.\.venv\Scripts\python.exe -c "import json; json.load(open('comfyui/workflow.template.json')); print('workflow ok')"`
-2. Commit:
-   ```
-   cd C:\Users\quint\git\book-gen
-   git add factory/books/ factory/comfyui/ factory/README.md
-   git commit -m "feat: book configs, ComfyUI workflow template, README"
-   ```
-
-## Rules
-- Use Write tool for all 5 files. Transcribe EXACTLY.
-- The README contains markdown with code fences — write it as a normal .md file (the fences are literal content).
-- Run the validation commands and report their output. If a config fails to load, STOP and report BLOCKED.
-
-## Report back
-Status, the validation command outputs (three titles + "workflow ok"), commit SHA and prior SHA, concerns. Concise.

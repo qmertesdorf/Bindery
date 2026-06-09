@@ -1,31 +1,71 @@
 # book-gen
 
-Project: building an **AI-assisted self-publishing business on Amazon KDP**.
+A one-command pipeline that turns a small JSON config into a **publish-ready Amazon KDP
+bundle** — print interior PDF, EPUB, wraparound cover PDF, ebook cover, and an
+upload checklist with the mandatory AI-content disclosure pre-filled.
 
-This folder holds the deep research (two adversarially-verified passes) and the
-candidate shortlist that came out of it. Started 2026-06-05.
+The proof-of-concept series is a set of **pet-loss grief journals**, chosen by upfront
+market research (below). The interesting part is the architecture: five isolated stages,
+with every external effect (the LLM, the PDF renderer, the image model) behind a thin
+injected adapter so the pure logic is unit-tested with fakes — `26 passing tests`, no
+network or GPU required to run them.
 
-## Files
-- [`research-findings.md`](research-findings.md) — verified facts on KDP policy, royalty
-  economics, earnings reality, enforcement/risks, and niche strategy. Includes what was
-  **refuted** (do not trust those numbers).
-- [`candidates.md`](candidates.md) — 10 concrete starting candidates + the mandatory
-  demand-validation gate to run before writing anything.
+## The pipeline
 
-## One-paragraph summary
-AI books are allowed on KDP but require private "AI-generated" disclosure to Amazon
-(not shown to buyers). Margins are structurally fine per sale (up to 70% on ebooks at
-$2.99–$9.99) but the *typical* seller earns very little (~44% of serious indies make
-≤$100/mo). The verified levers are: **catalog size** (volume/series, the strongest
-income predictor), **marketing/ad spend**, and **niching down** (Broad Category +
-Specific Audience + Clear Benefit). Avoid the saturated dead zones (plain notebooks,
-generic self-help/weight-loss/crypto/dropshipping/productivity/how-to/make-money-with-AI).
-There is **no credible evidence** for passive riches — treat it as a slow-build side business.
+```
+book.config.json ─▶ ① content (claude -p) ─▶ content.json
+                                                │
+              ┌──────────────────────────────────┤
+              ▼                                   ▼
+     ② interior                          ③ art (ComfyUI)
+     (HTML/CSS → PDF + EPUB)                      │
+              │                                   ▼
+              │  page count ───────────▶ ④ cover (art + typographic text → wraparound PDF)
+              ▼                                   │
+       interior.pdf / .epub              cover-paperback.pdf / cover-ebook.jpg
+                          └───────────┬────────────┘
+                                      ▼
+                          ⑤ checklist → upload-checklist.md (+ AI disclosure)
+```
 
-## Status / next steps
-- [x] Research pass 1 (policy + economics + risks)
-- [x] Research pass 2 (niches + earnings + strategy)
-- [x] 10 candidate shortlist
-- [ ] Demand-validate 1–2 candidates on live Amazon (competition + keyword check)
-- [ ] Build end-to-end production workflow (AI → manuscript/interior → cover → KDP upload → disclosure → ads)
-- [ ] Realistic startup-cost + time-per-title estimate (gap: no verified numbers found)
+`python build.py books/dog-loss.config.json` runs ①→⑤ unattended. A new title is a new
+config file and one command — templates and the ComfyUI workflow are shared across the series.
+
+Spine width is auto-computed from the rendered page count, and the title/author are placed
+as **real typographic text** over the art (not diffused into the image), so covers never
+come out with garbled lettering.
+
+## Run it
+
+The working code lives in [`factory/`](factory/). See
+**[factory/README.md](factory/README.md)** for setup, the three external dependencies
+(the `claude` CLI, a headless-Chromium `browse` renderer, and ComfyUI), and how to build a
+title.
+
+```powershell
+cd factory
+python -m venv .venv ; .\.venv\Scripts\Activate.ps1
+pip install -e ".[dev]"
+pytest -v          # 26 tests, no external services needed
+```
+
+## Research behind the niche
+
+Before writing code, the niche was validated against live Amazon data and KDP policy.
+
+- [`research-findings.md`](research-findings.md) — adversarially-verified facts on KDP
+  policy, royalty economics, the earnings reality (most sellers earn very little), and
+  enforcement risks. Includes what was **refuted**, so those numbers aren't trusted.
+- [`candidates.md`](candidates.md) — 10 concrete candidates plus the demand-validation gate
+  run before committing to one.
+- [`docs/specs/`](docs/specs/) — the design spec the build was implemented from.
+
+**One-paragraph takeaway:** AI books are allowed on KDP but require a private "AI-generated"
+disclosure to Amazon (not shown to buyers). Per-sale margins are fine (up to 70% on ebooks
+at $2.99–$9.99), but the *typical* seller earns little. The real levers are catalog size,
+ad spend, and niching down — not passive riches. Treated as a slow-build side business; the
+pet-loss grief journal passed the demand-vs-beatable-competition test.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

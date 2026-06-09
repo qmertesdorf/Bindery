@@ -9,7 +9,7 @@ def sample_config_dict():
         "slug": "dog-loss",
         "title": "Paw Prints on My Heart",
         "subtitle": "A Guided Grief Journal for Coping with the Loss of a Beloved Dog",
-        "author": "Quint Mertesdorf",
+        "author": "Your Name",
         "pet_kind": "dog",
         "prompt_count": 70,
         "art_prompt": "soft pastel watercolor of a dog at a rainbow bridge, gentle, tender, no text",
