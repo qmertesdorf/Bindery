@@ -1,6 +1,11 @@
 <!doctype html><html><head><meta charset="utf-8">
 <style>{{ css|safe }}</style></head><body>
 <div class="wrap">
+  {% if not front_only %}
+  <div class="back">
+    <p class="blurb">{{ blurb }}</p>
+  </div>
+  {% endif %}
   <div class="front">
     <h1>{{ cfg.title }}</h1>
     <p class="sub">{{ cfg.subtitle }}</p>

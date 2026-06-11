@@ -6,6 +6,7 @@ from jinja2 import Template
 from .config import BookConfig
 from .templating import render, TEMPLATES_DIR
 from .browsepdf import html_to_pdf, html_to_screenshot
+from .copy import book_blurb
 from . import specs
 
 _CSS_TEMPLATE = (TEMPLATES_DIR / "cover" / "cover.css").read_text(encoding="utf-8") \
@@ -34,7 +35,8 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
         name = "cover_wrap.html"
     css = _css(width_in, height_in, art_local.name, fill=front_only)
     html = render("cover/cover.html.j2", cfg=cfg, css=css,
-                  width_in=width_in, height_in=height_in)
+                  width_in=width_in, height_in=height_in,
+                  front_only=front_only, blurb=book_blurb(cfg))
     html_path = out_dir / name
     html_path.write_text(html, encoding="utf-8")
     return html_path
