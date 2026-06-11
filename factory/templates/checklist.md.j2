@@ -17,6 +17,15 @@
 - **Price:** ${{ "%.2f"|format(cfg.price_usd) }} (paperback)
 - **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale (60% − ${{ "%.2f"|format(print_cost) }} print)
 
+## Paperback print settings (must match the generated files)
+- **Trim size:** 6 x 9 in
+- **Interior:** Black & white
+- **Paper:** Cream  — ⚠ must select cream; the spine width ({{ spine }}in) was computed for cream stock. White paper is thinner and KDP will reject the cover.
+- **Bleed (interior):** No Bleed — the interior PDF is exactly 6x9 with margins (no edge-to-edge images).
+- **Cover finish:** Matte (recommended for the soft watercolor art; free choice, doesn't affect the file).
+- **ISBN:** Get a free KDP ISBN (KDP-only is fine). The eBook needs **no ISBN** (Amazon assigns an ASIN).
+- **In Print Previewer:** confirm the wraparound lines up and the **back-cover blurb clears the barcode** box (lower-right of the back cover).
+
 ## Categories (choose 2)
 1. Self-Help › Death & Grief
 2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)
