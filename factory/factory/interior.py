@@ -35,15 +35,19 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None) -> tuple[Pat
     return pdf, count_pages(html_path)
 
 
-def build_epub(cfg: BookConfig, content: dict, out_dir: Path, art_path: Path | None = None) -> Path:
+def build_epub(cfg: BookConfig, content: dict, out_dir: Path, cover_path: Path | None = None) -> Path:
     book = epub.EpubBook()
     book.set_identifier(f"petloss-{cfg.slug}")
     book.set_title(cfg.title)
     book.set_language("en")
     book.add_author(cfg.author)
 
-    if art_path is not None and Path(art_path).exists():
-        book.set_cover("cover.png", Path(art_path).read_bytes())
+    # Embed the finished, title-bearing ebook cover (a ~1 MB JPG) rather than
+    # the multi-MB print-resolution art PNG — keeps the EPUB small so it
+    # doesn't trigger KDP per-MB delivery fees on the 70% royalty plan.
+    if cover_path is not None and Path(cover_path).exists():
+        cp = Path(cover_path)
+        book.set_cover("cover" + cp.suffix, cp.read_bytes())
 
     def chapter(title, body_html, fname):
         c = epub.EpubHtml(title=title, file_name=fname, lang="en")

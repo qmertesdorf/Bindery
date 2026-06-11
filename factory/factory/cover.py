@@ -40,6 +40,19 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
     return html_path
 
 
+def _recompress_jpg(path: Path, quality: int = 90) -> None:
+    """Re-encode the cover JPG at a sane quality. The browse screenshot backend
+    saves near-lossless (multi-MB from hi-res art); q=90 is visually identical at
+    roughly 1/8 the size, keeping the ebook cover and EPUB light — KDP delivery
+    fees on the 70% royalty plan scale per megabyte."""
+    import fitz
+    try:
+        data = fitz.Pixmap(str(path)).tobytes("jpg", jpg_quality=quality)
+    except Exception:
+        return  # not a decodable image (e.g. a test stub) — leave it untouched
+    Path(path).write_bytes(data)
+
+
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
                 runner=None) -> tuple[Path, Path]:
     out_dir = Path(out_dir)
@@ -55,4 +68,5 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     front_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=True)
     jpg = out_dir / "cover-ebook.jpg"
     html_to_screenshot(front_html, jpg, width_px=1600, height_px=2560, runner=runner)
+    _recompress_jpg(jpg)
     return pdf, jpg
