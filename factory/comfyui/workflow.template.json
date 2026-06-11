@@ -3,16 +3,16 @@
     "seed": 0, "steps": 25, "cfg": 6.5, "sampler_name": "euler", "scheduler": "normal",
     "denoise": 1.0, "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["5", 0]}},
   "4": {"class_type": "CheckpointLoaderSimple", "inputs": {"ckpt_name": "juggernautXL_v9.safetensors"}},
-  "5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1216, "height": 896, "batch_size": 1}},
+  "5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1536, "height": 768, "batch_size": 1}},
   "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "PLACEHOLDER", "clip": ["4", 1]}},
   "7": {"class_type": "CLIPTextEncode", "inputs": {"text": "text, words, letters, watermark, signature, blurry, deformed, genitals, genitalia, nsfw, exposed underbelly, anatomical detail", "clip": ["4", 1]}},
   "10": {"class_type": "LatentUpscale", "inputs": {
-    "samples": ["3", 0], "upscale_method": "nearest-exact", "width": 2432, "height": 1792, "crop": "disabled"}},
+    "samples": ["3", 0], "upscale_method": "nearest-exact", "width": 3072, "height": 1536, "crop": "disabled"}},
   "11": {"class_type": "KSampler", "inputs": {
     "seed": 1, "steps": 20, "cfg": 6.5, "sampler_name": "euler", "scheduler": "normal",
     "denoise": 0.45, "model": ["4", 0], "positive": ["6", 0], "negative": ["7", 0], "latent_image": ["10", 0]}},
   "8": {"class_type": "VAEDecode", "inputs": {"samples": ["11", 0], "vae": ["4", 2]}},
   "12": {"class_type": "ImageScale", "inputs": {
-    "image": ["8", 0], "upscale_method": "lanczos", "width": 3744, "height": 2784, "crop": "disabled"}},
+    "image": ["8", 0], "upscale_method": "lanczos", "width": 5568, "height": 2784, "crop": "disabled"}},
   "9": {"class_type": "SaveImage", "inputs": {"filename_prefix": "petloss_cover", "images": ["12", 0]}}
 }

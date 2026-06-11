@@ -40,7 +40,7 @@ class ComfyClient:
     def __init__(self, base: str = BASE,
                  http_post: Callable = _default_post,
                  http_get: Callable = _default_get,
-                 poll_interval: float = 1.0, max_polls: int = 180):
+                 poll_interval: float = 1.0, max_polls: int = 600):
         self.base = base
         self.http_post = http_post
         self.http_get = http_get
