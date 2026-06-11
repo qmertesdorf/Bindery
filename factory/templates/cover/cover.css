@@ -3,47 +3,48 @@ html, body { margin: 0; padding: 0; }
 .wrap {
   box-sizing: border-box;
 {% if fill %}  position: fixed; inset: 0;
-  /* Ebook: the front cover IS the whole image; show the subject (centre of the
-     source art) via background-cover on this single full-bleed element. */
+  /* Ebook: the whole image IS the front cover; use the art directly. */
   background-image: url("{{ art_file }}");
 {% else %}  position: relative; width: {{ width_in }}in; height: {{ height_in }}in;
-  /* Paperback: one pre-composed, page-sized background (scenery on the back,
-     subject on the front, scrims baked in). A single full-page background
-     renders identically across PDF viewers — per-panel CSS background crops get
-     baked as oversized clipped patterns that bleed across panels in some. */
+  /* Paperback: one continuous page-sized image (cover_bg.png) with the subject
+     shifted onto the front and the scene swept onto the back. A single full-page
+     background renders identically in every PDF viewer. */
   background-image: url("cover_bg.png");
-{% endif %}  background-size: cover; background-position: center;
+{% endif %}
+  background-size: cover; background-position: center;
   font-family: Georgia, serif; color: #fff;
 }
 .front {
   position: absolute; top: 0; height: 100%;
 {% if fill %}  left: 0; right: 0; width: auto;
-  /* Ebook only: gradient scrim under the title (the paperback's scrim is baked
-     into cover_bg.png). */
-  background: linear-gradient(to bottom,
-    rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.32) 16%, rgba(0,0,0,0.00) 40%,
-    rgba(0,0,0,0.00) 80%, rgba(0,0,0,0.38) 100%);
 {% else %}  right: {{ bleed }}in; width: {{ trim_w }}in;
 {% endif %}
   display: flex; flex-direction: column; align-items: center;
   justify-content: flex-start; text-align: center;
   padding-top: 1in;
   text-shadow: 0 2px 10px rgba(0,0,0,0.75);
+  /* Scrim under the title (gradient over the continuous art — semi-transparent,
+     so it never adds an image layer or bleeds across panels). */
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.32) 16%, rgba(0,0,0,0.00) 40%,
+    rgba(0,0,0,0.00) 80%, rgba(0,0,0,0.38) 100%);
 }
 .front h1 { font-size: 38pt; margin: 0 0.4in; }
 .front .sub { font-size: 15pt; font-style: italic; margin: 0.3in 0.4in 0; }
 /* Author sits in normal flow under the subtitle. Chromium's PDF/print path
    drops this element when it's pushed to the bottom (position:absolute+bottom
-   OR margin-top:auto), so keep it in flow with the title block — a conventional
-   title/subtitle/author stack that prints reliably. */
+   OR margin-top:auto), so keep it in flow with the title block. */
 .front .author { margin: 0.55in 0.4in 0; font-variant: small-caps; font-size: 14pt; }
 
-/* Back cover (paperback wrap only): blurb centred over the baked-in scrim of
-   cover_bg.png. Bottom kept clear for KDP's barcode (~2 x 1.2in, lower-right). */
+/* Back cover (paperback wrap only): blurb centred in the left panel over a soft
+   scrim. Bottom kept clear for KDP's barcode (~2 x 1.2in, lower-right). */
 .back {
   position: absolute; top: 0; left: {{ bleed }}in; width: {{ trim_w }}in; height: 100%;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: 1.2in 0.7in 1.9in;
   text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  background: linear-gradient(to bottom,
+    rgba(0,0,0,0.00) 4%, rgba(0,0,0,0.34) 24%,
+    rgba(0,0,0,0.34) 66%, rgba(0,0,0,0.00) 88%);
 }
 .back .blurb { font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0; }
