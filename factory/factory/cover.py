@@ -46,6 +46,32 @@ def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
             f"renderer likely dropped an element — check cover positioning/CSS.")
 
 
+def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> None:
+    """Fail the build if the rendered cover's physical size doesn't match the page
+    count. The full-bleed wrap width encodes the spine (0.0025in/page on cream),
+    so a wrong trim, a renderer that ignores the requested size, or a spine that
+    doesn't fit the page count all surface here — and all get a KDP rejection.
+    Skips cleanly if the file isn't a real PDF (e.g. a test stub).
+    """
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    rect = doc[0].rect
+    w_in, h_in = rect.width / 72, rect.height / 72
+    exp_w, exp_h = specs.cover_dimensions_in(pages)
+    errs = []
+    if abs(w_in - exp_w) > tol_in:
+        errs.append(f"width {w_in:.3f}in vs expected {exp_w:.3f}in "
+                    f"(spine {specs.spine_width_in(pages)}in for {pages}pp)")
+    if abs(h_in - exp_h) > tol_in:
+        errs.append(f"height {h_in:.3f}in vs expected {exp_h:.3f}in")
+    if errs:
+        raise CoverError(f"Cover PDF {pdf.name} dimensions don't match "
+                         f"{pages} pages: " + "; ".join(errs))
+
+
 def _css(width_in: float, height_in: float, art_file: str, fill: bool = False) -> str:
     return Template(_CSS_TEMPLATE).render(
         width_in=width_in, height_in=height_in, art_file=art_file,
@@ -97,9 +123,10 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
                 margins_in=0.0, runner=runner)
-    # Regression guard: confirm the renderer actually placed the front-cover text
-    # and the back-cover blurb. Catches silent element drops for any future title.
+    # Regression guards: confirm the renderer placed the front-cover text and the
+    # back-cover blurb, and that the cover's physical size matches the page count.
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
+    _verify_cover_dimensions(pdf, pages)
     # ebook front cover JPG. The fill=True CSS makes the front cover fill the
     # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
     # which clears KDP's 1000px-short-side minimum.

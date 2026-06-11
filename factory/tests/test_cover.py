@@ -1,7 +1,9 @@
 import pytest
 from pathlib import Path
 from factory.config import BookConfig
-from factory.cover import render_cover_html, build_cover, _verify_cover_pdf, CoverError
+from factory import specs
+from factory.cover import (render_cover_html, build_cover, _verify_cover_pdf,
+                           _verify_cover_dimensions, CoverError)
 
 
 def cfg():
@@ -52,3 +54,31 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     stub = tmp_path / "stub.pdf"
     stub.write_bytes(b"x")
     _verify_cover_pdf(stub, ["anything"])
+
+
+def _pdf_of_size(path, w_in, h_in):
+    import fitz
+    doc = fitz.open()
+    doc.new_page(width=w_in * 72, height=h_in * 72)
+    doc.save(str(path))
+    doc.close()
+
+
+def test_verify_cover_dimensions_matches_page_count(tmp_path):
+    pages = 84
+    exp_w, exp_h = specs.cover_dimensions_in(pages)
+    good = tmp_path / "good.pdf"
+    _pdf_of_size(good, exp_w, exp_h)
+    _verify_cover_dimensions(good, pages)  # correct size -> passes
+
+    # a cover sized for the wrong page count (spine off) -> hard failure
+    wrong = tmp_path / "wrong.pdf"
+    wrong_w, _ = specs.cover_dimensions_in(pages + 200)
+    _pdf_of_size(wrong, wrong_w, exp_h)
+    with pytest.raises(CoverError):
+        _verify_cover_dimensions(wrong, pages)
+
+    # non-PDF stub is skipped, not an error
+    stub = tmp_path / "stub.pdf"
+    stub.write_bytes(b"x")
+    _verify_cover_dimensions(stub, pages)
