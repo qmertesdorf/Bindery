@@ -72,6 +72,32 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
                          f"{pages} pages: " + "; ".join(errs))
 
 
+def _verify_cover_single_image(pdf: Path) -> None:
+    """Fail the build unless the cover is ONE full-page background image. Multiple
+    images mean per-panel CSS background crops crept back in — Chromium bakes
+    those as oversized, clipped patterns that bleed across panels in some PDF
+    viewers (the cover looks broken outside Chromium). Skips a non-PDF stub."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    pg = doc[0]
+    imgs = pg.get_images(full=True)
+    if len(imgs) != 1:
+        raise CoverError(
+            f"Cover PDF {pdf.name} has {len(imgs)} images; expected exactly 1 "
+            f"full-page background. Per-panel background crops were likely "
+            f"reintroduced — they render broken in some PDF viewers.")
+    page_area = pg.rect.width * pg.rect.height
+    covered = any(r.width * r.height >= 0.95 * page_area
+                  for r in pg.get_image_rects(imgs[0][0]))
+    if not covered:
+        raise CoverError(
+            f"Cover PDF {pdf.name}'s background image doesn't cover the page — "
+            f"the composed wrap background is missing or mis-sized.")
+
+
 # Vertical scrim profiles (position-fraction, black-alpha), baked into the
 # composed background. Front: dark top+bottom for title/author; back: dark
 # middle band for the centred blurb.
@@ -100,15 +126,24 @@ def _bake_scrim(canvas, x0, w, stops):
     canvas.paste(region, (x0, 0))
 
 
+def _avg_color(img):
+    return img.resize((1, 1)).getpixel((0, 0))
+
+
 def _compose_wrap_bg(art_path: Path, out_dir: Path,
                      width_in: float, height_in: float, dpi: int = 300) -> None:
-    """Compose the whole wraparound background as ONE page-sized image: scenery
-    (left of the source art) on the back panel, the subject (centre) on the
-    front panel, a sampled solid on the thin spine, and legibility scrims baked
-    in. A single full-page background renders identically across PDF viewers,
-    whereas per-panel CSS background crops are baked by Chromium as oversized,
-    clipped patterns that bleed across panels in some viewers. Skips on a
-    non-image stub (tests)."""
+    """Compose the whole wraparound background as ONE page-sized image.
+
+    Front panel = the SUBJECT (sharp centre crop of the art). Back panel + spine
+    = a single soft vertical wash sampled from the art's sky/ground tones — so no
+    subject can appear on the back (the centred subject would otherwise bleed
+    onto the back panel) and the spine is continuous with the back rather than a
+    flat coloured strip. Scrims are baked in for text legibility.
+
+    A single full-page background renders identically across PDF viewers, whereas
+    per-panel CSS background crops are baked by Chromium as oversized, clipped
+    patterns that bleed across panels in some viewers. Skips on a non-image stub
+    (tests)."""
     from PIL import Image
     try:
         art = Image.open(art_path).convert("RGB")
@@ -116,17 +151,30 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path,
         return
     aw, ah = art.size
     W, H = round(width_in * dpi), round(height_in * dpi)
-    panel_w = round((specs.TRIM_W_IN + specs.BLEED_IN) * dpi)
-    panel_w = min(panel_w, W)
+    panel_w = min(round((specs.TRIM_W_IN + specs.BLEED_IN) * dpi), W)
+    front_x = W - panel_w                       # front panel left edge (px)
+
+    # Front: sharp centre crop (the subject).
     cw = min(aw, max(1, round(ah * panel_w / H)))
     fx = (aw - cw) // 2
     front = art.crop((fx, 0, fx + cw, ah)).resize((panel_w, H))
-    back = art.crop((0, 0, cw, ah)).resize((panel_w, H))
-    canvas = Image.new("RGB", (W, H), art.resize((1, 1)).getpixel((0, 0)))
+
+    # Back + spine: vertical wash from the art's top (sky) to bottom (ground).
+    band = max(1, ah // 6)
+    top = _avg_color(art.crop((0, 0, aw, band)))
+    bot = _avg_color(art.crop((0, ah - band, aw, ah)))
+    col = Image.new("RGB", (1, H))
+    cpx = col.load()
+    for y in range(H):
+        t = y / H
+        cpx[0, y] = tuple(round(top[i] + (bot[i] - top[i]) * t) for i in range(3))
+    back = col.resize((max(1, front_x), H))
+
+    canvas = Image.new("RGB", (W, H))
     canvas.paste(back, (0, 0))
-    canvas.paste(front, (W - panel_w, 0))
-    _bake_scrim(canvas, 0, panel_w, _BACK_SCRIM)
-    _bake_scrim(canvas, W - panel_w, panel_w, _FRONT_SCRIM)
+    canvas.paste(front, (front_x, 0))
+    _bake_scrim(canvas, 0, front_x, _BACK_SCRIM)
+    _bake_scrim(canvas, front_x, panel_w, _FRONT_SCRIM)
     canvas.save(out_dir / "cover_bg.png")
 
 
@@ -186,6 +234,7 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     # back-cover blurb, and that the cover's physical size matches the page count.
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
     _verify_cover_dimensions(pdf, pages)
+    _verify_cover_single_image(pdf)
     # ebook front cover JPG. The fill=True CSS makes the front cover fill the
     # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
     # which clears KDP's 1000px-short-side minimum.

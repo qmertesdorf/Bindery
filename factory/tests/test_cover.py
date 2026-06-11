@@ -3,7 +3,8 @@ from pathlib import Path
 from factory.config import BookConfig
 from factory import specs
 from factory.cover import (render_cover_html, build_cover, _verify_cover_pdf,
-                           _verify_cover_dimensions, CoverError)
+                           _verify_cover_dimensions, _verify_cover_single_image,
+                           CoverError)
 
 
 def cfg():
@@ -82,3 +83,32 @@ def test_verify_cover_dimensions_matches_page_count(tmp_path):
     stub = tmp_path / "stub.pdf"
     stub.write_bytes(b"x")
     _verify_cover_dimensions(stub, pages)
+
+
+def test_verify_cover_single_image(tmp_path):
+    import fitz
+    page = fitz.Rect(0, 0, 600, 400)
+    swatch = tmp_path / "s.png"
+    pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 60, 40))
+    pix.set_rect(pix.irect, (120, 120, 120))
+    pix.save(str(swatch))
+
+    # one full-page image -> passes
+    good = tmp_path / "good.pdf"
+    d = fitz.open(); p = d.new_page(width=600, height=400)
+    p.insert_image(page, filename=str(swatch))
+    d.save(str(good)); d.close()
+    _verify_cover_single_image(good)
+
+    # two images (per-panel backgrounds) -> hard failure
+    bad = tmp_path / "bad.pdf"
+    d = fitz.open(); p = d.new_page(width=600, height=400)
+    p.insert_image(fitz.Rect(0, 0, 300, 400), filename=str(swatch))
+    p.insert_image(fitz.Rect(300, 0, 600, 400), filename=str(swatch))
+    d.save(str(bad)); d.close()
+    with pytest.raises(CoverError):
+        _verify_cover_single_image(bad)
+
+    # non-PDF stub is skipped
+    stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
+    _verify_cover_single_image(stub)
