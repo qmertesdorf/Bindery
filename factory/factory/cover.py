@@ -58,6 +58,11 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
         doc = fitz.open(str(pdf))
     except Exception:
         return
+    if doc.page_count != 1:
+        raise CoverError(
+            f"Cover PDF {pdf.name} has {doc.page_count} pages; a KDP cover must be "
+            f"exactly 1. Content is overflowing the page box (check @page size / "
+            f"overflow).")
     rect = doc[0].rect
     w_in, h_in = rect.width / 72, rect.height / 72
     exp_w, exp_h = specs.cover_dimensions_in(pages)
@@ -130,6 +135,25 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         gap = W - (shift + aw)
         strip = art.crop((aw - min(gap, aw), 0, aw, H)).transpose(Image.FLIP_LEFT_RIGHT)
         canvas.paste(strip, (shift + aw, 0))
+
+    # Soft, localised scrims baked ONLY behind the title (top-front) and blurb
+    # (mid-back): blurred ellipses, so the darkening has no hard rectangular
+    # edges or spine seam and leaves the rest of the scene (incl. the subject)
+    # untouched — unlike full-panel CSS gradients, which read as a grey overlay
+    # over pale art.
+    from PIL import ImageDraw, ImageFilter
+    front_cx = W - round((specs.BLEED_IN + specs.TRIM_W_IN / 2) * dpi)
+    back_cx = round((specs.BLEED_IN + specs.TRIM_W_IN / 2) * dpi)
+    regions = [
+        (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
+        (back_cx, round(0.43 * H), round(2.7 * dpi), round(1.6 * dpi), 0.42),   # blurb
+    ]
+    overlay = Image.new("L", (W, H), 0)
+    draw = ImageDraw.Draw(overlay)
+    for cx, cy, rx, ry, alpha in regions:
+        draw.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=int(alpha * 255))
+    overlay = overlay.filter(ImageFilter.GaussianBlur(round(0.6 * dpi)))
+    canvas = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), canvas, overlay)
     canvas.save(out_dir / "cover_bg.png")
 
 
