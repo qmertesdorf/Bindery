@@ -77,6 +77,44 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
                          f"{pages} pages: " + "; ".join(errs))
 
 
+def _verify_cover_text_zones(pdf: Path, pages: int, inset_in: float = 0.2) -> None:
+    """Fail if any cover text strays outside its panel's safe area: into the bleed,
+    across the spine, within ``inset_in`` of the trim, or into KDP's barcode
+    keep-out (lower-right of the back cover). KDP rejects covers with text in
+    these regions. Front vs back is decided by which side of the spine the text
+    sits on. Skips a non-PDF stub."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    pg = doc[0]
+    W, H = pg.rect.width / 72, pg.rect.height / 72
+    bleed, tw = specs.BLEED_IN, specs.TRIM_W_IN
+    spine_l = bleed + tw
+    spine_c = spine_l + specs.spine_width_in(pages) / 2
+    top, bot = bleed + inset_in, H - bleed - inset_in
+    back_x = (bleed + inset_in, spine_l - inset_in)
+    front_x = (W - bleed - tw + inset_in, W - bleed - inset_in)
+    barcode = (spine_l - 2.0, spine_l, H - bleed - 1.2, H - bleed)  # x0,x1,y0,y1
+    bad = []
+    for b in pg.get_text("dict")["blocks"]:
+        for l in b.get("lines", []):
+            for s in l["spans"]:
+                x0, y0, x1, y1 = (v / 72 for v in s["bbox"])
+                cx = (x0 + x1) / 2
+                safe = front_x if cx > spine_c else back_x
+                label = s["text"].strip()[:22]
+                if x0 < safe[0] - 1e-3 or x1 > safe[1] + 1e-3 or y0 < top - 1e-3 or y1 > bot + 1e-3:
+                    bad.append(f'"{label}" outside the safe area')
+                elif cx <= spine_c and x1 > barcode[0] and x0 < barcode[1] \
+                        and y1 > barcode[2] and y0 < barcode[3]:
+                    bad.append(f'"{label}" overlaps the barcode zone')
+    if bad:
+        raise CoverError(f"Cover PDF {pdf.name} has text outside KDP safe zones: "
+                         + "; ".join(sorted(set(bad))))
+
+
 def _verify_cover_background(pdf: Path) -> None:
     """Fail the build if the cover's full-bleed background didn't render (a mostly
     white page) or if MULTIPLE background images are present (per-panel CSS crops,
@@ -105,7 +143,7 @@ def _verify_cover_background(pdf: Path) -> None:
 
 
 def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: float,
-                     dpi: int = 300, subject_x: float = 0.5, front_x: float = 0.70) -> None:
+                     dpi: int = 300, subject_x: float = 0.5, front_x: float = 0.64) -> None:
     """Compose the wraparound as ONE continuous page-sized image with the subject
     shifted onto the FRONT cover.
 
@@ -117,7 +155,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     result is a single full-page background (renders identically in every PDF
     viewer) with the subject on the front and the scene sweeping onto the back.
     Skips on a non-image stub (tests)."""
-    from PIL import Image
+    from PIL import Image, ImageFilter
     try:
         art = Image.open(art_path).convert("RGB")
     except Exception:
@@ -128,13 +166,17 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     shift = round(front_x * W - subject_x * aw)
     canvas = Image.new("RGB", (W, H))
     canvas.paste(art, (shift, 0))
-    if shift > 0:                                   # mirror-fill the left gap
+    # Mirror-extend to fill exposed edges, but BLUR the mirrored strips so the
+    # reflected scenery reads as soft, distant background rather than an obvious
+    # symmetric copy of the foreground.
+    blur = ImageFilter.GaussianBlur(round(0.14 * dpi))
+    if shift > 0:                                   # left gap (back-cover edge)
         strip = art.crop((0, 0, min(shift, aw), H)).transpose(Image.FLIP_LEFT_RIGHT)
-        canvas.paste(strip, (0, 0))
-    if shift + aw < W:                              # mirror-fill any right gap
+        canvas.paste(strip.filter(blur), (0, 0))
+    if shift + aw < W:                              # right gap (front-cover edge)
         gap = W - (shift + aw)
         strip = art.crop((aw - min(gap, aw), 0, aw, H)).transpose(Image.FLIP_LEFT_RIGHT)
-        canvas.paste(strip, (shift + aw, 0))
+        canvas.paste(strip.filter(blur), (shift + aw, 0))
 
     # Soft, localised scrims baked ONLY behind the title (top-front) and blurb
     # (mid-back): blurred ellipses, so the darkening has no hard rectangular
@@ -214,6 +256,7 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
     _verify_cover_dimensions(pdf, pages)
     _verify_cover_background(pdf)
+    _verify_cover_text_zones(pdf, pages)
     # ebook front cover JPG. The fill=True CSS makes the front cover fill the
     # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
     # which clears KDP's 1000px-short-side minimum.

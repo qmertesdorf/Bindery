@@ -16,7 +16,7 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
   font-family: Georgia, serif; color: #fff;
 }
 .front {
-  position: absolute; top: 0; height: 100%;
+  position: absolute; top: 0; height: 100%; box-sizing: border-box;
 {% if fill %}  left: 0; right: 0; width: auto;
 {% else %}  right: {{ bleed }}in; width: {{ trim_w }}in;
 {% endif %}
@@ -38,6 +38,7 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
    scrim. Bottom kept clear for KDP's barcode (~2 x 1.2in, lower-right). */
 .back {
   position: absolute; top: 0; left: {{ bleed }}in; width: {{ trim_w }}in; height: 100%;
+  box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   text-align: center; padding: 1.2in 0.7in 1.9in;
   text-shadow: 0 2px 10px rgba(0,0,0,0.7);

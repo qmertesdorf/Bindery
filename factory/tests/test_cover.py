@@ -4,7 +4,7 @@ from factory.config import BookConfig
 from factory import specs
 from factory.cover import (render_cover_html, build_cover, _verify_cover_pdf,
                            _verify_cover_dimensions, _verify_cover_background,
-                           CoverError)
+                           _verify_cover_text_zones, CoverError)
 
 
 def cfg():
@@ -118,3 +118,33 @@ def test_verify_cover_background(tmp_path):
     # non-PDF stub is skipped
     stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
     _verify_cover_background(stub)
+
+
+def test_verify_cover_text_zones(tmp_path):
+    import fitz
+    pages = 84
+    W, H = specs.cover_dimensions_in(pages)
+
+    def pdf_with_text(x_in, y_in):
+        p = tmp_path / f"t_{x_in}_{y_in}.pdf"
+        d = fitz.open(); pg = d.new_page(width=W * 72, height=H * 72)
+        pg.insert_text((x_in * 72, y_in * 72), "TITLE", fontsize=20)
+        d.save(str(p)); d.close()
+        return p
+
+    # text centred on the front cover, well inside the trim -> passes
+    front_cx = W - specs.BLEED_IN - specs.TRIM_W_IN / 2
+    _verify_cover_text_zones(pdf_with_text(front_cx - 0.3, 1.0), pages)
+
+    # text in the top-left bleed -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_text_zones(pdf_with_text(0.15, 0.2), pages)
+
+    # text in the back cover's lower-right barcode keep-out -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_text_zones(pdf_with_text(specs.BLEED_IN + specs.TRIM_W_IN - 1.0,
+                                               H - specs.BLEED_IN - 0.3), pages)
+
+    # non-PDF stub is skipped
+    stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
+    _verify_cover_text_zones(stub, pages)
