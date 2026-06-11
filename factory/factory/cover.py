@@ -13,6 +13,39 @@ _CSS_TEMPLATE = (TEMPLATES_DIR / "cover" / "cover.css").read_text(encoding="utf-
     if (TEMPLATES_DIR / "cover" / "cover.css").exists() else ""
 
 
+class CoverError(RuntimeError):
+    pass
+
+
+def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
+    """Fail the build if the rendered cover PDF is missing expected text.
+
+    Guards against the HTML->PDF renderer silently dropping an element (e.g. an
+    absolutely-positioned author name, which Chromium's print path discards) —
+    a defect that is otherwise invisible until someone inspects the file. Text
+    is whitespace-normalised so line wraps in the rendered cover don't cause
+    false alarms. Skips cleanly if the file isn't a real PDF (e.g. a test stub).
+    """
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    raw = "\n".join(doc[i].get_text() for i in range(doc.page_count))
+    # The renderer emits each line twice (text-shadow becomes a duplicate text
+    # layer); drop consecutive duplicate lines so multi-line text stays contiguous.
+    dedup = []
+    for ln in raw.splitlines():
+        if not dedup or dedup[-1] != ln:
+            dedup.append(ln)
+    norm = " ".join(" ".join(dedup).split())
+    missing = [s for s in required if " ".join(s.split()) not in norm]
+    if missing:
+        raise CoverError(
+            f"Cover PDF {pdf.name} is missing expected text: {missing}. The HTML "
+            f"renderer likely dropped an element — check cover positioning/CSS.")
+
+
 def _css(width_in: float, height_in: float, art_file: str, fill: bool = False) -> str:
     return Template(_CSS_TEMPLATE).render(
         width_in=width_in, height_in=height_in, art_file=art_file,
@@ -64,6 +97,9 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
                 margins_in=0.0, runner=runner)
+    # Regression guard: confirm the renderer actually placed the front-cover text
+    # and the back-cover blurb. Catches silent element drops for any future title.
+    _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
     # ebook front cover JPG. The fill=True CSS makes the front cover fill the
     # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
     # which clears KDP's 1000px-short-side minimum.

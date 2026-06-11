@@ -1,6 +1,7 @@
+import pytest
 from pathlib import Path
 from factory.config import BookConfig
-from factory.cover import render_cover_html, build_cover
+from factory.cover import render_cover_html, build_cover, _verify_cover_pdf, CoverError
 
 
 def cfg():
@@ -31,3 +32,23 @@ def test_build_cover_makes_pdf_and_jpg(tmp_path):
     pdf, jpg = build_cover(cfg(), pages=120, art_path=art, out_dir=tmp_path, runner=runner)
     assert Path(pdf).exists() and Path(pdf).suffix == ".pdf"
     assert Path(jpg).exists() and Path(jpg).suffix == ".jpg"
+
+
+def test_verify_cover_pdf_catches_dropped_text(tmp_path):
+    import fitz
+    p = tmp_path / "cover.pdf"
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Paw Prints on My Heart")
+    page.insert_text((72, 120), "Eleanor Hartley")
+    doc.save(str(p))
+    doc.close()
+    # all present -> passes; wrapped/extra whitespace tolerated
+    _verify_cover_pdf(p, ["Paw Prints on My   Heart", "Eleanor Hartley"])
+    # a missing element (e.g. author dropped by the renderer) -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_pdf(p, ["Eleanor Hartley", "A Guided Grief Journal"])
+    # a non-PDF stub (as produced by fake runners) is skipped, not an error
+    stub = tmp_path / "stub.pdf"
+    stub.write_bytes(b"x")
+    _verify_cover_pdf(stub, ["anything"])
