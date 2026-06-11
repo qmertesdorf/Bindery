@@ -72,6 +72,64 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
                          f"{pages} pages: " + "; ".join(errs))
 
 
+# Vertical scrim profiles (position-fraction, black-alpha), baked into the
+# composed background. Front: dark top+bottom for title/author; back: dark
+# middle band for the centred blurb.
+_FRONT_SCRIM = [(0.0, 0.45), (0.16, 0.32), (0.40, 0.0), (0.80, 0.0), (1.0, 0.38)]
+_BACK_SCRIM = [(0.0, 0.0), (0.04, 0.0), (0.24, 0.34), (0.66, 0.34), (0.88, 0.0), (1.0, 0.0)]
+
+
+def _interp(stops, f):
+    for (p0, a0), (p1, a1) in zip(stops, stops[1:]):
+        if f <= p1:
+            t = 0 if p1 == p0 else (f - p0) / (p1 - p0)
+            return a0 + (a1 - a0) * max(0.0, min(1.0, t))
+    return stops[-1][1]
+
+
+def _bake_scrim(canvas, x0, w, stops):
+    from PIL import Image
+    H = canvas.size[1]
+    col = Image.new("L", (1, H))
+    px = col.load()
+    for y in range(H):
+        px[0, y] = int(_interp(stops, y / H) * 255)
+    mask = col.resize((w, H))
+    region = canvas.crop((x0, 0, x0 + w, H))
+    region = Image.composite(Image.new("RGB", (w, H), (0, 0, 0)), region, mask)
+    canvas.paste(region, (x0, 0))
+
+
+def _compose_wrap_bg(art_path: Path, out_dir: Path,
+                     width_in: float, height_in: float, dpi: int = 300) -> None:
+    """Compose the whole wraparound background as ONE page-sized image: scenery
+    (left of the source art) on the back panel, the subject (centre) on the
+    front panel, a sampled solid on the thin spine, and legibility scrims baked
+    in. A single full-page background renders identically across PDF viewers,
+    whereas per-panel CSS background crops are baked by Chromium as oversized,
+    clipped patterns that bleed across panels in some viewers. Skips on a
+    non-image stub (tests)."""
+    from PIL import Image
+    try:
+        art = Image.open(art_path).convert("RGB")
+    except Exception:
+        return
+    aw, ah = art.size
+    W, H = round(width_in * dpi), round(height_in * dpi)
+    panel_w = round((specs.TRIM_W_IN + specs.BLEED_IN) * dpi)
+    panel_w = min(panel_w, W)
+    cw = min(aw, max(1, round(ah * panel_w / H)))
+    fx = (aw - cw) // 2
+    front = art.crop((fx, 0, fx + cw, ah)).resize((panel_w, H))
+    back = art.crop((0, 0, cw, ah)).resize((panel_w, H))
+    canvas = Image.new("RGB", (W, H), art.resize((1, 1)).getpixel((0, 0)))
+    canvas.paste(back, (0, 0))
+    canvas.paste(front, (W - panel_w, 0))
+    _bake_scrim(canvas, 0, panel_w, _BACK_SCRIM)
+    _bake_scrim(canvas, W - panel_w, panel_w, _FRONT_SCRIM)
+    canvas.save(out_dir / "cover_bg.png")
+
+
 def _css(width_in: float, height_in: float, art_file: str, fill: bool = False) -> str:
     return Template(_CSS_TEMPLATE).render(
         width_in=width_in, height_in=height_in, art_file=art_file,
@@ -92,6 +150,7 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
     else:
         width_in, height_in = specs.cover_dimensions_in(pages)
         name = "cover_wrap.html"
+        _compose_wrap_bg(art_local, out_dir, width_in, height_in)
     css = _css(width_in, height_in, art_local.name, fill=front_only)
     html = render("cover/cover.html.j2", cfg=cfg, css=css,
                   width_in=width_in, height_in=height_in,
