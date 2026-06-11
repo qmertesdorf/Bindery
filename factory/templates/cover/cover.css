@@ -1,15 +1,18 @@
 @page { margin: 0; }
 html, body { margin: 0; padding: 0; }
 .wrap {
-  position: relative; box-sizing: border-box;
-  width: {{ width_in }}in; height: {{ height_in }}in;
-  background-image: url("{{ art_file }}");
+  box-sizing: border-box;
+{% if fill %}  position: fixed; inset: 0;
+{% else %}  position: relative; width: {{ width_in }}in; height: {{ height_in }}in;
+{% endif %}  background-image: url("{{ art_file }}");
   background-size: cover; background-position: center;
   font-family: Georgia, serif; color: #fff;
 }
 .front {
   position: absolute; top: 0; height: 100%;
-  right: {{ bleed }}in; width: {{ trim_w }}in;
+{% if fill %}  left: 0; right: 0; width: auto;
+{% else %}  right: {{ bleed }}in; width: {{ trim_w }}in;
+{% endif %}
   display: flex; flex-direction: column; align-items: center;
   justify-content: flex-start; text-align: center;
   padding-top: 1in;

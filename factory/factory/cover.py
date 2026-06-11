@@ -12,10 +12,10 @@ _CSS_TEMPLATE = (TEMPLATES_DIR / "cover" / "cover.css").read_text(encoding="utf-
     if (TEMPLATES_DIR / "cover" / "cover.css").exists() else ""
 
 
-def _css(width_in: float, height_in: float, art_file: str) -> str:
+def _css(width_in: float, height_in: float, art_file: str, fill: bool = False) -> str:
     return Template(_CSS_TEMPLATE).render(
         width_in=width_in, height_in=height_in, art_file=art_file,
-        bleed=specs.BLEED_IN, trim_w=specs.TRIM_W_IN)
+        bleed=specs.BLEED_IN, trim_w=specs.TRIM_W_IN, fill=fill)
 
 
 def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
@@ -32,7 +32,7 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
     else:
         width_in, height_in = specs.cover_dimensions_in(pages)
         name = "cover_wrap.html"
-    css = _css(width_in, height_in, art_local.name)
+    css = _css(width_in, height_in, art_local.name, fill=front_only)
     html = render("cover/cover.html.j2", cfg=cfg, css=css,
                   width_in=width_in, height_in=height_in)
     html_path = out_dir / name
@@ -49,7 +49,9 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
                 margins_in=0.0, runner=runner)
-    # ebook front cover JPG (1600x2560)
+    # ebook front cover JPG. The fill=True CSS makes the front cover fill the
+    # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
+    # which clears KDP's 1000px-short-side minimum.
     front_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=True)
     jpg = out_dir / "cover-ebook.jpg"
     html_to_screenshot(front_html, jpg, width_px=1600, height_px=2560, runner=runner)
