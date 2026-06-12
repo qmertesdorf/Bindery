@@ -1,7 +1,7 @@
 # KDP Upload Checklist — {{ cfg.title }}
 
 ## Files to upload
-- Paperback interior: `interior.pdf` ({{ pages }} pages, 6x9", cream)
+- Paperback interior: `interior.pdf` ({{ pages }} pages, {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }}", cream)
 - Paperback cover (wraparound): `cover-paperback.pdf` (spine {{ spine }}in)
 {%- if cfg.makes_ebook %}
 - Ebook manuscript: `interior.epub`
@@ -24,7 +24,7 @@
 - **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale paperback (60% − ${{ "%.2f"|format(print_cost) }} print)
 
 ## Paperback print settings (must match the generated files)
-- **Trim size:** 6 x 9 in
+- **Trim size:** {{ "%g"|format(cfg.trim_w) }} x {{ "%g"|format(cfg.trim_h) }} in
 - **Interior:** Black & white
 - **Paper:** Cream  — ⚠ must select cream; the spine width ({{ spine }}in) was computed for cream stock. White paper is thinner and KDP will reject the cover.
 - **Bleed (interior):** No Bleed — the interior PDF is exactly 6x9 with margins (no edge-to-edge images).
@@ -43,6 +43,11 @@
 
 ## 7 backend keywords
 {{ keywords }}
+
+{%- if cfg.book_type == "standard" %}
+> ⚠ Before upload: re-verify every link in the book's "Where to Turn for Support"
+> resources page is still live and correct. Do not ship a dead or wrong support link.
+{%- endif %}
 
 ## AI Content Disclosure (KDP asks at publish — answer privately)
 - **Text: AI-generated** (AI-assisted prompts/copy, human-reviewed)

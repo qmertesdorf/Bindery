@@ -10,9 +10,10 @@ def cfg():
 
 def std_cfg():
     return BookConfig(slug="memoir", title="A Book", subtitle="Sub",
-                      author="A", art_prompt="x", price_usd=9.99,
+                      author="A", art_prompt="x", price_usd=14.99,
                       book_type="standard", synopsis="A gentle read about loss.",
-                      chapter_count=8, blurb="A comforting companion read.")
+                      chapter_count=18, blurb="A comforting companion read.",
+                      trim_w=5.5, trim_h=8.5)
 
 
 def test_make_checklist_has_disclosure_and_royalty(tmp_path):
@@ -45,3 +46,9 @@ def test_standard_checklist_no_pet_kind_crash(tmp_path):
     text = Path(make_checklist(std_cfg(), pages=120, out_dir=tmp_path)).read_text(encoding="utf-8")
     assert "A comforting companion read." in text   # standard description = blurb
     assert "{{" not in text                          # template fully rendered
+
+
+def test_checklist_shows_configured_trim_and_resources_note(tmp_path):
+    text = Path(make_checklist(std_cfg(), pages=150, out_dir=tmp_path)).read_text(encoding="utf-8")
+    assert "5.5 x 8.5" in text
+    assert "verify" in text.lower() and "resource" in text.lower()
