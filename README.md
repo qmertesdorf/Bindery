@@ -4,11 +4,13 @@ A one-command pipeline that turns a small JSON config into a **publish-ready Ama
 bundle** — print interior PDF, EPUB, wraparound cover PDF, ebook cover, and an
 upload checklist with the mandatory AI-content disclosure pre-filled.
 
-The proof-of-concept series is a set of **pet-loss grief journals**, chosen by upfront
-market research (below). The interesting part is the architecture: five isolated stages,
-with every external effect (the LLM, the PDF renderer, the image model) behind a thin
-injected adapter so the pure logic is unit-tested with fakes — `26 passing tests`, no
-network or GPU required to run them.
+The pipeline builds two kinds of book from the same five stages, switched by a `book_type`
+field in the config: **fill-in journals** (paperback only — the proof-of-concept series is a
+set of pet-loss grief journals, chosen by upfront market research below) and **standard
+read-through prose books** (paperback + Kindle — e.g. a pet-loss companion read). The
+interesting part is the architecture: five isolated stages, with every external effect (the
+LLM, the PDF renderer, the image model) behind a thin injected adapter so the pure logic is
+unit-tested with fakes — `57 passing tests`, no network or GPU required to run them.
 
 ## The pipeline
 
@@ -30,6 +32,8 @@ book.config.json ─▶ ① content (claude -p) ─▶ content.json
 
 `python build.py books/dog-loss.config.json` runs ①→⑤ unattended. A new title is a new
 config file and one command — templates and the ComfyUI workflow are shared across the series.
+Journals render fill-in pages and ship paperback-only; standard books generate prose
+chapters (an outline, then one LLM pass per chapter) and ship paperback + Kindle.
 
 Spine width is auto-computed from the rendered page count, and the title/author are placed
 as **real typographic text** over the art (not diffused into the image), so covers never

@@ -36,6 +36,15 @@ Output lands in `out/dog-loss/`: `interior.pdf`, `interior.epub`,
 ## Add a new title to the series
 Drop a new `books/<slug>.config.json` and run `build.py` on it. No template edits.
 
+## Book types: journals vs standard read-through books
+Set `"book_type"` in the config:
+- `"journal"` (default) — fill-in grief journal; **paperback only** (you can't write in a
+  Kindle book). Requires `pet_kind`.
+- `"standard"` — read-through prose book (front matter + chapters); produces **paperback +
+  Kindle**. Requires `synopsis` and `chapter_count` (plus optional `words_per_chapter`,
+  `blurb`). Prose is generated two-pass: an outline, then one LLM call per chapter. See
+  `books/dog-loss-companion.config.json` for an example.
+
 ## Upload (manual — KDP has no API for individuals)
 Open KDP, create paperback + ebook, upload the files, paste metadata from
 `upload-checklist.md`, and answer the AI-content disclosure as listed. Run KDP's
