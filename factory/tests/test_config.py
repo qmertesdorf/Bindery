@@ -112,3 +112,34 @@ def test_trim_override_for_standard(tmp_path):
 def test_trim_must_be_positive(tmp_path):
     with pytest.raises(ConfigError):
         load_config(_write(tmp_path, pet_kind="dog", trim_w=0))
+
+
+def _write_d(tmp_path, d):
+    p = tmp_path / "b.config.json"; p.write_text(json.dumps(d), encoding="utf-8"); return p
+
+
+def test_picture_config_loads(tmp_path):
+    cfg = load_config(_write_d(tmp_path, {
+        "slug": "dog-loss-kids", "title": "T", "subtitle": "S", "author": "A",
+        "art_prompt": "x", "book_type": "picture", "pet_kind": "dog",
+        "pet_name": "Sunny", "page_count": 22, "trim_w": 8.5, "trim_h": 8.5,
+        "price_usd": 10.99}))
+    assert cfg.book_type == "picture"
+    assert cfg.pet_name == "Sunny" and cfg.page_count == 22
+    assert cfg.makes_ebook is False
+
+
+def test_picture_requires_pet_name(tmp_path):
+    with pytest.raises(ConfigError, match="pet_name"):
+        load_config(_write_d(tmp_path, {
+            "slug": "k", "title": "T", "subtitle": "S", "author": "A",
+            "art_prompt": "x", "book_type": "picture", "pet_kind": "dog",
+            "page_count": 22}))
+
+
+def test_picture_page_count_even_and_min(tmp_path):
+    with pytest.raises(ConfigError, match="page_count"):
+        load_config(_write_d(tmp_path, {
+            "slug": "k", "title": "T", "subtitle": "S", "author": "A",
+            "art_prompt": "x", "book_type": "picture", "pet_kind": "dog",
+            "pet_name": "Sunny", "page_count": 21}))
