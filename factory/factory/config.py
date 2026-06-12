@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-REQUIRED = ["slug", "title", "subtitle", "author", "pet_kind", "art_prompt"]
+REQUIRED = ["slug", "title", "subtitle", "author", "art_prompt"]
 BOOK_TYPES = ("journal", "standard")
 
 
@@ -18,11 +18,15 @@ class BookConfig:
     title: str
     subtitle: str
     author: str
-    pet_kind: str
     art_prompt: str
-    prompt_count: int = 70
+    pet_kind: str = ""                # journals only
+    prompt_count: int = 70           # journals only
     price_usd: float = 9.99
     book_type: str = "journal"
+    synopsis: str = ""               # standard only
+    chapter_count: int = 0           # standard only
+    words_per_chapter: int = 0       # standard only
+    blurb: str = ""                  # standard back-cover/listing copy
 
     @property
     def makes_ebook(self) -> bool:
@@ -48,14 +52,26 @@ def load_config(path: str | Path) -> BookConfig:
     if book_type not in BOOK_TYPES:
         raise ConfigError(
             f"{path}: book_type must be one of {BOOK_TYPES}, got {book_type!r}")
+    if book_type == "journal" and not data.get("pet_kind"):
+        raise ConfigError(f"{path}: journal books require 'pet_kind'")
+    if book_type == "standard":
+        miss = [k for k in ("synopsis", "chapter_count")
+                if not data.get(k)]
+        if miss:
+            raise ConfigError(
+                f"{path}: standard books require: {', '.join(miss)}")
     return BookConfig(
         slug=data["slug"],
         title=data["title"],
         subtitle=data["subtitle"],
         author=data["author"],
-        pet_kind=data["pet_kind"],
         art_prompt=data["art_prompt"],
+        pet_kind=str(data.get("pet_kind", "")),
         prompt_count=int(data.get("prompt_count", 70)),
         price_usd=float(data.get("price_usd", 9.99)),
         book_type=book_type,
+        synopsis=str(data.get("synopsis", "")),
+        chapter_count=int(data.get("chapter_count", 0)),
+        words_per_chapter=int(data.get("words_per_chapter", 0)),
+        blurb=str(data.get("blurb", "")),
     )

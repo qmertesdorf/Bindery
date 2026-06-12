@@ -44,7 +44,8 @@ def test_journal_build_is_paperback_only(tmp_path, sample_config_dict, sample_co
 
 
 def test_standard_book_build_includes_ebook(tmp_path, sample_config_dict, sample_content):
-    cfg_dict = {**sample_config_dict, "book_type": "standard"}
+    cfg_dict = {**sample_config_dict, "book_type": "standard",
+                "synopsis": "A gentle read.", "chapter_count": 8}
     out_dir = _build(tmp_path, cfg_dict, sample_content)
     for f in ["interior.pdf", "cover-paperback.pdf", "upload-checklist.md",
               "interior.epub", "cover-ebook.jpg"]:
