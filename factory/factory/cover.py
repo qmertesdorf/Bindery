@@ -243,7 +243,7 @@ def _recompress_jpg(path: Path, quality: int = 90) -> None:
 
 
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
-                runner=None) -> tuple[Path, Path]:
+                runner=None, make_ebook_cover: bool = True) -> tuple[Path, Path | None]:
     out_dir = Path(out_dir)
     # wraparound paperback PDF
     wrap_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=False)
@@ -257,6 +257,9 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     _verify_cover_dimensions(pdf, pages)
     _verify_cover_background(pdf)
     _verify_cover_text_zones(pdf, pages)
+    # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
+    if not make_ebook_cover:
+        return pdf, None
     # ebook front cover JPG. The fill=True CSS makes the front cover fill the
     # viewport; the browse backend emits a fixed ~1250x2000 JPG (1.6 ratio),
     # which clears KDP's 1000px-short-side minimum.

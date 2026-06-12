@@ -43,9 +43,12 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     art_path = comfy.generate(workflow, positive_node=positive_node, sampler_node=sampler_node,
                               prompt=cfg.art_prompt, seed=seed, out_path=out_dir / "art.png")
 
-    # ④ cover (paperback wrap + ebook JPG), then EPUB embedding that JPG cover
-    _, cover_jpg = build_cover(cfg, pages, art_path, out_dir, runner=runner)
-    build_epub(cfg, content, out_dir, cover_path=cover_jpg)
+    # ④ cover (paperback wrap; ebook JPG only for standard books), then EPUB
+    #    embedding that JPG cover. Journals are paperback-only — no Kindle edition.
+    _, cover_jpg = build_cover(cfg, pages, art_path, out_dir, runner=runner,
+                               make_ebook_cover=cfg.makes_ebook)
+    if cfg.makes_ebook:
+        build_epub(cfg, content, out_dir, cover_path=cover_jpg)
 
     # ⑤ checklist
     make_checklist(cfg, pages, out_dir)

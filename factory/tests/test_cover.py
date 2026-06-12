@@ -37,6 +37,21 @@ def test_build_cover_makes_pdf_and_jpg(tmp_path):
     assert Path(jpg).exists() and Path(jpg).suffix == ".jpg"
 
 
+def test_build_cover_skips_ebook_when_disabled(tmp_path):
+    # journals are paperback-only: build the wrap PDF but no ebook JPG
+    art = tmp_path / "art.png"; art.write_bytes(b"\x89PNG")
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            Path(args[2]).write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+    pdf, jpg = build_cover(cfg(), pages=120, art_path=art, out_dir=tmp_path,
+                           runner=runner, make_ebook_cover=False)
+    assert Path(pdf).exists()
+    assert jpg is None
+    assert not (tmp_path / "cover-ebook.jpg").exists()
+
+
 def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     import fitz
     p = tmp_path / "cover.pdf"
