@@ -173,6 +173,26 @@ def test_generate_includes_matter():
     assert out["closing_letter"].startswith("Dear friend")
 
 
+def test_matter_is_retried_before_failing():
+    # A transient matter failure after all chapters succeed must not nuke the
+    # whole build — give it one retry, mirroring the chapter resilience.
+    state = {"n": 0}
+
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return _one_chapter_outline()
+        if "MATTER" in prompt:
+            state["n"] += 1
+            if state["n"] == 1:
+                return json.dumps({"epigraph": ""})        # invalid -> ContentError
+            return json.dumps(_MATTER_RESPONSE)
+        return json.dumps({"paragraphs": [_para(), _para()]})
+
+    out = generate_standard_content(cfg(chapter_count=1), generate_fn=fn)
+    assert out["epigraph"] == _MATTER_RESPONSE["epigraph"]
+    assert state["n"] == 2          # one retry rescued the transient matter failure
+
+
 def test_hard_short_chapter_is_retried_before_failing():
     # A transient refusal/truncation (a chapter under the hard MIN floor) must get
     # one fresh retry — a single LLM blip should not nuke a whole multi-chapter

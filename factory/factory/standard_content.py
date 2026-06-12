@@ -124,6 +124,16 @@ def _generate_one_chapter(cfg: BookConfig, ch: dict, n: int, titles: list[str],
     return body
 
 
+def _generate_matter(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict:
+    raw_m = generate_fn(build_matter_prompt(cfg))
+    try:
+        matter = json.loads(_strip_fences(raw_m))
+    except json.JSONDecodeError as e:
+        raise ContentError(f"matter is not valid JSON: {e}") from e
+    validate_matter(matter)
+    return matter
+
+
 def generate_standard_content(cfg: BookConfig,
                               generate_fn: Callable[[str], str]) -> dict:
     raw = generate_fn(build_outline_prompt(cfg))
@@ -157,12 +167,12 @@ def generate_standard_content(cfg: BookConfig,
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 
-    raw_m = generate_fn(build_matter_prompt(cfg))
+    # Matter is one small call after all chapters — but a transient failure here
+    # would still nuke a fully-generated book, so give it the same one retry.
     try:
-        matter = json.loads(_strip_fences(raw_m))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"matter is not valid JSON: {e}") from e
-    validate_matter(matter)
+        matter = _generate_matter(cfg, generate_fn)
+    except ContentError:
+        matter = _generate_matter(cfg, generate_fn)
 
     return {"preface": outline["preface"], "chapters": chapters,
             "epigraph": matter["epigraph"], "readings": matter["readings"],

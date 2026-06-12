@@ -51,4 +51,5 @@ def test_standard_checklist_no_pet_kind_crash(tmp_path):
 def test_checklist_shows_configured_trim_and_resources_note(tmp_path):
     text = Path(make_checklist(std_cfg(), pages=150, out_dir=tmp_path)).read_text(encoding="utf-8")
     assert "5.5 x 8.5" in text
+    assert "6x9" not in text and "6 x 9" not in text   # no hardcoded trim leaks through
     assert "verify" in text.lower() and "resource" in text.lower()
