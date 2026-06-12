@@ -1,7 +1,7 @@
 import json
 import pytest
 from factory.config import BookConfig
-from factory.content import ContentError
+from factory.content import ContentError, generate_content
 from factory.standard_content import (
     build_outline_prompt, build_chapter_prompt,
     validate_outline, validate_chapter, generate_standard_content,
@@ -68,3 +68,19 @@ def test_validate_chapter_rejects_too_short():
 def test_validate_outline_rejects_missing_preface():
     with pytest.raises(ContentError):
         validate_outline({"chapters": [{"title": "a", "synopsis": "s"}]}, 1)
+
+
+def test_validate_chapter_rejects_nonstring_paragraphs():
+    with pytest.raises(ContentError):
+        validate_chapter({"paragraphs": [{"text": "x"}]}, min_words=1)
+
+
+def test_validate_outline_rejects_whitespace_title():
+    with pytest.raises(ContentError):
+        validate_outline({"preface": "p", "chapters": [{"title": "   "}]}, 1)
+
+
+def test_generate_content_dispatches_standard():
+    # the content.py dispatcher must route standard books to the two-pass path
+    out = generate_content(cfg(chapter_count=2), generate_fn=_fake(2))
+    assert "chapters" in out and len(out["chapters"]) == 2

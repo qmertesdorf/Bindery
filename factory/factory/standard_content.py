@@ -48,18 +48,22 @@ def validate_outline(data: dict, expected_chapters: int) -> None:
             f"outline must have exactly {expected_chapters} chapters, got "
             f"{len(chapters) if isinstance(chapters, list) else 'non-list'}")
     for i, ch in enumerate(chapters, 1):
-        if not isinstance(ch, dict) or not ch.get("title"):
+        if not isinstance(ch, dict) or not str(ch.get("title", "")).strip():
             raise ContentError(f"outline chapter {i} missing 'title'")
 
 
-def validate_chapter(data: dict, min_words: int = MIN_CHAPTER_WORDS) -> None:
+def validate_chapter(data: dict, min_words: int = MIN_CHAPTER_WORDS,
+                     chapter_n: int | None = None) -> None:
+    where = f"chapter {chapter_n}" if chapter_n else "chapter"
     paras = data.get("paragraphs") if isinstance(data, dict) else None
     if not isinstance(paras, list) or not paras:
-        raise ContentError("chapter has no paragraphs")
-    words = sum(len(str(p).split()) for p in paras)
+        raise ContentError(f"{where} has no paragraphs")
+    if not all(isinstance(p, str) for p in paras):
+        raise ContentError(f"{where} paragraphs must all be strings")
+    words = sum(len(p.split()) for p in paras)
     if words < min_words:
         raise ContentError(
-            f"chapter prose too short ({words} words < {min_words}); "
+            f"{where} prose too short ({words} words < {min_words}); "
             f"the generation was likely truncated or refused")
 
 
@@ -79,7 +83,7 @@ def generate_standard_content(cfg: BookConfig,
             body = json.loads(_strip_fences(raw_c))
         except json.JSONDecodeError as e:
             raise ContentError(f"chapter {i} is not valid JSON: {e}") from e
-        validate_chapter(body)
+        validate_chapter(body, chapter_n=i)
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 
