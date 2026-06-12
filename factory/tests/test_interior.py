@@ -128,7 +128,7 @@ def test_standard_interior_sets_nonzero_page_margin(tmp_path, sample_content):
     # and inset via fixed .page padding.
     std_html = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
     std_text = Path(std_html).read_text(encoding="utf-8")
-    assert f"@page {{ margin: {specs.MARGIN_TOPBOTTOM_IN}in; }}" in std_text
+    assert "@page { margin: 0.6in; }" in std_text
 
     sample_content["prompts"] = sample_content["prompts"][:5]
     j_html = render_interior_html(cfg(), sample_content, out_dir=tmp_path)
@@ -158,6 +158,14 @@ def test_standard_interior_renders_at_configured_trim(tmp_path):
                        trim_w=5.5, trim_h=8.5)
     pdf_call = next(a for a in calls if a[1] == "pdf")
     assert "5.5in" in pdf_call and "8.5in" in pdf_call
+
+
+def test_standard_typography_is_roomy(tmp_path):
+    html_path = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
+    text = Path(html_path).read_text(encoding="utf-8")
+    assert "@page { margin: 0.6in; }" in text   # roomier than journal 0.5in
+    css = (Path(html_path).parent / "interior.css").read_text(encoding="utf-8")
+    assert "font-size: 12pt" in css             # 12pt body for standard
 
 
 def test_verify_interior_margins(tmp_path):

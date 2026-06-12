@@ -83,7 +83,7 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
     # --prefer-css-page-size, so a CSS `@page { margin: 0 }` (interior.css)
     # overrides any --margins value. Journals zero the @page margin and inset via
     # fixed .page padding; standard books flow prose across many pages and set a
-    # real `@page { margin: 0.5in }` in standard.html.j2 so every page is inset.
+    # real `@page { margin: 0.6in }` in standard.html.j2 so every page is inset.
     html_to_pdf(Path(html_path), pdf,
                 width_in=trim_w, height_in=trim_h,
                 margins_in=0.0, runner=runner)
