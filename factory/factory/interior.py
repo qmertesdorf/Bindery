@@ -81,6 +81,13 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
     _verify_interior_margins(pdf)
     pages = (pdf_page_count(pdf) if book_type == "standard"
              else count_pages(html_path))
+    if book_type == "standard" and pages < 1:
+        # The standard page count is load-bearing: the cover spine width is derived
+        # from it. A 0 here means the rendered PDF failed to open or is empty —
+        # fail loudly rather than ship a spineless, KDP-invalid cover.
+        raise InteriorError(
+            f"Standard interior {pdf.name} rendered 0 pages — the PDF failed to "
+            f"open or is empty; the cover spine width would be wrong.")
     return pdf, pages
 
 

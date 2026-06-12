@@ -91,6 +91,18 @@ def test_pdf_page_count(tmp_path):
     assert pdf_page_count(stub) == 0            # non-PDF stub -> 0, no crash
 
 
+def test_standard_build_rejects_zero_pages(tmp_path):
+    # if the rendered PDF can't be opened (0 pages), a standard build must fail
+    # loudly rather than feed a 0 page count into the cover spine math
+    html_path = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
+    def runner(args):
+        (tmp_path / "interior.pdf").write_bytes(b"not a pdf")   # fitz can't open -> 0 pages
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+    with pytest.raises(InteriorError):
+        build_interior_pdf(html_path, tmp_path, runner=runner, book_type="standard")
+
+
 def test_standard_build_uses_pdf_page_count(tmp_path):
     # standard books must take the page count from the RENDERED PDF, not HTML sections
     html_path = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)

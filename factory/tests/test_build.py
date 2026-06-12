@@ -23,7 +23,17 @@ def _build(tmp_path, config_dict, content, fake_llm=None):
 
     def runner(args):
         if args[1] in ("pdf", "screenshot"):
-            Path(args[2]).write_bytes(b"x")
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                # a real (blank) PDF so the standard path's pdf_page_count > 0;
+                # the journal path ignores this and counts HTML sections instead
+                import fitz
+                d = fitz.open()
+                for _ in range(12):
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
         class R: returncode = 0; stdout = ""; stderr = ""
         return R()
 
