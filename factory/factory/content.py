@@ -56,6 +56,9 @@ def validate_content(data: dict, expected_prompts: int) -> None:
 
 
 def generate_content(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict:
+    if cfg.book_type == "standard":
+        from .standard_content import generate_standard_content
+        return generate_standard_content(cfg, generate_fn)
     raw = generate_fn(build_prompt(cfg))
     try:
         data = json.loads(_strip_fences(raw))

@@ -1,0 +1,86 @@
+"""Standard (read-through) book content: two-pass outline + per-chapter prose."""
+from __future__ import annotations
+import json
+from typing import Callable
+from .config import BookConfig
+from .content import ContentError, _strip_fences
+
+MIN_CHAPTER_WORDS = 20   # floor that catches an empty / refused generation
+
+
+def build_outline_prompt(cfg: BookConfig) -> str:
+    return f"""You are an author planning a warm, comforting read-through book.
+Title: {cfg.title}
+Subtitle: {cfg.subtitle}
+What the book is about: {cfg.synopsis}
+
+Plan exactly {cfg.chapter_count} chapters that flow as a gentle, supportive read.
+
+Return ONLY valid JSON (no markdown, no commentary) for this OUTLINE:
+{{"preface": "2-4 warm sentences introducing the book",
+  "chapters": [{{"title": "chapter title", "synopsis": "one sentence"}}]}}
+with exactly {cfg.chapter_count} chapter objects. Output the JSON and nothing else."""
+
+
+def build_chapter_prompt(cfg: BookConfig, chapter: dict, n: int,
+                         prior_titles: list[str]) -> str:
+    prior = "; ".join(prior_titles) if prior_titles else "(this is the first chapter)"
+    return f"""You are writing one chapter of the book "{cfg.title}" ({cfg.subtitle}).
+Premise: {cfg.synopsis}
+This is chapter {n} of {cfg.chapter_count}: "{chapter['title']}" — {chapter.get('synopsis', '')}
+Earlier chapters so far: {prior}
+
+Write approximately {cfg.words_per_chapter} words of warm, gentle, tender prose.
+Do NOT repeat the chapter title or add headings.
+
+Return ONLY valid JSON: {{"paragraphs": ["paragraph 1", "paragraph 2"]}}
+(3-8 paragraphs). Output the JSON and nothing else."""
+
+
+def validate_outline(data: dict, expected_chapters: int) -> None:
+    if not isinstance(data, dict):
+        raise ContentError("outline is not a JSON object")
+    if not data.get("preface"):
+        raise ContentError("outline missing 'preface'")
+    chapters = data.get("chapters")
+    if not isinstance(chapters, list) or len(chapters) != expected_chapters:
+        raise ContentError(
+            f"outline must have exactly {expected_chapters} chapters, got "
+            f"{len(chapters) if isinstance(chapters, list) else 'non-list'}")
+    for i, ch in enumerate(chapters, 1):
+        if not isinstance(ch, dict) or not ch.get("title"):
+            raise ContentError(f"outline chapter {i} missing 'title'")
+
+
+def validate_chapter(data: dict, min_words: int = MIN_CHAPTER_WORDS) -> None:
+    paras = data.get("paragraphs") if isinstance(data, dict) else None
+    if not isinstance(paras, list) or not paras:
+        raise ContentError("chapter has no paragraphs")
+    words = sum(len(str(p).split()) for p in paras)
+    if words < min_words:
+        raise ContentError(
+            f"chapter prose too short ({words} words < {min_words}); "
+            f"the generation was likely truncated or refused")
+
+
+def generate_standard_content(cfg: BookConfig,
+                              generate_fn: Callable[[str], str]) -> dict:
+    raw = generate_fn(build_outline_prompt(cfg))
+    try:
+        outline = json.loads(_strip_fences(raw))
+    except json.JSONDecodeError as e:
+        raise ContentError(f"outline is not valid JSON: {e}") from e
+    validate_outline(outline, cfg.chapter_count)
+
+    chapters, titles = [], []
+    for i, ch in enumerate(outline["chapters"], 1):
+        raw_c = generate_fn(build_chapter_prompt(cfg, ch, i, titles))
+        try:
+            body = json.loads(_strip_fences(raw_c))
+        except json.JSONDecodeError as e:
+            raise ContentError(f"chapter {i} is not valid JSON: {e}") from e
+        validate_chapter(body)
+        chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
+        titles.append(ch["title"])
+
+    return {"preface": outline["preface"], "chapters": chapters}
