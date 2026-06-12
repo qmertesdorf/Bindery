@@ -1,13 +1,22 @@
 <!doctype html><html><head><meta charset="utf-8">
-<link rel="stylesheet" href="interior.css"></head><body>
+<link rel="stylesheet" href="interior.css">
+{# Real per-page print margins for flowing prose. Overrides interior.css's
+   `@page { margin: 0 }` (journals inset via fixed .page padding instead).
+   browse honours CSS @page; a uniform 0.5in clears every KDP limit
+   (inside 0.5, outside 0.375, top/bottom 0.5). MUST follow the <link>. #}
+<style>@page { margin: 0.5in; }</style></head><body>
 
-<section class="page title-page"><h1 class="book-title">{{ cfg.title }}</h1>
+{# Standard read-through books rely on REAL per-page print margins (set by
+   build_interior_pdf), so front matter and chapters flow freely — no fixed
+   .page boxes, whose padding would double-inset over the print margin. Page
+   breaks come from break-before. #}
+<section class="title-page"><h1 class="book-title">{{ cfg.title }}</h1>
 <p class="book-sub">{{ cfg.subtitle }}</p>
 <p class="byline">{{ cfg.author }}</p></section>
 
-<section class="page preface"><div class="intro-body">
-{% for para in content.preface.split('\n') if para.strip() %}<p>{{ para.strip() }}</p>{% endfor %}
-</div></section>
+<section class="preface"><h2 class="chapter-head">Preface</h2>
+{% for para in content.preface.split('\n') if para.strip() %}<p class="body-para">{{ para.strip() }}</p>{% endfor %}
+</section>
 
 {% for ch in content.chapters %}
 <section class="chapter"><h2 class="chapter-head">{{ ch.title }}</h2>

@@ -75,6 +75,11 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
                        book_type: str = "journal") -> tuple[Path, int]:
     out_dir = Path(out_dir)
     pdf = out_dir / "interior.pdf"
+    # Page margins come from CSS @page, not this flag: browse renders without
+    # --prefer-css-page-size, so a CSS `@page { margin: 0 }` (interior.css)
+    # overrides any --margins value. Journals zero the @page margin and inset via
+    # fixed .page padding; standard books flow prose across many pages and set a
+    # real `@page { margin: 0.5in }` in standard.html.j2 so every page is inset.
     html_to_pdf(Path(html_path), pdf,
                 width_in=specs.TRIM_W_IN, height_in=specs.TRIM_H_IN,
                 margins_in=0.0, runner=runner)

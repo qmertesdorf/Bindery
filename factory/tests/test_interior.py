@@ -119,6 +119,23 @@ def test_standard_build_uses_pdf_page_count(tmp_path):
     assert pages == 5   # 5 real PDF pages, not the HTML section count
 
 
+def test_standard_interior_sets_nonzero_page_margin(tmp_path, sample_content):
+    # Regression: standard prose flows across many pages, so the only thing that
+    # keeps top/bottom insets on EVERY page is a real CSS `@page` margin (browse
+    # renders without --prefer-css-page-size, so @page wins over the --margins
+    # flag). A standard interior that left @page at 0 rendered edge-to-edge and
+    # tripped the live margin guard. Journals deliberately keep @page margin 0
+    # and inset via fixed .page padding.
+    std_html = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
+    std_text = Path(std_html).read_text(encoding="utf-8")
+    assert f"@page {{ margin: {specs.MARGIN_TOPBOTTOM_IN}in; }}" in std_text
+
+    sample_content["prompts"] = sample_content["prompts"][:5]
+    j_html = render_interior_html(cfg(), sample_content, out_dir=tmp_path)
+    j_text = Path(j_html).read_text(encoding="utf-8")
+    assert "@page" not in j_text          # journal page margin lives in interior.css (0)
+
+
 def test_verify_interior_margins(tmp_path):
     import fitz
     W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72
