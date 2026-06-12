@@ -8,7 +8,7 @@
 <section class="page"><div class="intro-body"><p>{{ content.intro }}</p>
 <p>{{ content.how_to_use }}</p></div></section>
 
-<section class="page"><h2 class="section-head">About {{ cfg.pet_kind|capitalize }}</h2>
+<section class="page"><h2 class="section-head about-head">About Your {{ cfg.pet_kind|capitalize }}</h2>
 {% for f in content.pet_profile_fields %}
 <div class="profile-field"><span class="lead">{{ f }}:</span><div class="lines"></div></div>
 {% endfor %}</section>

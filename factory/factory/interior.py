@@ -26,12 +26,46 @@ def count_pages(html_path: Path) -> int:
     return len(re.findall(r'<section class="page"', text))
 
 
+class InteriorError(RuntimeError):
+    pass
+
+
+def _verify_interior_margins(pdf: Path, tol_in: float = 0.06) -> None:
+    """Fail the build if any interior text falls outside the page margins (e.g. a
+    page with too many fields whose content runs off the bottom into the trim).
+    KDP rejects interiors with text in the margins. Skips a non-PDF stub."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    x0s = specs.MARGIN_INSIDE_IN
+    x1s = specs.TRIM_W_IN - specs.MARGIN_OUTSIDE_IN
+    y0s = specs.MARGIN_TOPBOTTOM_IN
+    y1s = specs.TRIM_H_IN - specs.MARGIN_TOPBOTTOM_IN
+    bad = []
+    for pno in range(doc.page_count):
+        for b in doc[pno].get_text("dict")["blocks"]:
+            for ln in b.get("lines", []):
+                for s in ln["spans"]:
+                    x0, y0, x1, y1 = (v / 72 for v in s["bbox"])
+                    if (x0 < x0s - tol_in or x1 > x1s + tol_in
+                            or y0 < y0s - tol_in or y1 > y1s + tol_in):
+                        bad.append((pno + 1, s["text"].strip()[:24]))
+    if bad:
+        msg = "; ".join(f'p{p} "{t}"' for p, t in bad[:5])
+        raise InteriorError(
+            f"Interior {pdf.name} has text outside the margins "
+            f"({len(bad)} span(s)): {msg}")
+
+
 def build_interior_pdf(html_path: Path, out_dir: Path, runner=None) -> tuple[Path, int]:
     out_dir = Path(out_dir)
     pdf = out_dir / "interior.pdf"
     html_to_pdf(Path(html_path), pdf,
                 width_in=specs.TRIM_W_IN, height_in=specs.TRIM_H_IN,
                 margins_in=0.0, runner=runner)
+    _verify_interior_margins(pdf)
     return pdf, count_pages(html_path)
 
 

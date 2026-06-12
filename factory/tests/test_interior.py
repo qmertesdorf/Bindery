@@ -1,7 +1,10 @@
+import pytest
 from pathlib import Path
+from factory import specs
 from factory.config import BookConfig
 from factory.interior import render_interior_html
-from factory.interior import count_pages, build_interior_pdf, build_epub
+from factory.interior import (count_pages, build_interior_pdf, build_epub,
+                              _verify_interior_margins, InteriorError)
 
 
 def cfg():
@@ -46,3 +49,24 @@ def test_build_epub(tmp_path, sample_content):
     out = build_epub(cfg(), sample_content, tmp_path)
     assert Path(out).exists()
     assert Path(out).suffix == ".epub"
+
+
+def test_verify_interior_margins(tmp_path):
+    import fitz
+    W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72
+
+    def page_with_text(x_in, y_in):
+        p = tmp_path / f"i_{x_in}_{y_in}.pdf"
+        d = fitz.open(); pg = d.new_page(width=W, height=H)
+        pg.insert_text((x_in * 72, y_in * 72), "text", fontsize=12)
+        d.save(str(p)); d.close()
+        return p
+
+    # text inside the margins -> passes
+    _verify_interior_margins(page_with_text(1.0, 2.0))
+    # text below the bottom margin (runs into the trim) -> hard failure
+    with pytest.raises(InteriorError):
+        _verify_interior_margins(page_with_text(1.0, 8.9))
+    # non-PDF stub is skipped
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _verify_interior_margins(stub)
