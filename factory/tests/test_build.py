@@ -4,13 +4,14 @@ from factory.art import ComfyClient
 from build import run_build
 
 
-def _build(tmp_path, config_dict, content):
+def _build(tmp_path, config_dict, content, fake_llm=None):
     """Run the full pipeline with fakes (no LLM / ComfyUI / browser)."""
     cfgp = tmp_path / "book.config.json"
     config_dict = {**config_dict, "prompt_count": 5}
     cfgp.write_text(json.dumps(config_dict), encoding="utf-8")
 
-    fake_llm = lambda prompt: json.dumps({**content, "prompts": content["prompts"][:5]})
+    if fake_llm is None:
+        fake_llm = lambda prompt: json.dumps({**content, "prompts": content["prompts"][:5]})
 
     def http_post(url, json): return {"prompt_id": "p"}
     def http_get(url):
@@ -43,10 +44,21 @@ def test_journal_build_is_paperback_only(tmp_path, sample_config_dict, sample_co
     assert not (Path(out_dir) / "cover-ebook.jpg").exists(), "journal should not produce an ebook cover"
 
 
-def test_standard_book_build_includes_ebook(tmp_path, sample_config_dict, sample_content):
+def test_standard_book_build_includes_ebook(tmp_path, sample_config_dict):
     cfg_dict = {**sample_config_dict, "book_type": "standard",
-                "synopsis": "A gentle read.", "chapter_count": 8}
-    out_dir = _build(tmp_path, cfg_dict, sample_content)
+                "synopsis": "A comforting read on grieving a dog.",
+                "chapter_count": 3, "words_per_chapter": 40,
+                "blurb": "A comforting companion read."}
+
+    outline = {"preface": "A short preface.",
+               "chapters": [{"title": f"Chapter {i}", "synopsis": "s"} for i in range(1, 4)]}
+
+    def fake_llm(prompt):
+        if "OUTLINE" in prompt:                       # outline pass
+            return json.dumps(outline)
+        return json.dumps({"paragraphs": [" ".join(["word"] * 30)] * 2})  # chapter pass
+
+    out_dir = _build(tmp_path, cfg_dict, content=None, fake_llm=fake_llm)
     for f in ["interior.pdf", "cover-paperback.pdf", "upload-checklist.md",
               "interior.epub", "cover-ebook.jpg"]:
         assert (Path(out_dir) / f).exists(), f"missing {f}"
