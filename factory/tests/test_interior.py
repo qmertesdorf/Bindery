@@ -47,10 +47,15 @@ def test_build_interior_pdf_calls_browse(tmp_path, sample_content):
 def test_build_epub_standard_chapters(tmp_path):
     out = build_epub(std_cfg(), std_content(), tmp_path)
     assert Path(out).exists() and Path(out).suffix == ".epub"
-    # the chapters are present in the package
+    # the chapters are actually rendered into the package (not just the nav doc)
     import zipfile
-    names = zipfile.ZipFile(out).namelist()
-    assert any(n.endswith(".xhtml") for n in names)
+    zf = zipfile.ZipFile(out)
+    names = zf.namelist()
+    assert any(n.endswith("chap1.xhtml") for n in names)
+    assert any(n.endswith("chap2.xhtml") for n in names)
+    # and the chapter title made it into the content
+    chap1 = next(n for n in names if n.endswith("chap1.xhtml"))
+    assert "First" in zf.read(chap1).decode("utf-8")
 
 
 def std_cfg():
