@@ -136,15 +136,24 @@ def generate_standard_content(cfg: BookConfig,
     target = cfg.words_per_chapter
     chapters, titles = [], []
     for i, ch in enumerate(outline["chapters"], 1):
-        body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
+        # A chapter can hard-fail (refusal, truncation, sub-floor length, bad JSON)
+        # — a transient LLM blip that should not nuke a whole multi-chapter build.
+        # Give it ONE fresh retry; if that also fails, let the guard fail the build.
+        try:
+            body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
+        except ContentError:
+            body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
         # LLMs routinely under-deliver on length. If a chapter lands well under
         # the target, retry ONCE with an explicit expand instruction and keep the
-        # longer draft — a build-time guard against a too-thin book, bounded so a
-        # stubbornly-short model can't loop the build forever.
+        # longer draft — bounded so a stubbornly-short model can't loop forever.
+        # The length retry is best-effort: a failed retry must not fail the build.
         if target and _chapter_words(body) < target * LENGTH_FLOOR_RATIO:
-            retry = _generate_one_chapter(cfg, ch, i, titles, generate_fn, expand=True)
-            if _chapter_words(retry) > _chapter_words(body):
-                body = retry
+            try:
+                retry = _generate_one_chapter(cfg, ch, i, titles, generate_fn, expand=True)
+                if _chapter_words(retry) > _chapter_words(body):
+                    body = retry
+            except ContentError:
+                pass
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 

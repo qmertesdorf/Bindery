@@ -171,3 +171,38 @@ def test_generate_includes_matter():
     assert out["epigraph"].startswith("A few gentle")
     assert len(out["readings"]) == 3
     assert out["closing_letter"].startswith("Dear friend")
+
+
+def test_hard_short_chapter_is_retried_before_failing():
+    # A transient refusal/truncation (a chapter under the hard MIN floor) must get
+    # one fresh retry — a single LLM blip should not nuke a whole multi-chapter
+    # build. Here the first chapter attempt is too short (raises), the retry is fine.
+    state = {"n": 0}
+
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return _one_chapter_outline()
+        if "MATTER" in prompt:
+            return json.dumps(_MATTER_RESPONSE)
+        state["n"] += 1
+        if state["n"] == 1:
+            return json.dumps({"paragraphs": ["too short"]})       # 2 words -> hard fail
+        return json.dumps({"paragraphs": [" ".join(["word"] * 120)]})
+
+    out = generate_standard_content(cfg(chapter_count=1, words_per_chapter=100), fn)
+    assert out["chapters"][0]["paragraphs"]
+    assert state["n"] == 2          # one retry rescued the transient failure
+
+
+def test_chapter_fails_build_when_both_attempts_too_short():
+    # If BOTH the attempt and its retry come back below the hard floor, the guard
+    # must still fail the build (do not ship an empty chapter).
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return _one_chapter_outline()
+        if "MATTER" in prompt:
+            return json.dumps(_MATTER_RESPONSE)
+        return json.dumps({"paragraphs": ["too short"]})           # always 2 words
+
+    with pytest.raises(ContentError):
+        generate_standard_content(cfg(chapter_count=1, words_per_chapter=100), fn)
