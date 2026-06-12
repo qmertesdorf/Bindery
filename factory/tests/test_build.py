@@ -66,6 +66,10 @@ def test_standard_book_build_includes_ebook(tmp_path, sample_config_dict):
     def fake_llm(prompt):
         if "OUTLINE" in prompt:                       # outline pass
             return json.dumps(outline)
+        if "MATTER" in prompt:                        # front/back matter pass
+            return json.dumps({"epigraph": "Gentle lines.",
+                               "readings": ["r1", "r2", "r3"],
+                               "closing_letter": "Dear friend, be gentle."})
         return json.dumps({"paragraphs": [" ".join(["word"] * 30)] * 2})  # chapter pass
 
     out_dir = _build(tmp_path, cfg_dict, content=None, fake_llm=fake_llm)
