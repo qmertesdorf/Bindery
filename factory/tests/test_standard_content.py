@@ -5,6 +5,7 @@ from factory.content import ContentError, generate_content
 from factory.standard_content import (
     build_outline_prompt, build_chapter_prompt,
     validate_outline, validate_chapter, generate_standard_content,
+    build_matter_prompt, validate_matter,
 )
 
 
@@ -20,8 +21,12 @@ def _para(n_words=30):
     return " ".join(["word"] * n_words)
 
 
+_MATTER_RESPONSE = {"epigraph": "Softly now.", "readings": ["r one", "r two", "r three"],
+                    "closing_letter": "Dear friend, be gentle."}
+
+
 def _fake(outline_chapters=3):
-    """A prompt-aware fake LLM: outline call vs chapter call."""
+    """A prompt-aware fake LLM: outline call vs chapter call vs matter call."""
     outline = {"preface": "A short preface.",
                "chapters": [{"title": f"Chapter {i}", "synopsis": "s"}
                             for i in range(1, outline_chapters + 1)]}
@@ -29,6 +34,8 @@ def _fake(outline_chapters=3):
     def fn(prompt):
         if "OUTLINE" in prompt:
             return json.dumps(outline)
+        if "MATTER" in prompt:
+            return json.dumps(_MATTER_RESPONSE)
         return json.dumps({"paragraphs": [_para(), _para()]})
     return fn
 
@@ -101,6 +108,8 @@ def test_short_chapter_triggers_one_retry_and_keeps_longer():
     def fn(prompt):
         if "OUTLINE" in prompt:
             return _one_chapter_outline()
+        if "MATTER" in prompt:
+            return json.dumps(_MATTER_RESPONSE)
         state["calls"] += 1
         if "TOO SHORT" in prompt:                      # the expand-retry prompt
             return json.dumps({"paragraphs": [long_para]})
@@ -119,6 +128,8 @@ def test_adequate_chapter_skips_retry():
     def fn(prompt):
         if "OUTLINE" in prompt:
             return _one_chapter_outline()
+        if "MATTER" in prompt:
+            return json.dumps(_MATTER_RESPONSE)
         state["calls"] += 1
         return json.dumps({"paragraphs": [" ".join(["word"] * 120)]})  # >= 100*0.8
 
@@ -131,3 +142,32 @@ def test_expand_prompt_demands_more_length():
                              {"title": "T", "synopsis": "s"}, 1, [], expand=True)
     assert "TOO SHORT" in p
     assert "1800" in p
+
+
+def test_matter_prompt_mentions_title_and_marker():
+    p = build_matter_prompt(cfg())
+    assert "Gentle Goodbye" in p
+    assert "MATTER" in p          # marker the fake/dispatch key on
+
+
+def test_validate_matter_requires_keys():
+    with pytest.raises(ContentError):
+        validate_matter({"epigraph": "x"})          # missing readings/closing_letter
+    validate_matter({"epigraph": "x", "readings": ["a", "b", "c"],
+                     "closing_letter": "Dear friend, ..."})   # ok
+
+
+def test_generate_includes_matter():
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return json.dumps({"preface": "p",
+                               "chapters": [{"title": "C1", "synopsis": "s"}]})
+        if "MATTER" in prompt:
+            return json.dumps({"epigraph": "A few gentle lines.",
+                               "readings": ["r one", "r two", "r three"],
+                               "closing_letter": "Dear friend, be gentle."})
+        return json.dumps({"paragraphs": [_para(), _para()]})
+    out = generate_standard_content(cfg(chapter_count=1), generate_fn=fn)
+    assert out["epigraph"].startswith("A few gentle")
+    assert len(out["readings"]) == 3
+    assert out["closing_letter"].startswith("Dear friend")

@@ -63,6 +63,36 @@ def validate_outline(data: dict, expected_chapters: int) -> None:
             raise ContentError(f"outline chapter {i} missing 'title'")
 
 
+def build_matter_prompt(cfg: BookConfig) -> str:
+    return f"""You are writing the gentle front/back matter for the comfort book
+"{cfg.title}" ({cfg.subtitle}).
+Premise: {cfg.synopsis}
+
+Write, as warm original prose (no quotes from other authors, no poems you did not
+write, never the "Rainbow Bridge" poem):
+- epigraph: 1-3 short tender lines for the opening page.
+- readings: 4 short comforting passages (40-80 words each) to dip into on hard days.
+- closing_letter: a warm 120-180 word farewell letter to the grieving reader.
+
+Return ONLY valid JSON for this MATTER:
+{{"epigraph": "...", "readings": ["...", "..."], "closing_letter": "..."}}
+Output the JSON and nothing else."""
+
+
+def validate_matter(data: dict) -> None:
+    if not isinstance(data, dict):
+        raise ContentError("matter is not a JSON object")
+    if not str(data.get("epigraph", "")).strip():
+        raise ContentError("matter missing 'epigraph'")
+    readings = data.get("readings")
+    if not isinstance(readings, list) or len(readings) < 3:
+        raise ContentError("matter needs at least 3 readings")
+    if not all(isinstance(r, str) and r.strip() for r in readings):
+        raise ContentError("matter readings must be non-empty strings")
+    if not str(data.get("closing_letter", "")).strip():
+        raise ContentError("matter missing 'closing_letter'")
+
+
 def validate_chapter(data: dict, min_words: int = MIN_CHAPTER_WORDS,
                      chapter_n: int | None = None) -> None:
     where = f"chapter {chapter_n}" if chapter_n else "chapter"
@@ -118,4 +148,13 @@ def generate_standard_content(cfg: BookConfig,
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 
-    return {"preface": outline["preface"], "chapters": chapters}
+    raw_m = generate_fn(build_matter_prompt(cfg))
+    try:
+        matter = json.loads(_strip_fences(raw_m))
+    except json.JSONDecodeError as e:
+        raise ContentError(f"matter is not valid JSON: {e}") from e
+    validate_matter(matter)
+
+    return {"preface": outline["preface"], "chapters": chapters,
+            "epigraph": matter["epigraph"], "readings": matter["readings"],
+            "closing_letter": matter["closing_letter"]}
