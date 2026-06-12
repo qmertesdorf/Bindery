@@ -84,16 +84,17 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
     return pdf, pages
 
 
-def build_epub(cfg: BookConfig, content: dict, out_dir: Path, cover_path: Path | None = None) -> Path:
+def build_epub(cfg: BookConfig, content: dict, out_dir: Path,
+               cover_path: Path | None = None) -> Path:
     book = epub.EpubBook()
-    book.set_identifier(f"petloss-{cfg.slug}")
+    book.set_identifier(f"book-{cfg.slug}")
     book.set_title(cfg.title)
     book.set_language("en")
     book.add_author(cfg.author)
 
-    # Embed the finished, title-bearing ebook cover (a ~1 MB JPG) rather than
-    # the multi-MB print-resolution art PNG — keeps the EPUB small so it
-    # doesn't trigger KDP per-MB delivery fees on the 70% royalty plan.
+    # Embed the finished, title-bearing ebook cover JPG (≈1 MB) rather than the
+    # print-resolution PNG, keeping the EPUB light (KDP charges per-MB delivery
+    # on the 70% royalty plan).
     if cover_path is not None and Path(cover_path).exists():
         cp = Path(cover_path)
         book.set_cover("cover" + cp.suffix, cp.read_bytes())
@@ -104,15 +105,18 @@ def build_epub(cfg: BookConfig, content: dict, out_dir: Path, cover_path: Path |
         book.add_item(c)
         return c
 
-    intro = chapter("Welcome", f"<p>{content['intro']}</p><p>{content['how_to_use']}</p>", "intro.xhtml")
-    prompts_html = "".join(f"<p>{p}</p><hr/>" for p in content["prompts"])
-    prompts = chapter("Reflections", prompts_html, "prompts.xhtml")
-    miles = chapter("Milestones", "".join(f"<p>{m}</p>" for m in content["milestones"]), "miles.xhtml")
+    items = []
+    if content.get("preface"):
+        pre_html = "".join(f"<p>{p}</p>" for p in content["preface"].split("\n") if p.strip())
+        items.append(chapter("Preface", pre_html, "preface.xhtml"))
+    for i, ch in enumerate(content["chapters"], 1):
+        body = "".join(f"<p>{p}</p>" for p in ch["paragraphs"])
+        items.append(chapter(ch["title"], body, f"chap{i}.xhtml"))
 
-    book.toc = (intro, prompts, miles)
+    book.toc = tuple(items)
     book.add_item(epub.EpubNcx())
     book.add_item(epub.EpubNav())
-    book.spine = ["nav", intro, prompts, miles]
+    book.spine = ["nav", *items]
 
     out = Path(out_dir) / "interior.epub"
     out.parent.mkdir(parents=True, exist_ok=True)

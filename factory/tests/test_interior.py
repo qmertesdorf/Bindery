@@ -44,11 +44,13 @@ def test_build_interior_pdf_calls_browse(tmp_path, sample_content):
     assert any(a[1] == "pdf" for a in calls)
 
 
-def test_build_epub(tmp_path, sample_content):
-    sample_content["prompts"] = sample_content["prompts"][:5]
-    out = build_epub(cfg(), sample_content, tmp_path)
-    assert Path(out).exists()
-    assert Path(out).suffix == ".epub"
+def test_build_epub_standard_chapters(tmp_path):
+    out = build_epub(std_cfg(), std_content(), tmp_path)
+    assert Path(out).exists() and Path(out).suffix == ".epub"
+    # the chapters are present in the package
+    import zipfile
+    names = zipfile.ZipFile(out).namelist()
+    assert any(n.endswith(".xhtml") for n in names)
 
 
 def std_cfg():
