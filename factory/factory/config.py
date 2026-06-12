@@ -27,6 +27,8 @@ class BookConfig:
     chapter_count: int = 0           # standard only
     words_per_chapter: int = 0       # standard only
     blurb: str = ""                  # standard back-cover/listing copy
+    trim_w: float = 6.0              # paperback trim width (in)
+    trim_h: float = 9.0              # paperback trim height (in)
 
     @property
     def makes_ebook(self) -> bool:
@@ -60,6 +62,10 @@ def load_config(path: str | Path) -> BookConfig:
         if miss:
             raise ConfigError(
                 f"{path}: standard books require: {', '.join(miss)}")
+    trim_w = float(data.get("trim_w", 6.0))
+    trim_h = float(data.get("trim_h", 9.0))
+    if trim_w <= 0 or trim_h <= 0:
+        raise ConfigError(f"{path}: trim_w/trim_h must be positive")
     return BookConfig(
         slug=data["slug"],
         title=data["title"],
@@ -74,4 +80,6 @@ def load_config(path: str | Path) -> BookConfig:
         chapter_count=int(data.get("chapter_count", 0)),
         words_per_chapter=int(data.get("words_per_chapter", 0)),
         blurb=str(data.get("blurb", "")),
+        trim_w=trim_w,
+        trim_h=trim_h,
     )

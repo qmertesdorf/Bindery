@@ -18,10 +18,11 @@ def spine_width_in(pages: int) -> float:
     return round(pages * SPINE_PER_PAGE_IN, 4)
 
 
-def cover_dimensions_in(pages: int) -> tuple[float, float]:
+def cover_dimensions_in(pages: int, trim_w: float = TRIM_W_IN,
+                        trim_h: float = TRIM_H_IN) -> tuple[float, float]:
     spine = spine_width_in(pages)
-    width = BLEED_IN + TRIM_W_IN + spine + TRIM_W_IN + BLEED_IN
-    height = TRIM_H_IN + 2 * BLEED_IN
+    width = BLEED_IN + trim_w + spine + trim_w + BLEED_IN
+    height = trim_h + 2 * BLEED_IN
     return (round(width, 4), round(height, 4))
 
 

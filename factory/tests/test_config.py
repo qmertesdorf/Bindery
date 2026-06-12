@@ -95,3 +95,20 @@ def test_standard_config_loads_fields(tmp_path):
     assert cfg.blurb == "Back cover."
     assert cfg.pet_kind == ""                    # optional for standard
     assert cfg.makes_ebook is True
+
+
+def test_trim_defaults_to_6x9(tmp_path):
+    cfg = load_config(_write(tmp_path, pet_kind="dog"))
+    assert cfg.trim_w == 6.0 and cfg.trim_h == 9.0
+
+
+def test_trim_override_for_standard(tmp_path):
+    cfg = load_config(_write(tmp_path, book_type="standard",
+                             synopsis="A gentle read.", chapter_count=8,
+                             trim_w=5.5, trim_h=8.5))
+    assert cfg.trim_w == 5.5 and cfg.trim_h == 8.5
+
+
+def test_trim_must_be_positive(tmp_path):
+    with pytest.raises(ConfigError):
+        load_config(_write(tmp_path, pet_kind="dog", trim_w=0))
