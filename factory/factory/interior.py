@@ -42,7 +42,9 @@ class InteriorError(RuntimeError):
     pass
 
 
-def _verify_interior_margins(pdf: Path, tol_in: float = 0.06) -> None:
+def _verify_interior_margins(pdf: Path, trim_w: float = specs.TRIM_W_IN,
+                             trim_h: float = specs.TRIM_H_IN,
+                             tol_in: float = 0.06) -> None:
     """Fail the build if any interior text falls outside the page margins (e.g. a
     page with too many fields whose content runs off the bottom into the trim).
     KDP rejects interiors with text in the margins. Skips a non-PDF stub."""
@@ -52,9 +54,9 @@ def _verify_interior_margins(pdf: Path, tol_in: float = 0.06) -> None:
     except Exception:
         return
     x0s = specs.MARGIN_INSIDE_IN
-    x1s = specs.TRIM_W_IN - specs.MARGIN_OUTSIDE_IN
+    x1s = trim_w - specs.MARGIN_OUTSIDE_IN
     y0s = specs.MARGIN_TOPBOTTOM_IN
-    y1s = specs.TRIM_H_IN - specs.MARGIN_TOPBOTTOM_IN
+    y1s = trim_h - specs.MARGIN_TOPBOTTOM_IN
     bad = []
     for pno in range(doc.page_count):
         for b in doc[pno].get_text("dict")["blocks"]:
@@ -72,7 +74,9 @@ def _verify_interior_margins(pdf: Path, tol_in: float = 0.06) -> None:
 
 
 def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
-                       book_type: str = "journal") -> tuple[Path, int]:
+                       book_type: str = "journal",
+                       trim_w: float = specs.TRIM_W_IN,
+                       trim_h: float = specs.TRIM_H_IN) -> tuple[Path, int]:
     out_dir = Path(out_dir)
     pdf = out_dir / "interior.pdf"
     # Page margins come from CSS @page, not this flag: browse renders without
@@ -81,9 +85,9 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
     # fixed .page padding; standard books flow prose across many pages and set a
     # real `@page { margin: 0.5in }` in standard.html.j2 so every page is inset.
     html_to_pdf(Path(html_path), pdf,
-                width_in=specs.TRIM_W_IN, height_in=specs.TRIM_H_IN,
+                width_in=trim_w, height_in=trim_h,
                 margins_in=0.0, runner=runner)
-    _verify_interior_margins(pdf)
+    _verify_interior_margins(pdf, trim_w, trim_h)
     pages = (pdf_page_count(pdf) if book_type == "standard"
              else count_pages(html_path))
     if book_type == "standard" and pages < 1:

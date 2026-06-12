@@ -136,6 +136,30 @@ def test_standard_interior_sets_nonzero_page_margin(tmp_path, sample_content):
     assert "@page" not in j_text          # journal page margin lives in interior.css (0)
 
 
+def std_cfg_5x8():
+    return BookConfig(slug="comp", title="Gentle Goodbye", subtitle="Sub",
+                      author="A", art_prompt="x", book_type="standard",
+                      synopsis="Grieving a dog.", chapter_count=2,
+                      words_per_chapter=40, trim_w=5.5, trim_h=8.5)
+
+
+def test_standard_interior_renders_at_configured_trim(tmp_path):
+    # the browse pdf call must request the book's trim, not a hardcoded 6x9
+    html_path = render_interior_html(std_cfg_5x8(), std_content(), out_dir=tmp_path)
+    calls = []
+    def runner(args):
+        calls.append(args)
+        import fitz
+        d = fitz.open(); d.new_page(width=5.5*72, height=8.5*72)
+        d.save(str(tmp_path / "interior.pdf")); d.close()
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+    build_interior_pdf(html_path, tmp_path, runner=runner, book_type="standard",
+                       trim_w=5.5, trim_h=8.5)
+    pdf_call = next(a for a in calls if a[1] == "pdf")
+    assert "5.5in" in pdf_call and "8.5in" in pdf_call
+
+
 def test_verify_interior_margins(tmp_path):
     import fitz
     W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72
