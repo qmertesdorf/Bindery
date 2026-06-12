@@ -18,6 +18,7 @@ def render_interior_html(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
     html = render(template, cfg=cfg, content=content)
     html_path = out_dir / "interior.html"
     html_path.write_text(html, encoding="utf-8")
+    # copy CSS next to the HTML so the relative <link> resolves
     shutil.copy(TEMPLATES_DIR / "interior" / "interior.css", out_dir / "interior.css")
     return html_path
 
@@ -31,10 +32,10 @@ def pdf_page_count(pdf: Path) -> int:
     """Real rendered page count of a PDF (0 for a non-PDF stub)."""
     import fitz
     try:
-        doc = fitz.open(str(pdf))
+        with fitz.open(str(pdf)) as doc:
+            return doc.page_count
     except Exception:
         return 0
-    return doc.page_count
 
 
 class InteriorError(RuntimeError):

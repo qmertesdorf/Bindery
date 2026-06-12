@@ -84,6 +84,22 @@ def test_pdf_page_count(tmp_path):
     assert pdf_page_count(stub) == 0            # non-PDF stub -> 0, no crash
 
 
+def test_standard_build_uses_pdf_page_count(tmp_path):
+    # standard books must take the page count from the RENDERED PDF, not HTML sections
+    html_path = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
+    import fitz
+    def runner(args):
+        p = tmp_path / "interior.pdf"
+        d = fitz.open()
+        for _ in range(5):
+            d.new_page()
+        d.save(str(p)); d.close()
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+    _, pages = build_interior_pdf(html_path, tmp_path, runner=runner, book_type="standard")
+    assert pages == 5   # 5 real PDF pages, not the HTML section count
+
+
 def test_verify_interior_margins(tmp_path):
     import fitz
     W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72
