@@ -5,6 +5,28 @@ avoid all confirmed dead zones; build a series in ONE niche). **None are backed 
 sales data** — they are structurally sound starting points that MUST pass the validation
 gate below before any production work.
 
+## Production status (updated 2026-06-12)
+
+The line actually in production is **pet-loss grief** — it was not one of the 10 below; it
+emerged as the validated niche and is where the factory has shipped real titles. All
+paperback (KDP):
+
+- **Fill-in grief journals (paperback only — a journal is useless as a reflowable Kindle):**
+  *Paw Prints on My Heart* (dog), plus cat-loss and pet-loss journal builds.
+- **Standard read-through prose (NEW):** *Until We Meet at the Bridge — A Gentle Companion
+  for Grieving the Loss of Your Dog* — a 102-page **5.5×8.5** companion read, **paperback +
+  Kindle, $14.99**. First prose title off the new standard-book pipeline.
+
+**New capability:** the factory now builds **standard read-through prose books** (front
+matter + chapters + auto-generated readings/closing letter + static memorial/resources
+page), not just low-content journals. This unlocks the prose-based candidates below (#7
+hyper-local how-to, #8 caregiver/life-transition guides, #10 children's books) and supports
+**series depth in the validated pet-loss niche** — natural next titles: a cat-loss companion
+read, loss of a senior dog, sudden/anticipated loss, and a children's pet-loss picture book.
+Series depth is the strongest income lever (see `research-findings.md` §4).
+
+---
+
 ## Low-content / medium-content (fastest, cheapest — design tools only)
 1. **Profession-specific clinical/field logbooks** — e.g. *Nurse Practitioner Clinical
    Rotation Logbook*, *Phlebotomy Competency Log*, *HVAC Service Call Logbook*. Real
