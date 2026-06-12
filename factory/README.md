@@ -44,6 +44,12 @@ Set `"book_type"` in the config:
   Kindle**. Requires `synopsis` and `chapter_count` (plus optional `words_per_chapter`,
   `blurb`). Prose is generated two-pass: an outline, then one LLM call per chapter. See
   `books/dog-loss-companion.config.json` for an example.
+  - **Trim size:** set `trim_w`/`trim_h` in the config (default 6×9 in; the dog-loss
+    companion uses 5.5×8.5 in, a gift-leaning size). Margins are 0.6 in with a 12pt body.
+  - **Auto-generated front/back matter:** an epigraph, a few short original readings, and a
+    closing letter are produced by the LLM. A static, human-verified "In Loving Memory"
+    dedication page and a "Where to Turn for Support" resources page are included verbatim
+    — the upload checklist reminds you to re-verify those resource links before uploading.
 
 ## Upload (manual — KDP has no API for individuals)
 Open KDP, create paperback + ebook, upload the files, paste metadata from
