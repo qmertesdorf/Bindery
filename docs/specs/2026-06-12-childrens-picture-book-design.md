@@ -146,8 +146,9 @@ text/letters baked into the image; deformed anatomy; image doesn't match
   KDP's full-bleed interior setup for v1. (Full-bleed is a future option.)
 - `render_interior_html` selects `picture.html.j2` by `book_type`; the template
   references the `page_NN.png` files produced by stage ③.
-- Front/back matter: half-title, copyright/AI-disclosure page, dedication page,
-  the story pages, a closing page (`closing`). With ~18–22 story pages this lands
+- Front/back matter: half-title, copyright page, dedication page,
+  the story pages, a closing page (`closing`). No in-book AI-disclosure page —
+  KDP's AI disclosure is a private upload-form field, not printed in the book. With ~18–22 story pages this lands
   naturally at **≥ 24 pages**; one trailing blank is added only if needed to make
   the count **even**.
 
@@ -166,8 +167,9 @@ picture interior (`pdf_page_count`).
   spine from page count. Paperback only.
 - `copy.book_blurb` gains a `picture` branch (kid-book back-cover line, or
   `cfg.blurb`).
-- `checklist.py` reused; flags **colour interior** + **8.5×8.5** + paperback-only;
-  the mandatory AI-content disclosure is already handled.
+- `checklist.py` reused; flags **colour interior** + **8.5×8.5** + paperback-only.
+  The KDP **upload-form** AI disclosure (private, never printed) is already
+  emitted by the checklist — unchanged.
 
 ### 7. First title
 
