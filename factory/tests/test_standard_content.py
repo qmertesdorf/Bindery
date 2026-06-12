@@ -84,3 +84,50 @@ def test_generate_content_dispatches_standard():
     # the content.py dispatcher must route standard books to the two-pass path
     out = generate_content(cfg(chapter_count=2), generate_fn=_fake(2))
     assert "chapters" in out and len(out["chapters"]) == 2
+
+
+def _one_chapter_outline():
+    return json.dumps({"preface": "p",
+                       "chapters": [{"title": "C1", "synopsis": "s"}]})
+
+
+def test_short_chapter_triggers_one_retry_and_keeps_longer():
+    # target 100 words; first draft is short (60) -> one "expand" retry; the
+    # retry is longer (200) so it's kept. Exactly one retry, never a loop.
+    state = {"calls": 0}
+    long_para = " ".join(["word"] * 200)
+    short_para = " ".join(["word"] * 60)
+
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return _one_chapter_outline()
+        state["calls"] += 1
+        if "TOO SHORT" in prompt:                      # the expand-retry prompt
+            return json.dumps({"paragraphs": [long_para]})
+        return json.dumps({"paragraphs": [short_para]})
+
+    out = generate_standard_content(cfg(chapter_count=1, words_per_chapter=100), fn)
+    wc = sum(len(p.split()) for p in out["chapters"][0]["paragraphs"])
+    assert wc == 200            # kept the longer retry draft
+    assert state["calls"] == 2  # one generate + one retry, no runaway loop
+
+
+def test_adequate_chapter_skips_retry():
+    # a chapter at/above the length floor must NOT trigger a wasteful retry
+    state = {"calls": 0}
+
+    def fn(prompt):
+        if "OUTLINE" in prompt:
+            return _one_chapter_outline()
+        state["calls"] += 1
+        return json.dumps({"paragraphs": [" ".join(["word"] * 120)]})  # >= 100*0.8
+
+    generate_standard_content(cfg(chapter_count=1, words_per_chapter=100), fn)
+    assert state["calls"] == 1  # no retry
+
+
+def test_expand_prompt_demands_more_length():
+    p = build_chapter_prompt(cfg(words_per_chapter=1800),
+                             {"title": "T", "synopsis": "s"}, 1, [], expand=True)
+    assert "TOO SHORT" in p
+    assert "1800" in p

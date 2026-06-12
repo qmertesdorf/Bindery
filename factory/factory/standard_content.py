@@ -5,7 +5,8 @@ from typing import Callable
 from .config import BookConfig
 from .content import ContentError, _strip_fences
 
-MIN_CHAPTER_WORDS = 20   # floor that catches an empty / refused generation
+MIN_CHAPTER_WORDS = 20    # hard floor that catches an empty / refused generation
+LENGTH_FLOOR_RATIO = 0.8  # below this fraction of the target, retry once for length
 
 
 def build_outline_prompt(cfg: BookConfig) -> str:
@@ -23,18 +24,28 @@ with exactly {cfg.chapter_count} chapter objects. Output the JSON and nothing el
 
 
 def build_chapter_prompt(cfg: BookConfig, chapter: dict, n: int,
-                         prior_titles: list[str]) -> str:
+                         prior_titles: list[str], expand: bool = False) -> str:
     prior = "; ".join(prior_titles) if prior_titles else "(this is the first chapter)"
-    return f"""You are writing one chapter of the book "{cfg.title}" ({cfg.subtitle}).
+    prompt = f"""You are writing one chapter of the book "{cfg.title}" ({cfg.subtitle}).
 Premise: {cfg.synopsis}
 This is chapter {n} of {cfg.chapter_count}: "{chapter['title']}" — {chapter.get('synopsis', '')}
 Earlier chapters so far: {prior}
 
-Write approximately {cfg.words_per_chapter} words of warm, gentle, tender prose.
-Do NOT repeat the chapter title or add headings.
+Write a complete, unhurried chapter of AT LEAST {cfg.words_per_chapter} words in
+7-10 full paragraphs of warm, gentle, tender prose. Develop the theme with
+concrete sensory detail and small, specific moments; reflect slowly and offer
+quiet comfort. Do not summarize, rush, or end the chapter early. Do NOT repeat
+the chapter title or add headings.
 
-Return ONLY valid JSON: {{"paragraphs": ["paragraph 1", "paragraph 2"]}}
-(3-8 paragraphs). Output the JSON and nothing else."""
+Return ONLY valid JSON: {{"paragraphs": ["paragraph 1", "paragraph 2", ...]}}
+Output the JSON and nothing else."""
+    if expand:
+        prompt += (
+            f"\n\nYour previous draft was TOO SHORT. Write a substantially longer, "
+            f"richer version — at least {cfg.words_per_chapter} words across 8-10 "
+            f"full paragraphs. Deepen each beat with more detail; do not pad with "
+            f"repetition.")
+    return prompt
 
 
 def validate_outline(data: dict, expected_chapters: int) -> None:
@@ -67,6 +78,22 @@ def validate_chapter(data: dict, min_words: int = MIN_CHAPTER_WORDS,
             f"the generation was likely truncated or refused")
 
 
+def _chapter_words(body: dict) -> int:
+    return sum(len(p.split()) for p in body["paragraphs"])
+
+
+def _generate_one_chapter(cfg: BookConfig, ch: dict, n: int, titles: list[str],
+                          generate_fn: Callable[[str], str],
+                          expand: bool = False) -> dict:
+    raw_c = generate_fn(build_chapter_prompt(cfg, ch, n, titles, expand=expand))
+    try:
+        body = json.loads(_strip_fences(raw_c))
+    except json.JSONDecodeError as e:
+        raise ContentError(f"chapter {n} is not valid JSON: {e}") from e
+    validate_chapter(body, chapter_n=n)
+    return body
+
+
 def generate_standard_content(cfg: BookConfig,
                               generate_fn: Callable[[str], str]) -> dict:
     raw = generate_fn(build_outline_prompt(cfg))
@@ -76,14 +103,18 @@ def generate_standard_content(cfg: BookConfig,
         raise ContentError(f"outline is not valid JSON: {e}") from e
     validate_outline(outline, cfg.chapter_count)
 
+    target = cfg.words_per_chapter
     chapters, titles = [], []
     for i, ch in enumerate(outline["chapters"], 1):
-        raw_c = generate_fn(build_chapter_prompt(cfg, ch, i, titles))
-        try:
-            body = json.loads(_strip_fences(raw_c))
-        except json.JSONDecodeError as e:
-            raise ContentError(f"chapter {i} is not valid JSON: {e}") from e
-        validate_chapter(body, chapter_n=i)
+        body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
+        # LLMs routinely under-deliver on length. If a chapter lands well under
+        # the target, retry ONCE with an explicit expand instruction and keep the
+        # longer draft — a build-time guard against a too-thin book, bounded so a
+        # stubbornly-short model can't loop the build forever.
+        if target and _chapter_words(body) < target * LENGTH_FLOOR_RATIO:
+            retry = _generate_one_chapter(cfg, ch, i, titles, generate_fn, expand=True)
+            if _chapter_words(retry) > _chapter_words(body):
+                body = retry
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 
