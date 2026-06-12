@@ -7,6 +7,13 @@ from . import specs
 
 
 def _keywords(cfg: BookConfig) -> str:
+    if cfg.book_type == "standard":
+        # Derive simple keyword seeds from the title; the publisher refines these
+        # against live Amazon search before upload.
+        base = [cfg.title.lower(), "comfort read", "grief support book",
+                "pet loss book", "coping with loss", "memorial gift",
+                "rainbow bridge"]
+        return ", ".join(base[:7])
     base = [f"{cfg.pet_kind} loss gift", f"{cfg.pet_kind} memorial journal",
             "pet loss grief journal", "pet bereavement", "rainbow bridge keepsake",
             "in memory of pet", f"loss of a {cfg.pet_kind}"]

@@ -13,11 +13,15 @@
 - **Subtitle:** {{ cfg.subtitle }}
 - **Author:** {{ cfg.author }}
 - **Description:** (paste)
+{%- if cfg.book_type == "standard" %}
+  <p>{{ cfg.blurb or cfg.synopsis }}</p>
+{%- else %}
   <p>A gentle, guided journal to help you grieve and remember your beloved {{ cfg.pet_kind }}.
   Undated reflective prompts, memory pages, and milestone reflections give you a private
   space to process loss at your own pace. A comforting keepsake and a thoughtful gift.</p>
-- **Price:** ${{ "%.2f"|format(cfg.price_usd) }} (paperback)
-- **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale (60% − ${{ "%.2f"|format(print_cost) }} print)
+{%- endif %}
+- **Price:** ${{ "%.2f"|format(cfg.price_usd) }}{% if cfg.makes_ebook %} (same list price for paperback and Kindle — $9.99 earns 70% ebook / 60% paperback){% else %} (paperback){% endif %}
+- **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale paperback (60% − ${{ "%.2f"|format(print_cost) }} print)
 
 ## Paperback print settings (must match the generated files)
 - **Trim size:** 6 x 9 in
@@ -29,8 +33,13 @@
 - **In Print Previewer:** confirm the wraparound lines up and the **back-cover blurb clears the barcode** box (lower-right of the back cover).
 
 ## Categories (choose 2)
+{%- if cfg.book_type == "standard" %}
+1. Self-Help › Death & Grief
+2. Family & Relationships › Death, Grief, Bereavement
+{%- else %}
 1. Self-Help › Death & Grief
 2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)
+{%- endif %}
 
 ## 7 backend keywords
 {{ keywords }}

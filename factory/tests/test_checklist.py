@@ -10,8 +10,9 @@ def cfg():
 
 def std_cfg():
     return BookConfig(slug="memoir", title="A Book", subtitle="Sub",
-                      author="A", pet_kind="n/a", art_prompt="x",
-                      price_usd=9.99, book_type="standard")
+                      author="A", art_prompt="x", price_usd=9.99,
+                      book_type="standard", synopsis="A gentle read about loss.",
+                      chapter_count=8, blurb="A comforting companion read.")
 
 
 def test_make_checklist_has_disclosure_and_royalty(tmp_path):
@@ -37,3 +38,10 @@ def test_standard_checklist_includes_ebook(tmp_path):
     text = Path(make_checklist(std_cfg(), pages=120, out_dir=tmp_path)).read_text(encoding="utf-8")
     assert "interior.epub" in text
     assert "cover-ebook.jpg" in text
+
+
+def test_standard_checklist_no_pet_kind_crash(tmp_path):
+    # standard books have empty pet_kind; keywords/description must not break
+    text = Path(make_checklist(std_cfg(), pages=120, out_dir=tmp_path)).read_text(encoding="utf-8")
+    assert "A comforting companion read." in text   # standard description = blurb
+    assert "{{" not in text                          # template fully rendered
