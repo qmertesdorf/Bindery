@@ -14,9 +14,9 @@
 <p class="book-sub">{{ cfg.subtitle }}</p>
 <p class="byline">{{ cfg.author }}</p></section>
 
-{% if content.epigraph %}<section class="epigraph"><div class="intro-body">
+{% if content.epigraph %}<section class="epigraph">
 {% for line in content.epigraph.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
-</div></section>{% endif %}
+</section>{% endif %}
 
 <section class="preface"><h2 class="chapter-head">Preface</h2>
 {% for para in content.preface.split('\n') if para.strip() %}<p class="body-para">{{ para.strip() }}</p>{% endfor %}
