@@ -27,7 +27,7 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
 
     # ② interior (PDF + page count; EPUB built after art so it can embed the cover)
     html = render_interior_html(cfg, content, out_dir)
-    _, pages = build_interior_pdf(html, out_dir, runner=runner)
+    _, pages = build_interior_pdf(html, out_dir, runner=runner, book_type=cfg.book_type)
 
     # ③ art
     if comfy is None:

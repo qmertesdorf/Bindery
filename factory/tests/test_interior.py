@@ -4,7 +4,7 @@ from factory import specs
 from factory.config import BookConfig
 from factory.interior import render_interior_html
 from factory.interior import (count_pages, build_interior_pdf, build_epub,
-                              _verify_interior_margins, InteriorError)
+                              _verify_interior_margins, InteriorError, pdf_page_count)
 
 
 def cfg():
@@ -49,6 +49,39 @@ def test_build_epub(tmp_path, sample_content):
     out = build_epub(cfg(), sample_content, tmp_path)
     assert Path(out).exists()
     assert Path(out).suffix == ".epub"
+
+
+def std_cfg():
+    return BookConfig(slug="comp", title="Gentle Goodbye", subtitle="Sub",
+                      author="A", art_prompt="x", book_type="standard",
+                      synopsis="Grieving a dog.", chapter_count=2,
+                      words_per_chapter=40)
+
+
+def std_content():
+    return {"preface": "A short preface.",
+            "chapters": [{"title": "First", "paragraphs": ["Para one.", "Para two."]},
+                         {"title": "Second", "paragraphs": ["Para three."]}]}
+
+
+def test_standard_interior_renders_chapters_no_fill_lines(tmp_path):
+    html_path = render_interior_html(std_cfg(), std_content(), out_dir=tmp_path)
+    text = Path(html_path).read_text(encoding="utf-8")
+    assert "Gentle Goodbye" in text
+    assert "First" in text and "Para one." in text
+    assert 'class="chapter"' in text
+    assert 'class="lines"' not in text          # no journal fill-in ruled lines
+
+
+def test_pdf_page_count(tmp_path):
+    import fitz
+    p = tmp_path / "doc.pdf"
+    d = fitz.open()
+    d.new_page(); d.new_page(); d.new_page()
+    d.save(str(p)); d.close()
+    assert pdf_page_count(p) == 3
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    assert pdf_page_count(stub) == 0            # non-PDF stub -> 0, no crash
 
 
 def test_verify_interior_margins(tmp_path):

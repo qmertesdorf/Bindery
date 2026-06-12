@@ -13,10 +13,11 @@ from ebooklib import epub
 def render_interior_html(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    html = render("interior/book.html.j2", cfg=cfg, content=content)
+    template = ("interior/standard.html.j2" if cfg.book_type == "standard"
+                else "interior/journal.html.j2")
+    html = render(template, cfg=cfg, content=content)
     html_path = out_dir / "interior.html"
     html_path.write_text(html, encoding="utf-8")
-    # copy CSS next to the HTML so the relative <link> resolves
     shutil.copy(TEMPLATES_DIR / "interior" / "interior.css", out_dir / "interior.css")
     return html_path
 
@@ -24,6 +25,16 @@ def render_interior_html(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
 def count_pages(html_path: Path) -> int:
     text = Path(html_path).read_text(encoding="utf-8")
     return len(re.findall(r'<section class="page"', text))
+
+
+def pdf_page_count(pdf: Path) -> int:
+    """Real rendered page count of a PDF (0 for a non-PDF stub)."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return 0
+    return doc.page_count
 
 
 class InteriorError(RuntimeError):
@@ -59,14 +70,17 @@ def _verify_interior_margins(pdf: Path, tol_in: float = 0.06) -> None:
             f"({len(bad)} span(s)): {msg}")
 
 
-def build_interior_pdf(html_path: Path, out_dir: Path, runner=None) -> tuple[Path, int]:
+def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
+                       book_type: str = "journal") -> tuple[Path, int]:
     out_dir = Path(out_dir)
     pdf = out_dir / "interior.pdf"
     html_to_pdf(Path(html_path), pdf,
                 width_in=specs.TRIM_W_IN, height_in=specs.TRIM_H_IN,
                 margins_in=0.0, runner=runner)
     _verify_interior_margins(pdf)
-    return pdf, count_pages(html_path)
+    pages = (pdf_page_count(pdf) if book_type == "standard"
+             else count_pages(html_path))
+    return pdf, pages
 
 
 def build_epub(cfg: BookConfig, content: dict, out_dir: Path, cover_path: Path | None = None) -> Path:

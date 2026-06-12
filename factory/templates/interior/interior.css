@@ -19,3 +19,10 @@ h1.book-title { font-size: 30pt; text-align: center; margin-top: 2in; }
 .profile-field { font-size: 13pt; margin-bottom: 0.3in; }
 .profile-field .lead { font-weight: bold; }
 .intro-body { font-size: 13pt; line-height: 1.6; margin-top: 1in; }
+
+/* Standard read-through books: each chapter starts on a new page; prose flows. */
+.chapter { break-before: page; page-break-before: always; }
+.chapter-head { font-size: 18pt; margin: 0 0 0.4in 0; text-align: center; }
+.body-para { font-size: 11pt; line-height: 1.5; margin: 0 0 0.18in 0;
+             text-indent: 0.25in; text-align: justify; }
+.title-page { text-align: center; }
