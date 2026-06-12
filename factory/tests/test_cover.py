@@ -4,7 +4,28 @@ from factory.config import BookConfig
 from factory import specs
 from factory.cover import (render_cover_html, build_cover, _verify_cover_pdf,
                            _verify_cover_dimensions, _verify_cover_background,
-                           _verify_cover_text_zones, CoverError)
+                           _verify_cover_text_zones, _verify_cover_no_white_edge,
+                           CoverError)
+
+
+def test_verify_cover_no_white_edge(tmp_path):
+    import fitz
+    def cover(white_strip):
+        p = tmp_path / f"c_{white_strip}.pdf"
+        d = fitz.open(); pg = d.new_page(width=400, height=600)
+        pg.draw_rect(fitz.Rect(0, 0, 400, 600), fill=(0.12, 0.12, 0.12), color=(0.12, 0.12, 0.12))
+        if white_strip:
+            pg.draw_rect(fitz.Rect(397, 0, 400, 600), fill=(1, 1, 1), color=(1, 1, 1))
+        d.save(str(p)); d.close()
+        return p
+    # a hair-thin white line at the right edge (full-bleed bg fell short) -> fail
+    with pytest.raises(CoverError):
+        _verify_cover_no_white_edge(cover(True))
+    # a clean full-bleed (dark to every edge) -> passes
+    _verify_cover_no_white_edge(cover(False))
+    # a non-PDF stub is skipped, not an error
+    stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
+    _verify_cover_no_white_edge(stub)
 
 
 def cfg():

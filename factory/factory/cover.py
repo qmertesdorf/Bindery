@@ -145,6 +145,41 @@ def _verify_cover_background(pdf: Path) -> None:
             f"full-bleed background art did not render.")
 
 
+def _verify_cover_no_white_edge(pdf: Path, white: int = 252, frac: float = 0.55) -> None:
+    """Fail if an outer edge of the cover is a hair-thin near-pure-white line — the
+    signature of a full-bleed background that fell a few px short in the HTML->PDF
+    render, letting the white page show through at the trim/bleed edge. KDP would
+    print that white line. Full-bleed art never legitimately paints a pure-white
+    (>=252) majority along an edge, so this won't fire on bright sky. Skips a
+    non-PDF stub."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    pix = doc[0].get_pixmap(dpi=150)
+    W, H, n, s = pix.width, pix.height, pix.n, pix.samples
+
+    def is_white(x, y):
+        i = (y * W + x) * n
+        return min(s[i], s[i + 1], s[i + 2]) >= white
+
+    bad = []
+    ys = list(range(0, H, max(1, H // 250)))
+    xs = list(range(0, W, max(1, W // 250)))
+    for x, name in ((0, "left"), (W - 1, "right")):
+        if sum(is_white(x, y) for y in ys) / len(ys) > frac:
+            bad.append(name)
+    for y, name in ((0, "top"), (H - 1, "bottom")):
+        if sum(is_white(x, y) for x in xs) / len(xs) > frac:
+            bad.append(name)
+    if bad:
+        raise CoverError(
+            f"Cover PDF {pdf.name} has a thin white line at the {', '.join(bad)} "
+            f"edge(s) — the full-bleed background fell short in the render and the "
+            f"white page shows through. Overscan the cover background.")
+
+
 def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: float,
                      trim_w: float = specs.TRIM_W_IN, dpi: int = 300,
                      subject_x: float = 0.5, front_x: float = 0.64) -> None:
@@ -255,12 +290,13 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h)
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
-                margins_in=0.0, runner=runner)
+                margins_in=0.0, runner=runner, prefer_css_page_size=True)
     # Regression guards: confirm the renderer placed the front-cover text and the
     # back-cover blurb, and that the cover's physical size matches the page count.
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
     _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h)
     _verify_cover_background(pdf)
+    _verify_cover_no_white_edge(pdf)
     _verify_cover_text_zones(pdf, pages, cfg.trim_w)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:

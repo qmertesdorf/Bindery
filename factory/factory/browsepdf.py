@@ -43,14 +43,21 @@ def _run(runner, args):
 
 
 def html_to_pdf(html: Path, out_pdf: Path, *, width_in: float, height_in: float,
-                margins_in: float = 0.0, runner: Runner | None = None) -> Path:
+                margins_in: float = 0.0, runner: Runner | None = None,
+                prefer_css_page_size: bool = False) -> Path:
     runner = runner or _default_runner
     b = browse_binary()
     out_pdf.parent.mkdir(parents=True, exist_ok=True)
+    args = [b, "pdf", str(out_pdf),
+            "--width", f"{width_in}in", "--height", f"{height_in}in",
+            "--margins", f"{margins_in}in", "--print-background"]
+    # Full-bleed covers: make the PDF paper EXACTLY the CSS @page size. Without
+    # this, browse's paper raster is ~2px wider than the rendered content, leaving
+    # a hair-thin white line in the bleed at one trim edge.
+    if prefer_css_page_size:
+        args.append("--prefer-css-page-size")
     _run(runner, [b, "goto", _file_url(Path(html))])
-    _run(runner, [b, "pdf", str(out_pdf),
-                  "--width", f"{width_in}in", "--height", f"{height_in}in",
-                  "--margins", f"{margins_in}in", "--print-background"])
+    _run(runner, args)
     return out_pdf
 
 
