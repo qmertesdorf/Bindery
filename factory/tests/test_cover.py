@@ -163,3 +163,33 @@ def test_verify_cover_text_zones(tmp_path):
     # non-PDF stub is skipped
     stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
     _verify_cover_text_zones(stub, pages)
+
+
+def std_cfg_5x8():
+    return BookConfig(slug="comp", title="Gentle Goodbye", subtitle="Sub",
+                      author="A", art_prompt="x", book_type="standard",
+                      synopsis="s", chapter_count=8, trim_w=5.5, trim_h=8.5,
+                      blurb="A gentle companion read.")
+
+
+def test_cover_html_uses_configured_trim(tmp_path):
+    art = tmp_path / "art.png"; art.write_bytes(b"\x89PNG")
+    # 150pp at 5.5x8.5 -> width 11.625, height 8.75
+    html = render_cover_html(std_cfg_5x8(), pages=150, art_path=art, out_dir=tmp_path)
+    text = Path(html).read_text(encoding="utf-8")
+    assert "11.625in" in text
+    assert "8.75in" in text
+
+
+def test_verify_cover_dimensions_custom_trim(tmp_path):
+    pages = 150
+    exp_w, exp_h = specs.cover_dimensions_in(pages, 5.5, 8.5)
+    good = tmp_path / "good.pdf"
+    _pdf_of_size(good, exp_w, exp_h)
+    _verify_cover_dimensions(good, pages, trim_w=5.5, trim_h=8.5)  # passes
+    # a 6x9-sized cover is WRONG for a 5.5x8.5 book -> failure
+    wrong = tmp_path / "wrong.pdf"
+    w6, h6 = specs.cover_dimensions_in(pages)  # 6x9
+    _pdf_of_size(wrong, w6, h6)
+    with pytest.raises(CoverError):
+        _verify_cover_dimensions(wrong, pages, trim_w=5.5, trim_h=8.5)

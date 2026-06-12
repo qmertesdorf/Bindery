@@ -46,7 +46,9 @@ def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
             f"renderer likely dropped an element — check cover positioning/CSS.")
 
 
-def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> None:
+def _verify_cover_dimensions(pdf: Path, pages: int, trim_w: float = specs.TRIM_W_IN,
+                             trim_h: float = specs.TRIM_H_IN,
+                             tol_in: float = 0.05) -> None:
     """Fail the build if the rendered cover's physical size doesn't match the page
     count. The full-bleed wrap width encodes the spine (0.0025in/page on cream),
     so a wrong trim, a renderer that ignores the requested size, or a spine that
@@ -65,7 +67,7 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
             f"overflow).")
     rect = doc[0].rect
     w_in, h_in = rect.width / 72, rect.height / 72
-    exp_w, exp_h = specs.cover_dimensions_in(pages)
+    exp_w, exp_h = specs.cover_dimensions_in(pages, trim_w, trim_h)
     errs = []
     if abs(w_in - exp_w) > tol_in:
         errs.append(f"width {w_in:.3f}in vs expected {exp_w:.3f}in "
@@ -77,7 +79,8 @@ def _verify_cover_dimensions(pdf: Path, pages: int, tol_in: float = 0.05) -> Non
                          f"{pages} pages: " + "; ".join(errs))
 
 
-def _verify_cover_text_zones(pdf: Path, pages: int, inset_in: float = 0.2) -> None:
+def _verify_cover_text_zones(pdf: Path, pages: int, trim_w: float = specs.TRIM_W_IN,
+                             inset_in: float = 0.2) -> None:
     """Fail if any cover text strays outside its panel's safe area: into the bleed,
     across the spine, within ``inset_in`` of the trim, or into KDP's barcode
     keep-out (lower-right of the back cover). KDP rejects covers with text in
@@ -90,7 +93,7 @@ def _verify_cover_text_zones(pdf: Path, pages: int, inset_in: float = 0.2) -> No
         return
     pg = doc[0]
     W, H = pg.rect.width / 72, pg.rect.height / 72
-    bleed, tw = specs.BLEED_IN, specs.TRIM_W_IN
+    bleed, tw = specs.BLEED_IN, trim_w
     spine_l = bleed + tw
     spine_c = spine_l + specs.spine_width_in(pages) / 2
     top, bot = bleed + inset_in, H - bleed - inset_in
@@ -143,7 +146,8 @@ def _verify_cover_background(pdf: Path) -> None:
 
 
 def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: float,
-                     dpi: int = 300, subject_x: float = 0.5, front_x: float = 0.64) -> None:
+                     trim_w: float = specs.TRIM_W_IN, dpi: int = 300,
+                     subject_x: float = 0.5, front_x: float = 0.64) -> None:
     """Compose the wraparound as ONE continuous page-sized image with the subject
     shifted onto the FRONT cover.
 
@@ -184,8 +188,8 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     # untouched — unlike full-panel CSS gradients, which read as a grey overlay
     # over pale art.
     from PIL import ImageDraw, ImageFilter
-    front_cx = W - round((specs.BLEED_IN + specs.TRIM_W_IN / 2) * dpi)
-    back_cx = round((specs.BLEED_IN + specs.TRIM_W_IN / 2) * dpi)
+    front_cx = W - round((specs.BLEED_IN + trim_w / 2) * dpi)
+    back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
         (back_cx, round(0.43 * H), round(2.7 * dpi), round(1.6 * dpi), 0.42),   # blurb
@@ -199,10 +203,11 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     canvas.save(out_dir / "cover_bg.png")
 
 
-def _css(width_in: float, height_in: float, art_file: str, fill: bool = False) -> str:
+def _css(width_in: float, height_in: float, art_file: str, fill: bool = False,
+         trim_w: float = specs.TRIM_W_IN) -> str:
     return Template(_CSS_TEMPLATE).render(
         width_in=width_in, height_in=height_in, art_file=art_file,
-        bleed=specs.BLEED_IN, trim_w=specs.TRIM_W_IN, fill=fill)
+        bleed=specs.BLEED_IN, trim_w=trim_w, fill=fill)
 
 
 def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
@@ -213,14 +218,14 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
     if Path(art_path).resolve() != art_local.resolve():
         shutil.copy(art_path, art_local)
     if front_only:
-        width_in = specs.TRIM_W_IN + 2 * specs.BLEED_IN
-        height_in = specs.TRIM_H_IN + 2 * specs.BLEED_IN
+        width_in = cfg.trim_w + 2 * specs.BLEED_IN
+        height_in = cfg.trim_h + 2 * specs.BLEED_IN
         name = "cover_front.html"
     else:
-        width_in, height_in = specs.cover_dimensions_in(pages)
+        width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h)
         name = "cover_wrap.html"
-        _compose_wrap_bg(art_local, out_dir, width_in, height_in)
-    css = _css(width_in, height_in, art_local.name, fill=front_only)
+        _compose_wrap_bg(art_local, out_dir, width_in, height_in, trim_w=cfg.trim_w)
+    css = _css(width_in, height_in, art_local.name, fill=front_only, trim_w=cfg.trim_w)
     html = render("cover/cover.html.j2", cfg=cfg, css=css,
                   width_in=width_in, height_in=height_in,
                   front_only=front_only, blurb=book_blurb(cfg))
@@ -247,16 +252,16 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     out_dir = Path(out_dir)
     # wraparound paperback PDF
     wrap_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=False)
-    width_in, height_in = specs.cover_dimensions_in(pages)
+    width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h)
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
                 margins_in=0.0, runner=runner)
     # Regression guards: confirm the renderer placed the front-cover text and the
     # back-cover blurb, and that the cover's physical size matches the page count.
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
-    _verify_cover_dimensions(pdf, pages)
+    _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h)
     _verify_cover_background(pdf)
-    _verify_cover_text_zones(pdf, pages)
+    _verify_cover_text_zones(pdf, pages, cfg.trim_w)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None
