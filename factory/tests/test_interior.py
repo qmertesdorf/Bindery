@@ -168,6 +168,32 @@ def test_standard_typography_is_roomy(tmp_path):
     assert "font-size: 12pt" in css             # 12pt body for standard
 
 
+def std_content_full():
+    return {"preface": "A short preface.", "epigraph": "Gentle opening lines.",
+            "chapters": [{"title": "First", "paragraphs": ["Para one.", "Para two."]}],
+            "readings": ["Reading one.", "Reading two.", "Reading three."],
+            "closing_letter": "Dear friend, be gentle with yourself."}
+
+
+def test_standard_interior_renders_front_and_back_matter(tmp_path):
+    html_path = render_interior_html(std_cfg(), std_content_full(), out_dir=tmp_path)
+    text = Path(html_path).read_text(encoding="utf-8")
+    assert "Gentle opening lines." in text            # epigraph (front)
+    assert "Reading one." in text                      # readings (back)
+    assert "Dear friend" in text                       # closing letter (back)
+    assert "In Loving Memory" in text                  # static memorial page
+    assert "ASPCA Pet Loss Support" in text            # static resources
+
+
+def test_epub_includes_matter(tmp_path):
+    out = build_epub(std_cfg(), std_content_full(), tmp_path)
+    import zipfile
+    names = zipfile.ZipFile(out).namelist()
+    assert any(n.endswith("epigraph.xhtml") for n in names)
+    assert any(n.endswith("readings.xhtml") for n in names)
+    assert any(n.endswith("closing.xhtml") for n in names)
+
+
 def test_verify_interior_margins(tmp_path):
     import fitz
     W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72

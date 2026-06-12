@@ -122,12 +122,21 @@ def build_epub(cfg: BookConfig, content: dict, out_dir: Path,
         return c
 
     items = []
+    if content.get("epigraph"):
+        epi = "".join(f"<p>{p}</p>" for p in content["epigraph"].split("\n") if p.strip())
+        items.append(chapter("Epigraph", epi, "epigraph.xhtml"))
     if content.get("preface"):
         pre_html = "".join(f"<p>{p}</p>" for p in content["preface"].split("\n") if p.strip())
         items.append(chapter("Preface", pre_html, "preface.xhtml"))
     for i, ch in enumerate(content["chapters"], 1):
         body = "".join(f"<p>{p}</p>" for p in ch["paragraphs"])
         items.append(chapter(ch["title"], body, f"chap{i}.xhtml"))
+    if content.get("readings"):
+        rd = "".join(f"<p>{r}</p>" for r in content["readings"])
+        items.append(chapter("Words for the Hard Days", rd, "readings.xhtml"))
+    if content.get("closing_letter"):
+        cl = "".join(f"<p>{p}</p>" for p in content["closing_letter"].split("\n") if p.strip())
+        items.append(chapter("A Closing Letter", cl, "closing.xhtml"))
 
     book.toc = tuple(items)
     book.add_item(epub.EpubNcx())

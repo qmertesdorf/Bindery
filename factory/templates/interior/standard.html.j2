@@ -14,6 +14,10 @@
 <p class="book-sub">{{ cfg.subtitle }}</p>
 <p class="byline">{{ cfg.author }}</p></section>
 
+{% if content.epigraph %}<section class="epigraph"><div class="intro-body">
+{% for line in content.epigraph.split('\n') if line.strip() %}<p>{{ line.strip() }}</p>{% endfor %}
+</div></section>{% endif %}
+
 <section class="preface"><h2 class="chapter-head">Preface</h2>
 {% for para in content.preface.split('\n') if para.strip() %}<p class="body-para">{{ para.strip() }}</p>{% endfor %}
 </section>
@@ -23,5 +27,17 @@
 {% for para in ch.paragraphs %}<p class="body-para">{{ para }}</p>{% endfor %}
 </section>
 {% endfor %}
+
+{% if content.readings %}
+<section class="chapter readings-section"><h2 class="chapter-head">Words for the Hard Days</h2>
+{% for r in content.readings %}<p class="body-para" style="text-indent:0;margin-bottom:0.28in">{{ r }}</p>{% endfor %}
+</section>{% endif %}
+
+{% include "interior/_matter.html.j2" %}
+
+{% if content.closing_letter %}
+<section class="chapter closing-letter"><h2 class="chapter-head">A Closing Letter</h2>
+{% for para in content.closing_letter.split('\n') if para.strip() %}<p class="body-para">{{ para.strip() }}</p>{% endfor %}
+</section>{% endif %}
 
 </body></html>
