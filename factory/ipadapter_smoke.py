@@ -11,6 +11,7 @@ out/<slug>/_ipa_smoke/ is reused). Eyeball hero.png vs page_ipa.png.
 """
 from __future__ import annotations
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -47,21 +48,19 @@ def ensure_hero(cfg, out: Path, comfy, auditor, fresh: bool) -> dict:
     print("[ipa] generating story bible via claude…", flush=True)
     content = generate_picture_content(cfg, claude_generate)
     anchor, style = content["character_anchor"], content["art_style"]
-    child = anchor.split(cfg.pet_name)[0].rstrip(" .,;")
     scene = content["pages"][0]["scene"]
-    print(f"[ipa]   child : {child}", flush=True)
+    print(f"[ipa]   anchor: {anchor}", flush=True)
 
-    print("[ipa] rendering CHILD-ONLY hero (audited, animal-suppressed negative)…", flush=True)
+    print("[ipa] rendering CHILD+DOG hero (audited — anchors both identities)…", flush=True)
     base_wf = json.loads((Path("comfyui") / "workflow.template.json").read_text(encoding="utf-8"))
-    wf = square_workflow(base_wf)
-    wf["7"]["inputs"]["text"] = wf["7"]["inputs"]["text"] + ", " + NO_ANIMALS
     _generate_audited(
-        comfy, wf, positive_node="6", sampler_node="3",
-        prompt=(f"{style}. A single young child, full body, standing, facing forward, "
-                f"plain pale background, no animals, no pets. {child}"),
-        seed=777, out_path=hero, auditor=auditor, anchor=child, reference_path=None,
-        scene="a single child character, full body, no animals", max_tries=4)
-    meta = {"anchor": anchor, "style": style, "child": child, "scene": scene}
+        comfy, square_workflow(base_wf), positive_node="6", sampler_node="3",
+        prompt=(f"{style}. A cheerful little boy kneeling with his arm gently around "
+                f"his small fluffy white dog, both shown full body together, facing "
+                f"forward, plain pale background. {anchor}"),
+        seed=777, out_path=hero, auditor=auditor, anchor=anchor, reference_path=None,
+        scene="the boy and his small white dog together, full body", max_tries=4)
+    meta = {"anchor": anchor, "style": style, "scene": scene}
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
     return {"hero": hero, **meta}
 
@@ -83,8 +82,9 @@ def main() -> int:
     name = upload_image(h["hero"])
     print(f"[ipa] hero uploaded as {name}", flush=True)
 
+    scene = os.environ.get("IPA_SCENE") or h["scene"]  # override to test a specific scene
     print(f"[ipa] generating page via IPAdapter (weight={weight}, end_at={end_at})…", flush=True)
-    print(f"[ipa]   scene: {h['scene']}", flush=True)
+    print(f"[ipa]   scene: {scene}", flush=True)
     ipa_wf = json.loads(
         (Path("comfyui") / "workflow.ipadapter.template.json").read_text(encoding="utf-8"))
     ipa_wf["22"]["inputs"]["image"] = name
@@ -92,9 +92,9 @@ def main() -> int:
     ipa_wf["23"]["inputs"]["end_at"] = end_at
     page = out / f"page_w{weight}_e{end_at}.png"
     comfy.generate(ipa_wf, positive_node="6", sampler_node="3",
-                   prompt=f"{h['style']}. {h['scene']}", seed=101, out_path=page)
+                   prompt=f"{h['style']}. {scene}", seed=101, out_path=page)
 
-    pv = auditor.audit(page, anchor=h["anchor"], reference_path=h["hero"], scene=h["scene"])
+    pv = auditor.audit(page, anchor=h["anchor"], reference_path=h["hero"], scene=scene)
     print(f"[ipa] PAGE VERDICT (w={weight}, end_at={end_at}): {pv}", flush=True)
     print(f"[ipa] eyeball {h['hero']} vs {page}", flush=True)
     return 0
