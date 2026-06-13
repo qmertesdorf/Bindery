@@ -1,12 +1,19 @@
 """Stage 3: generate cover art via the local ComfyUI HTTP API."""
 from __future__ import annotations
 import copy
+import sys
 import time
 import urllib.parse
 from pathlib import Path
 from typing import Callable
 
 BASE = "http://127.0.0.1:8188"
+
+
+def _log(msg: str) -> None:
+    """Progress line to stderr so a real build shows what the auditor is doing
+    (which images regenerate and why) — the signal needed to tune strictness."""
+    print(msg, file=sys.stderr, flush=True)
 
 
 class ArtError(RuntimeError):
@@ -108,6 +115,7 @@ def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
                       max_tries) -> Path:
     """Generate an image, audit it, and regenerate (fresh seed + corrective hints)
     until it passes or the try budget runs out — then fail the build loudly."""
+    name = Path(out_path).name
     issues: list[str] = []
     for attempt in range(max_tries):
         p = prompt
@@ -119,10 +127,15 @@ def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
         verdict = auditor.audit(out_path, anchor=anchor,
                                 reference_path=reference_path, scene=scene)
         if verdict.get("ok"):
+            _log(f"  [audit] {name}: OK"
+                 + (f" on attempt {attempt + 1}/{max_tries}" if attempt else ""))
             return Path(out_path)
         issues = verdict.get("issues", [])
+        _log(f"  [audit] {name}: REJECT attempt {attempt + 1}/{max_tries} — "
+             f"{'; '.join(issues) or 'no reason given'}"
+             + ("; regenerating" if attempt + 1 < max_tries else ""))
     raise ArtError(
-        f"could not produce a consistent illustration for {Path(out_path).name} "
+        f"could not produce a consistent illustration for {name} "
         f"after {max_tries} tries; last issues: {issues}")
 
 
@@ -135,7 +148,9 @@ def generate_picture_art(cfg, content, out_dir, comfy, workflow, *,
     out_dir.mkdir(parents=True, exist_ok=True)
     sq = square_workflow(workflow)
     style, anchor = content["art_style"], content["character_anchor"]
+    n_pages = len(content["pages"])
 
+    _log(f"[art] generating character reference sheet (anchors {n_pages} pages)…")
     ref = _generate_audited(
         comfy, sq, positive_node=positive_node, sampler_node=sampler_node,
         prompt=f"{style}. Character reference sheet, full body, plain background. {anchor}",
@@ -145,6 +160,7 @@ def generate_picture_art(cfg, content, out_dir, comfy, workflow, *,
 
     pages = []
     for i, page in enumerate(content["pages"], 1):
+        _log(f"[art] page {i}/{n_pages}: {page['scene'][:70]}")
         out = out_dir / f"page_{i:02d}.png"
         pages.append(_generate_audited(
             comfy, sq, positive_node=positive_node, sampler_node=sampler_node,
@@ -153,8 +169,10 @@ def generate_picture_art(cfg, content, out_dir, comfy, workflow, *,
             reference_path=ref, scene=page["scene"], max_tries=max_tries))
 
     # Wide cover illustration (uses the unmodified wrap-sized workflow).
+    _log("[art] generating cover illustration…")
     cover = comfy.generate(
         workflow, positive_node=positive_node, sampler_node=sampler_node,
         prompt=f"{style}. {anchor}. Front cover illustration: {content['pages'][0]['scene']}",
         seed=seed, out_path=out_dir / "art.png")
+    _log(f"[art] complete: reference + {n_pages} pages + cover")
     return {"reference": ref, "pages": pages, "cover": Path(cover)}
