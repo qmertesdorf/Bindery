@@ -21,6 +21,24 @@ def inject_prompt(workflow: dict, *, positive_node: str, sampler_node: str,
     return wf
 
 
+def square_workflow(workflow: dict, *, base: int = 1024, final: int = 2048) -> dict:
+    """Return a deep copy of the workflow producing a SQUARE image (the base graph
+    is sized wide for the cover wrap). Rewrites dimensions by node class_type so it
+    survives node-id changes: EmptyLatentImage -> base, LatentUpscale -> 2*base,
+    ImageScale -> final. No new nodes or models — a parameter change only."""
+    wf = copy.deepcopy(workflow)
+    for node in wf.values():
+        ct = node.get("class_type")
+        inp = node.get("inputs", {})
+        if ct == "EmptyLatentImage":
+            inp["width"] = inp["height"] = base
+        elif ct == "LatentUpscale":
+            inp["width"] = inp["height"] = base * 2
+        elif ct == "ImageScale":
+            inp["width"] = inp["height"] = final
+    return wf
+
+
 def _default_post(url, json):
     import requests
     r = requests.post(url, json=json, timeout=30)

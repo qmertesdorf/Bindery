@@ -1,6 +1,26 @@
 import json
 from pathlib import Path
-from factory.art import inject_prompt, ComfyClient
+from factory.art import inject_prompt, ComfyClient, square_workflow
+
+
+def test_square_workflow_sets_square_dims_by_class_type():
+    wf = {
+        "5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1536, "height": 768}},
+        "10": {"class_type": "LatentUpscale", "inputs": {"width": 3072, "height": 1536}},
+        "12": {"class_type": "ImageScale", "inputs": {"width": 5568, "height": 2784}},
+        "6": {"class_type": "CLIPTextEncode", "inputs": {"text": "x"}},
+    }
+    sq = square_workflow(wf, base=1024, final=2048)
+    assert sq["5"]["inputs"]["width"] == sq["5"]["inputs"]["height"] == 1024
+    assert sq["10"]["inputs"]["width"] == sq["10"]["inputs"]["height"] == 2048
+    assert sq["12"]["inputs"]["width"] == sq["12"]["inputs"]["height"] == 2048
+    # original untouched (deep copy) and unrelated nodes preserved
+    assert wf["5"]["inputs"]["width"] == 1536
+    assert sq["6"]["inputs"]["text"] == "x"
+
+def test_square_workflow_tolerates_missing_nodes():
+    wf = {"6": {"class_type": "CLIPTextEncode", "inputs": {"text": "x"}}}
+    assert square_workflow(wf) == wf  # nothing to change, equal content
 
 
 def test_inject_prompt_sets_text_and_seed():
