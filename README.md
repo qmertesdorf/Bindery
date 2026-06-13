@@ -4,13 +4,20 @@ A one-command pipeline that turns a small JSON config into a **publish-ready Ama
 bundle** — print interior PDF, EPUB, wraparound cover PDF, ebook cover, and an
 upload checklist with the mandatory AI-content disclosure pre-filled.
 
-The pipeline builds two kinds of book from the same five stages, switched by a `book_type`
+The pipeline builds three kinds of book from the same five stages, switched by a `book_type`
 field in the config: **fill-in journals** (paperback only — the proof-of-concept series is a
 set of pet-loss grief journals, chosen by upfront market research below) and **standard
 read-through prose books** (paperback + Kindle — e.g. a pet-loss companion read). The
 interesting part is the architecture: five isolated stages, with every external effect (the
 LLM, the PDF renderer, the image model) behind a thin injected adapter so the pure logic is
-unit-tested with fakes — `57 passing tests`, no network or GPU required to run them.
+unit-tested with fakes — no network or GPU required to run them.
+
+A **third** `book_type` builds **children's picture books**: a full-colour,
+framed 8.5×8.5 paperback where every page is illustrated. Because the art is the
+content, the picture pipeline runs **art before the interior**, and a **vision
+auditor** checks each illustration against a generated character reference sheet —
+regenerating any that drift off-model so the child and pet stay consistent across
+the book. Still one config + one command.
 
 ## The pipeline
 
