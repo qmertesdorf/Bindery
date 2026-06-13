@@ -1,0 +1,38 @@
+<!doctype html><html><head><meta charset="utf-8">
+<style>
+  @page { size: {{ "%g"|format(cfg.trim_w) }}in {{ "%g"|format(cfg.trim_h) }}in; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: Georgia, "Times New Roman", serif; color: #2b2b2b; }
+  .pp { width: {{ "%g"|format(cfg.trim_w) }}in; height: {{ "%g"|format(cfg.trim_h) }}in;
+        padding: 0.5in; page-break-after: always; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; text-align: center; }
+  .pp img { max-width: 100%; max-height: 6.4in; object-fit: contain; }
+  .caption { margin-top: 0.35in; font-size: 18pt; line-height: 1.5; max-width: 6.2in; }
+  .title-main { font-size: 34pt; margin: 0 0 0.2in; }
+  .title-sub { font-size: 16pt; font-style: italic; }
+  .byline { margin-top: 0.6in; font-size: 14pt; }
+  .ded { font-size: 18pt; font-style: italic; }
+  .copyright { justify-content: flex-end; font-size: 9pt; color: #666; text-align: left;
+               align-items: flex-start; line-height: 1.6; }
+</style></head><body>
+
+<section class="pp"><h1 class="title-main">{{ cfg.title }}</h1>
+  <p class="title-sub">{{ cfg.subtitle }}</p>
+  <p class="byline">{{ cfg.author }}</p></section>
+
+<section class="pp copyright">
+  <p>{{ cfg.title }}<br>Copyright &copy; {{ cfg.author }}. All rights reserved.<br>
+  No part of this book may be reproduced without permission.</p></section>
+
+<section class="pp"><p class="ded">{{ content.dedication }}</p></section>
+
+{% for page in content.pages %}
+<section class="pp">
+  <img src="page_{{ "%02d"|format(loop.index) }}.png" alt="">
+  <p class="caption">{{ page.text }}</p>
+</section>
+{% endfor %}
+
+<section class="pp"><p class="caption">{{ content.closing }}</p></section>
+
+</body></html>

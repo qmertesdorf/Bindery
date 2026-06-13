@@ -13,8 +13,9 @@ from ebooklib import epub
 def render_interior_html(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    template = ("interior/standard.html.j2" if cfg.book_type == "standard"
-                else "interior/journal.html.j2")
+    template = {"standard": "interior/standard.html.j2",
+                "picture": "interior/picture.html.j2"}.get(
+                    cfg.book_type, "interior/journal.html.j2")
     html = render(template, cfg=cfg, content=content)
     html_path = out_dir / "interior.html"
     html_path.write_text(html, encoding="utf-8")
@@ -40,6 +41,21 @@ def pdf_page_count(pdf: Path) -> int:
 
 class InteriorError(RuntimeError):
     pass
+
+
+MIN_PICTURE_PAGES = 24  # KDP paperback minimum
+
+
+def _verify_picture_page_count(pages: int) -> None:
+    """KDP rejects paperbacks under 24 pages, and a wrap needs an even leaf count."""
+    if pages < MIN_PICTURE_PAGES:
+        raise InteriorError(
+            f"Picture interior rendered {pages} pages — KDP requires at least "
+            f"{MIN_PICTURE_PAGES}. Increase page_count or front/back matter.")
+    if pages % 2 != 0:
+        raise InteriorError(
+            f"Picture interior rendered an odd page count ({pages}); a printed "
+            f"book needs an even number of leaves. Adjust page_count/matter.")
 
 
 def _verify_interior_margins(pdf: Path, trim_w: float = specs.TRIM_W_IN,
@@ -88,7 +104,7 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
                 width_in=trim_w, height_in=trim_h,
                 margins_in=0.0, runner=runner)
     _verify_interior_margins(pdf, trim_w, trim_h)
-    pages = (pdf_page_count(pdf) if book_type == "standard"
+    pages = (pdf_page_count(pdf) if book_type in ("standard", "picture")
              else count_pages(html_path))
     if book_type == "standard" and pages < 1:
         # The standard page count is load-bearing: the cover spine width is derived
@@ -97,6 +113,8 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
         raise InteriorError(
             f"Standard interior {pdf.name} rendered 0 pages — the PDF failed to "
             f"open or is empty; the cover spine width would be wrong.")
+    if book_type == "picture":
+        _verify_picture_page_count(pages)
     return pdf, pages
 
 
