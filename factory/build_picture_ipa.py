@@ -29,7 +29,7 @@ from factory.cover import build_cover
 from factory.checklist import make_checklist
 
 BASE = "http://127.0.0.1:8188"
-WEIGHT, END_AT = 0.6, 0.8
+WEIGHT, END_AT = 0.5, 0.6  # lower than the hero so page scenes compose richer backgrounds
 NO_ANIMALS = "dog, puppy, animal, pet, creature, second animal"
 IPA_TEMPLATE = Path("comfyui") / "workflow.ipadapter.template.json"
 
@@ -43,9 +43,12 @@ def upload_image(path: Path) -> str:
     return r.json()["name"]
 
 
+SMILE_NEG = "big smile, grin, grinning, laughing, cheerful, beaming"
+
+
 def ipa_page(comfy, auditor, hero_name, *, style, scene, anchor, ref_path, out,
-             seed, suppress_animals=False, weight=WEIGHT, end_at=END_AT,
-             max_tries=4) -> bool:
+             seed, suppress_animals=False, no_smile=False, weight=WEIGHT,
+             end_at=END_AT, max_tries=4) -> bool:
     """Generate one IPAdapter page conditioned on hero_name; audit vs ref_path.
     Returns True if it passed; keeps the best attempt (never fails the book)."""
     issues: list[str] = []
@@ -54,8 +57,9 @@ def ipa_page(comfy, auditor, hero_name, *, style, scene, anchor, ref_path, out,
         wf["22"]["inputs"]["image"] = hero_name
         wf["23"]["inputs"]["weight"] = weight
         wf["23"]["inputs"]["end_at"] = end_at
-        if suppress_animals:
-            wf["7"]["inputs"]["text"] = wf["7"]["inputs"]["text"] + ", " + NO_ANIMALS
+        neg_extra = ([NO_ANIMALS] if suppress_animals else []) + ([SMILE_NEG] if no_smile else [])
+        if neg_extra:
+            wf["7"]["inputs"]["text"] = wf["7"]["inputs"]["text"] + ", " + ", ".join(neg_extra)
         prompt = f"{style}. {scene}"
         if issues:
             prompt += " Fix these problems: " + "; ".join(issues)
@@ -96,7 +100,7 @@ def main() -> int:
     _generate_audited(
         comfy, wfc, positive_node="6", sampler_node="3",
         prompt=(f"{style}. A single young child, full body, standing, facing forward, "
-                f"plain pale background, no animals. {child}"),
+                f"calm gentle neutral expression, plain pale background, no animals. {child}"),
         seed=777, out_path=hero_child, auditor=auditor, anchor=child,
         reference_path=None, scene="a single child, full body, no animals", max_tries=5)
     child_name = upload_image(hero_child)
@@ -104,8 +108,8 @@ def main() -> int:
     print("[book] 3/5 hero B (child + dog, boy from hero A)…", flush=True)
     hero_pair = out / "hero_pair.png"
     ipa_page(comfy, auditor, child_name, style=style,
-             scene=(f"the same boy kneeling with his arm gently around his {dog_desc}, "
-                    f"both shown full body together, plain pale background"),
+             scene=(f"the same boy with a calm gentle smile kneeling with his arm gently "
+                    f"around his {dog_desc}, both shown full body together, plain pale background"),
              anchor=anchor, ref_path=hero_child, out=hero_pair, seed=555,
              weight=0.55, end_at=0.7, max_tries=5)
     pair_name = upload_image(hero_pair)
@@ -114,16 +118,28 @@ def main() -> int:
     pages = content["pages"]
     n = len(pages)
     flagged = []
+    grief = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy",
+             "aching", "empty", "quiet", "reflective", "missing", "sorrowful", "tearful"}
     for i, pg in enumerate(pages, 1):
         scene = pg["scene"]
-        s = scene.lower()
-        dog = cfg.pet_name.lower() in s or "dog" in s or "puppy" in s
+        mood = pg.get("mood", "tender")
+        dog = pg.get("moment") == "memory"  # authored by the bible, not guessed
+        somber = mood.lower() in grief
         hero_name, ref = (pair_name, hero_pair) if dog else (child_name, hero_child)
-        print(f"[book]   page {i}/{n} ({'memory: dog' if dog else 'absence: no dog'}): "
-              f"{scene[:58]}", flush=True)
-        ok = ipa_page(comfy, auditor, hero_name, style=style, scene=scene, anchor=anchor,
-                      ref_path=ref, out=out / f"page_{i:02d}.png", seed=100 + i,
-                      suppress_animals=not dog)
+        audit_anchor = anchor if dog else child  # present pages: don't expect the absent dog
+        expr = "a quiet, gentle, NOT smiling face" if somber else "a warm gentle smile"
+        cast = "only the boy and his dog" if dog else "only the boy, no other people, no animals"
+        art_scene = (f"{scene} The boy shows {expr}, clearly {mood}. {cast}. "
+                     f"Richly illustrated, detailed background setting.")
+        print(f"[book]   page {i}/{n} ({'memory+dog' if dog else 'present,no dog'}, "
+              f"{mood}{'/no-smile' if somber else ''}): {scene[:40]}", flush=True)
+        # memory pages hold two characters → a touch more conditioning; present
+        # pages have only the boy → lower weight lets the setting compose richer.
+        w, e = (0.6, 0.8) if dog else (0.5, 0.6)
+        ok = ipa_page(comfy, auditor, hero_name, style=style, scene=art_scene,
+                      anchor=audit_anchor, ref_path=ref, out=out / f"page_{i:02d}.png",
+                      seed=100 + i, suppress_animals=not dog, no_smile=somber,
+                      weight=w, end_at=e)
         if not ok:
             flagged.append(i)
 

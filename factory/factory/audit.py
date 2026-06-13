@@ -38,11 +38,16 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - any text, letters, words, or numbers are rendered in the artwork;
 - broken anatomy (malformed faces, extra or missing limbs/eyes);
 - the character's DEFINING outfit colours or key markings are clearly wrong
-  (e.g. a red coat where the character wears yellow, or a missing described marking).
+  (e.g. a red coat where the character wears yellow, or a missing described marking);
+- the child's expression clearly CONTRADICTS the mood the scene calls for — in
+  particular a smiling, grinning, or visibly happy child on a sad, lonely,
+  wistful, or grieving page (the face must read at least quiet/subdued there).
 
 ACCEPT (set ok=true) — do NOT reject — for natural variation that keeps the
 character recognisable:
-- different hairstyle detail, expression, pose, camera angle, or framing;
+- different hairstyle detail, pose, camera angle, or framing;
+- a quiet/neutral expression on a somber page (it need not be tearful — gentle is
+  fine), or a warm one on a happy page;
 - a different or simpler background, lighting, or time of day;
 - missing or rearranged minor scene props; the scene only needs to be roughly right.
 

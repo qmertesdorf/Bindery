@@ -25,19 +25,38 @@ Output the JSON and nothing else."""
 
 def build_story_prompt(cfg: BookConfig, anchor: str) -> str:
     return f"""You are writing the gentle children's picture book "{cfg.title}" for a
-child (ages 4-8) grieving their {cfg.pet_kind}, {cfg.pet_name}. The child narrates;
-{cfg.pet_name} appears in soft remembered moments. Warm, simple, never clinical;
-never the "Rainbow Bridge" poem.
+child (ages 4-8) whose {cfg.pet_kind}, {cfg.pet_name}, has died. The child narrates.
+Warm, simple, honest, never clinical; never the "Rainbow Bridge" poem.
 
 The recurring characters (keep every page consistent with this): {anchor}
 
-Write EXACTLY {cfg.page_count} story pages that move gently from loss to remembering
-with love. Return ONLY valid JSON:
-{{"pages": [{{"text": "...", "scene": "..."}}], "closing": "..."}}
-- each "text": 1-2 short child-friendly sentences for that page.
-- each "scene": a concrete VISUAL description of what to illustrate on that page
-  (setting, what the child and {cfg.pet_name} are doing), consistent with the
-  characters above. Do NOT include any words/letters to render in the picture.
+This is a grief book. {cfg.pet_name} is GONE. Structure the {cfg.page_count} pages as
+a gentle arc: a few happy MEMORIES of {cfg.pet_name} alive → the loss and the empty
+home → missing {cfg.pet_name}, sad and comforted (sometimes by a parent, or looking
+at a photo) → slowly remembering with love and quiet hope.
+
+Return ONLY valid JSON:
+{{"pages": [{{"text": "...", "moment": "memory|present", "mood": "...",
+            "scene": "..."}}], "closing": "..."}}
+- "text": 1-2 short child-friendly sentences for the page.
+- "moment": "memory" for a flashback when {cfg.pet_name} was alive; "present" for
+  now, after the loss.
+- "mood": the child's feeling on this page (e.g. happy, playful, tender, sad,
+  lonely, wistful, comforted, hopeful) — vary it honestly with the moment.
+- "scene": a RICH, concrete visual description — the SETTING (a real place: a
+  sunlit park, a cozy living room with furniture, a bedroom at dusk), what the
+  child is doing, and the child's expression matching the mood.
+  CRITICAL constraints (an image model can only reliably draw the child alone, or
+  the child with the dog):
+  * The picture shows ONLY the child — never any other PEOPLE (no parent, no
+    friends); a parent's comfort belongs in the "text", not the picture.
+  * On a "present" page the scene must show ONLY the child in a setting with an
+    expression matching the mood, and must NOT mention or depict {cfg.pet_name},
+    the {cfg.pet_kind}, a photo/picture of it, or its bed/leash/toys — naming the
+    animal makes the image model draw a live one. The loss is carried by the
+    "text", not the picture.
+  * Only "memory" pages show {cfg.pet_name} (alive, with the child).
+  Keep objects simple. No words/letters in the picture.
 - "closing": one comforting closing line for the final page.
 Exactly {cfg.page_count} page objects. Output the JSON and nothing else."""
 
@@ -63,6 +82,11 @@ def validate_story(data: dict, expected_pages: int) -> None:
             raise ContentError(f"story page {i} missing 'text'")
         if not str(pg.get("scene", "")).strip():
             raise ContentError(f"story page {i} missing 'scene'")
+        if str(pg.get("moment", "")).strip() not in ("memory", "present"):
+            raise ContentError(
+                f"story page {i} 'moment' must be 'memory' or 'present'")
+        if not str(pg.get("mood", "")).strip():
+            raise ContentError(f"story page {i} missing 'mood'")
     if not str(data.get("closing", "")).strip():
         raise ContentError("story missing 'closing'")
 
