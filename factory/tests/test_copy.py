@@ -25,3 +25,11 @@ def test_standard_blurb_uses_blurb_field():
 
 def test_standard_blurb_falls_back_to_synopsis():
     assert book_blurb(standard_cfg()) == "A gentle read about loss."
+
+
+def test_picture_blurb_mentions_child_and_pet():
+    cfg = BookConfig(slug="k", title="T", subtitle="S", author="A", art_prompt="x",
+                     book_type="picture", pet_kind="dog", pet_name="Sunny",
+                     page_count=22, trim_w=8.5, trim_h=8.5)
+    b = book_blurb(cfg)
+    assert "dog" in b.lower() and ("child" in b.lower() or "little" in b.lower())

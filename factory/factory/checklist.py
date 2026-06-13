@@ -7,6 +7,12 @@ from . import specs
 
 
 def _keywords(cfg: BookConfig) -> str:
+    if cfg.book_type == "picture":
+        base = [f"{cfg.pet_kind} loss children's book",
+                f"pet loss book for kids", "grief picture book",
+                f"death of a {cfg.pet_kind} kids", "rainbow bridge children",
+                "memorial gift child", "saying goodbye pet"]
+        return ", ".join(base[:7])
     if cfg.book_type == "standard":
         # Derive simple keyword seeds from the title; the publisher refines these
         # against live Amazon search before upload.
@@ -25,9 +31,11 @@ def make_checklist(cfg: BookConfig, pages: int, out_dir: Path) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     md = render("checklist.md.j2",
                 cfg=cfg, pages=pages,
-                spine=specs.spine_width_in(pages),
-                royalty=specs.royalty_usd(cfg.price_usd, pages),
-                print_cost=specs.printing_cost_usd(pages),
+                spine=specs.spine_width_in(pages, specs.spine_per_page(cfg.book_type)),
+                royalty=specs.royalty_usd(cfg.price_usd, pages,
+                                          colour=cfg.book_type == "picture"),
+                print_cost=specs.printing_cost_usd(pages,
+                                                   colour=cfg.book_type == "picture"),
                 keywords=_keywords(cfg))
     out = out_dir / "upload-checklist.md"
     out.write_text(md, encoding="utf-8")
