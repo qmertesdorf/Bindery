@@ -101,3 +101,60 @@ class ComfyClient:
                 return {"filename": im["filename"], "subfolder": im.get("subfolder", ""),
                         "type": im.get("type", "output")}
         raise ArtError("no image in ComfyUI outputs")
+
+
+def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
+                      seed, out_path, auditor, anchor, reference_path, scene,
+                      max_tries) -> Path:
+    """Generate an image, audit it, and regenerate (fresh seed + corrective hints)
+    until it passes or the try budget runs out — then fail the build loudly."""
+    issues: list[str] = []
+    for attempt in range(max_tries):
+        p = prompt
+        if issues:
+            p = f"{prompt} Fix these problems from the last attempt: {'; '.join(issues)}"
+        comfy.generate(workflow, positive_node=positive_node,
+                       sampler_node=sampler_node, prompt=p,
+                       seed=seed + attempt * 1009, out_path=out_path)
+        verdict = auditor.audit(out_path, anchor=anchor,
+                                reference_path=reference_path, scene=scene)
+        if verdict.get("ok"):
+            return Path(out_path)
+        issues = verdict.get("issues", [])
+    raise ArtError(
+        f"could not produce a consistent illustration for {Path(out_path).name} "
+        f"after {max_tries} tries; last issues: {issues}")
+
+
+def generate_picture_art(cfg, content, out_dir, comfy, workflow, *,
+                         positive_node: str, sampler_node: str, seed: int,
+                         auditor, max_tries: int = 4) -> dict:
+    """Stage 3 for picture books: reference sheet + one audited illustration per
+    page (square) + a wide cover illustration. Returns the written paths."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    sq = square_workflow(workflow)
+    style, anchor = content["art_style"], content["character_anchor"]
+
+    ref = _generate_audited(
+        comfy, sq, positive_node=positive_node, sampler_node=sampler_node,
+        prompt=f"{style}. Character reference sheet, full body, plain background. {anchor}",
+        seed=seed, out_path=out_dir / "reference.png", auditor=auditor,
+        anchor=anchor, reference_path=None, scene="character reference sheet",
+        max_tries=max_tries)
+
+    pages = []
+    for i, page in enumerate(content["pages"], 1):
+        out = out_dir / f"page_{i:02d}.png"
+        pages.append(_generate_audited(
+            comfy, sq, positive_node=positive_node, sampler_node=sampler_node,
+            prompt=f"{style}. {anchor}. Scene: {page['scene']}",
+            seed=seed + i, out_path=out, auditor=auditor, anchor=anchor,
+            reference_path=ref, scene=page["scene"], max_tries=max_tries))
+
+    # Wide cover illustration (uses the unmodified wrap-sized workflow).
+    cover = comfy.generate(
+        workflow, positive_node=positive_node, sampler_node=sampler_node,
+        prompt=f"{style}. {anchor}. Front cover illustration: {content['pages'][0]['scene']}",
+        seed=seed, out_path=out_dir / "art.png")
+    return {"reference": ref, "pages": pages, "cover": Path(cover)}
