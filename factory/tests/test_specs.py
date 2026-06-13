@@ -39,3 +39,18 @@ def test_cover_dimensions_defaults_unchanged():
     # default trim still 6x9 for journals
     w, h = specs.cover_dimensions_in(120)
     assert w == pytest.approx(12.55) and h == pytest.approx(9.25)
+
+
+def test_white_spine_is_thinner_than_cream():
+    assert specs.spine_per_page("picture") < specs.spine_per_page("journal")
+
+
+def test_cover_dimensions_take_per_page():
+    cream = specs.cover_dimensions_in(40, 8.5, 8.5, per_page=specs.SPINE_PER_PAGE_IN)
+    white = specs.cover_dimensions_in(40, 8.5, 8.5,
+                                      per_page=specs.SPINE_PER_PAGE_WHITE_IN)
+    assert white[0] < cream[0]  # thinner spine -> narrower wrap
+
+
+def test_colour_print_costs_more_than_bw():
+    assert specs.printing_cost_usd(40, colour=True) > specs.printing_cost_usd(40)

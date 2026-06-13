@@ -214,3 +214,19 @@ def test_verify_cover_dimensions_custom_trim(tmp_path):
     _pdf_of_size(wrong, w6, h6)
     with pytest.raises(CoverError):
         _verify_cover_dimensions(wrong, pages, trim_w=5.5, trim_h=8.5)
+
+
+def test_picture_cover_dimensions_use_white_spine(tmp_path):
+    cfg = BookConfig(slug="k", title="T", subtitle="S", author="A",
+                     art_prompt="x", book_type="picture", pet_kind="dog",
+                     pet_name="Sunny", page_count=26, trim_w=8.5, trim_h=8.5,
+                     price_usd=10.99)
+    (tmp_path / "art.png").write_bytes(b"\x89PNG")
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            Path(args[2]).write_bytes(b"x")  # stub; guards skip non-PDF
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+    pdf, jpg = build_cover(cfg, 26, tmp_path / "art.png", tmp_path,
+                           runner=runner, make_ebook_cover=False)
+    assert pdf.exists() and jpg is None
