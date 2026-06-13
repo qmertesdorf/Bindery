@@ -7,7 +7,8 @@ from pathlib import Path
 from factory.config import load_config
 from factory.content import generate_content, claude_generate
 from factory.interior import render_interior_html, build_interior_pdf, build_epub
-from factory.art import ComfyClient
+from factory.art import ComfyClient, generate_picture_art
+from factory.audit import ClaudeVisionAuditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
 
@@ -16,7 +17,7 @@ DEFAULT_SEED = 12345
 
 def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
               comfy=None, workflow=None, positive_node="6", sampler_node="3",
-              runner=None, seed=DEFAULT_SEED) -> Path:
+              runner=None, seed=DEFAULT_SEED, auditor=None) -> Path:
     cfg = load_config(config_path)
     out_dir = Path(out_root) / cfg.slug
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -25,13 +26,7 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     content = generate_content(cfg, generate_fn=generate_fn)
     (out_dir / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
 
-    # ② interior (PDF + page count; EPUB built after art so it can embed the cover)
-    html = render_interior_html(cfg, content, out_dir)
-    _, pages = build_interior_pdf(html, out_dir, runner=runner,
-                                  book_type=cfg.book_type,
-                                  trim_w=cfg.trim_w, trim_h=cfg.trim_h)
-
-    # ③ art
+    # Resolve image backend + workflow up front (picture needs art before interior).
     if comfy is None:
         comfy = ComfyClient()
     if workflow is None:
@@ -42,8 +37,31 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
             "ComfyUI workflow still has the placeholder checkpoint. Edit "
             "comfyui/workflow.template.json and set ckpt_name to a real checkpoint "
             "from your ComfyUI install before running the factory.")
-    art_path = comfy.generate(workflow, positive_node=positive_node, sampler_node=sampler_node,
-                              prompt=cfg.art_prompt, seed=seed, out_path=out_dir / "art.png")
+
+    if cfg.book_type == "picture":
+        # ②③ Picture books illustrate every page, so art runs BEFORE the interior
+        # (the interior embeds page_NN.png). Consistency is enforced by the auditor.
+        if auditor is None:
+            auditor = ClaudeVisionAuditor()
+        art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
+                                   positive_node=positive_node,
+                                   sampler_node=sampler_node, seed=seed,
+                                   auditor=auditor)
+        html = render_interior_html(cfg, content, out_dir)
+        _, pages = build_interior_pdf(html, out_dir, runner=runner,
+                                      book_type=cfg.book_type,
+                                      trim_w=cfg.trim_w, trim_h=cfg.trim_h)
+        art_path = art["cover"]
+    else:
+        # ② interior (PDF + page count; EPUB built after art so it can embed the cover)
+        html = render_interior_html(cfg, content, out_dir)
+        _, pages = build_interior_pdf(html, out_dir, runner=runner,
+                                      book_type=cfg.book_type,
+                                      trim_w=cfg.trim_w, trim_h=cfg.trim_h)
+        # ③ art
+        art_path = comfy.generate(workflow, positive_node=positive_node,
+                                  sampler_node=sampler_node, prompt=cfg.art_prompt,
+                                  seed=seed, out_path=out_dir / "art.png")
 
     # ④ cover (paperback wrap; ebook JPG only for standard books), then EPUB
     #    embedding that JPG cover. Journals are paperback-only — no Kindle edition.
