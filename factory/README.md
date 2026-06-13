@@ -36,7 +36,7 @@ Output lands in `out/dog-loss/`: `interior.pdf`, `interior.epub`,
 ## Add a new title to the series
 Drop a new `books/<slug>.config.json` and run `build.py` on it. No template edits.
 
-## Book types: journals vs standard read-through books
+## Book types: journals, standard, and picture books
 Set `"book_type"` in the config:
 - `"journal"` (default) — fill-in grief journal; **paperback only** (you can't write in a
   Kindle book). Requires `pet_kind`.
@@ -50,6 +50,18 @@ Set `"book_type"` in the config:
     closing letter are produced by the LLM. A static, human-verified "In Loving Memory"
     dedication page and a "Where to Turn for Support" resources page are included verbatim
     — the upload checklist reminds you to re-verify those resource links before uploading.
+- `"picture"` — full-colour framed 8.5×8.5 children's picture book; **paperback only**.
+  Requires `pet_kind`, `pet_name`, and `page_count` (even, ≥ 20). The pipeline runs
+  **art before the interior** (page images are embedded in the HTML), generating a
+  character reference sheet plus one illustration per page, each audited by a Claude vision
+  call for character consistency before the interior is assembled. **ComfyUI must be
+  running** — a picture build renders approximately `page_count`+2 images, so expect a
+  longer run than a single-cover title. See `books/dog-loss-kids.config.json` for an
+  example.
+
+`python build.py books/dog-loss-kids.config.json` builds the picture book
+(ComfyUI must be running; it renders a reference sheet, one illustration per
+page, and the cover — each audited for character consistency).
 
 ## Upload (manual — KDP has no API for individuals)
 Open KDP, create paperback + ebook, upload the files, paste metadata from

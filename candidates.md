@@ -16,6 +16,12 @@ paperback (KDP):
 - **Standard read-through prose (NEW):** *Until We Meet at the Bridge — A Gentle Companion
   for Grieving the Loss of Your Dog* — a 102-page **5.5×8.5** companion read, **paperback +
   Kindle, $14.99**. First prose title off the new standard-book pipeline.
+- **Children's picture book (NEW):** *The Morning Walk — A Gentle Goodbye to a
+  Beloved Dog* — a full-colour 8.5×8.5 framed picture book (ages 4–8), paperback,
+  $10.99. First title off the new `picture` book_type: a frozen character anchor,
+  a generated character reference sheet, and a vision auditor that regenerates any
+  off-model illustration. Third format in the dog sub-line (journal + companion +
+  kids' book).
 
 **New capability:** the factory now builds **standard read-through prose books** (front
 matter + chapters + auto-generated readings/closing letter + static memorial/resources

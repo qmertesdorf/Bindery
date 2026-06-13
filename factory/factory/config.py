@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED = ["slug", "title", "subtitle", "author", "art_prompt"]
-BOOK_TYPES = ("journal", "standard")
+BOOK_TYPES = ("journal", "standard", "picture")
 
 
 class ConfigError(ValueError):
@@ -29,6 +29,9 @@ class BookConfig:
     blurb: str = ""                  # standard back-cover/listing copy
     trim_w: float = 6.0              # paperback trim width (in)
     trim_h: float = 9.0              # paperback trim height (in)
+    pet_name: str = ""               # picture only — the remembered pet's name
+    page_count: int = 0              # picture only — number of story pages
+    art_style: str = ""              # picture only — locked illustration style (optional)
 
     @property
     def makes_ebook(self) -> bool:
@@ -62,6 +65,16 @@ def load_config(path: str | Path) -> BookConfig:
         if miss:
             raise ConfigError(
                 f"{path}: standard books require: {', '.join(miss)}")
+    if book_type == "picture":
+        if not data.get("pet_kind"):
+            raise ConfigError(f"{path}: picture books require 'pet_kind'")
+        if not data.get("pet_name"):
+            raise ConfigError(f"{path}: picture books require 'pet_name'")
+        pc = int(data.get("page_count", 0))
+        if pc < 20 or pc % 2 != 0:
+            raise ConfigError(
+                f"{path}: picture 'page_count' must be even and >= 20 "
+                f"(with fixed matter this clears KDP's 24-page floor); got {pc}")
     trim_w = float(data.get("trim_w", 6.0))
     trim_h = float(data.get("trim_h", 9.0))
     if trim_w <= 0 or trim_h <= 0:
@@ -82,4 +95,7 @@ def load_config(path: str | Path) -> BookConfig:
         blurb=str(data.get("blurb", "")),
         trim_w=trim_w,
         trim_h=trim_h,
+        pet_name=str(data.get("pet_name", "")),
+        page_count=int(data.get("page_count", 0)),
+        art_style=str(data.get("art_style", "")),
     )

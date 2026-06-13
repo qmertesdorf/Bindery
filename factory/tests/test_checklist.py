@@ -53,3 +53,20 @@ def test_checklist_shows_configured_trim_and_resources_note(tmp_path):
     assert "5.5 x 8.5" in text
     assert "6x9" not in text and "6 x 9" not in text   # no hardcoded trim leaks through
     assert "verify" in text.lower() and "resource" in text.lower()
+
+
+def test_picture_checklist_is_colour_and_juvenile(tmp_path):
+    import json
+    from factory.config import load_config
+    cfgp = tmp_path / "k.config.json"
+    cfgp.write_text(json.dumps({
+        "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
+        "book_type": "picture", "pet_kind": "dog", "pet_name": "Sunny",
+        "page_count": 26, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99}),
+        encoding="utf-8")
+    cfg = load_config(cfgp)
+    out = make_checklist(cfg, 26, tmp_path)
+    text = out.read_text(encoding="utf-8")
+    assert "Color" in text  # interior is colour, not "Black & white"
+    assert "Juvenile" in text  # juvenile category, not Self-Help
+    assert "cream" not in text.lower()  # colour books print on white stock

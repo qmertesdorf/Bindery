@@ -25,6 +25,38 @@ def sample_config_file(tmp_path, sample_config_dict):
 
 
 @pytest.fixture
+def picture_config_dict():
+    return {
+        "slug": "dog-loss-kids",
+        "title": "Sunny's Last Walk",
+        "subtitle": "A Gentle Goodbye to a Beloved Dog",
+        "author": "Eleanor Hartley",
+        "book_type": "picture",
+        "pet_kind": "dog",
+        "pet_name": "Sunny",
+        "page_count": 20,
+        "art_prompt": "soft storybook watercolor cover, a child and a golden dog",
+        "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+    }
+
+
+@pytest.fixture
+def picture_content():
+    _pages = (
+        [{"text": "We walked every morning, Sunny and me.", "scene": "garden path at dawn"},
+         {"text": "Now the leash hangs still by the door.", "scene": "quiet hallway, leash on a hook"}]
+        + [{"text": f"I remember you, page {i}.", "scene": f"memory scene {i}"} for i in range(3, 21)]
+    )
+    return {
+        "character_anchor": "a small girl with short brown hair and a golden retriever",
+        "art_style": "soft flat storybook watercolor, muted palette, soft edges",
+        "dedication": "For Sunny, our best friend.",
+        "pages": _pages,
+        "closing": "Love does not leave. It stays, soft and warm, forever.",
+    }
+
+
+@pytest.fixture
 def sample_content():
     return {
         "intro": "This journal is a gentle space to remember your companion.",

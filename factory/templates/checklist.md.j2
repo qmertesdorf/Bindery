@@ -1,7 +1,7 @@
 # KDP Upload Checklist — {{ cfg.title }}
 
 ## Files to upload
-- Paperback interior: `interior.pdf` ({{ pages }} pages, {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }}", cream)
+- Paperback interior: `interior.pdf` ({{ pages }} pages, {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }}", {% if cfg.book_type == "picture" %}colour{% else %}cream{% endif %})
 - Paperback cover (wraparound): `cover-paperback.pdf` (spine {{ spine }}in)
 {%- if cfg.makes_ebook %}
 - Ebook manuscript: `interior.epub`
@@ -15,6 +15,8 @@
 - **Description:** (paste)
 {%- if cfg.book_type == "standard" %}
   <p>{{ cfg.blurb or cfg.synopsis }}</p>
+{%- elif cfg.book_type == "picture" %}
+  <p>{{ cfg.blurb or "A gentle, beautifully illustrated picture book for a child saying goodbye to a beloved " ~ cfg.pet_kind ~ ", helping a family remember " ~ cfg.pet_name ~ " with love." }}</p>
 {%- else %}
   <p>A gentle, guided journal to help you grieve and remember your beloved {{ cfg.pet_kind }}.
   Undated reflective prompts, memory pages, and milestone reflections give you a private
@@ -25,8 +27,13 @@
 
 ## Paperback print settings (must match the generated files)
 - **Trim size:** {{ "%g"|format(cfg.trim_w) }} x {{ "%g"|format(cfg.trim_h) }} in
+{%- if cfg.book_type == "picture" %}
+- **Interior:** Standard Color (full-colour illustrations)
+- **Paper:** White — ⚠ select white; the spine width ({{ spine }}in) was computed for white/colour stock.
+{%- else %}
 - **Interior:** Black & white
 - **Paper:** Cream  — ⚠ must select cream; the spine width ({{ spine }}in) was computed for cream stock. White paper is thinner and KDP will reject the cover.
+{%- endif %}
 - **Bleed (interior):** No Bleed — the interior PDF is exactly {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }} with margins (no edge-to-edge images).
 - **Cover finish:** Matte (recommended for the soft watercolor art; free choice, doesn't affect the file).
 - **ISBN:** Get a free KDP ISBN (KDP-only is fine).{% if cfg.makes_ebook %} The eBook needs **no ISBN** (Amazon assigns an ASIN).{% endif %}
@@ -36,6 +43,9 @@
 {%- if cfg.book_type == "standard" %}
 1. Self-Help › Death & Grief
 2. Family & Relationships › Death, Grief, Bereavement
+{%- elif cfg.book_type == "picture" %}
+1. Children's Books › Growing Up & Facts of Life › Difficult Discussions › Death & Dying
+2. Children's Books › Animals › Dogs   (Juvenile Nonfiction/Fiction › Social Themes › Death & Dying)
 {%- else %}
 1. Self-Help › Death & Grief
 2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)

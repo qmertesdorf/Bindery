@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 from factory.art import ComfyClient
+from factory.audit import ClaudeVisionAuditor  # noqa: F401 (import sanity)
 from build import run_build
 
 
@@ -76,3 +77,54 @@ def test_standard_book_build_includes_ebook(tmp_path, sample_config_dict):
     for f in ["interior.pdf", "cover-paperback.pdf", "upload-checklist.md",
               "interior.epub", "cover-ebook.jpg"]:
         assert (Path(out_dir) / f).exists(), f"missing {f}"
+
+
+def test_picture_build_paperback_only_with_pages(tmp_path, picture_config_dict, picture_content):
+    cfgp = tmp_path / "book.config.json"
+    cfgp.write_text(json.dumps(picture_config_dict), encoding="utf-8")
+
+    bible = {"character_anchor": picture_content["character_anchor"],
+             "art_style": picture_content["art_style"],
+             "dedication": picture_content["dedication"]}
+    story = {"pages": picture_content["pages"], "closing": picture_content["closing"]}
+    def fake_llm(prompt):
+        return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)
+
+    def http_post(url, json): return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+
+    class FakeAuditor:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+            return {"ok": True, "issues": []}
+
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                import fitz
+                d = fitz.open()
+                for _ in range(26):   # >= 24, even, for the picture page guard
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+
+    workflow = {"5": {"class_type": "EmptyLatentImage", "inputs": {"width": 1536, "height": 768}},
+                "6": {"class_type": "CLIPTextEncode", "inputs": {"text": ""}},
+                "3": {"class_type": "KSampler", "inputs": {"seed": 0}}}
+
+    out_dir = run_build(cfgp, out_root=tmp_path / "out", generate_fn=fake_llm,
+                        comfy=comfy, workflow=workflow, positive_node="6",
+                        sampler_node="3", runner=runner, auditor=FakeAuditor())
+    for f in ["content.json", "reference.png", "page_01.png", "page_02.png",
+              "art.png", "interior.pdf", "cover-paperback.pdf", "upload-checklist.md"]:
+        assert (Path(out_dir) / f).exists(), f"missing {f}"
+    assert not (Path(out_dir) / "interior.epub").exists()
+    assert not (Path(out_dir) / "cover-ebook.jpg").exists()

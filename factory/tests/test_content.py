@@ -39,3 +39,21 @@ def test_validate_rejects_missing_key(sample_content):
 def test_validate_rejects_wrong_prompt_count(sample_content):
     with pytest.raises(ContentError):
         validate_content(sample_content, expected_prompts=999)
+
+
+import json
+from factory.config import BookConfig
+from factory.content import generate_content
+
+def test_generate_content_dispatches_picture():
+    cfg = BookConfig(slug="k", title="T", subtitle="S", author="A", art_prompt="x",
+                     book_type="picture", pet_kind="dog", pet_name="Sunny",
+                     page_count=4, trim_w=8.5, trim_h=8.5)
+    bible = {"character_anchor": "a child and a golden dog",
+             "art_style": "soft watercolor", "dedication": "For Sunny"}
+    story = {"pages": [{"text": f"t{i}", "scene": f"s{i}"} for i in range(4)],
+             "closing": "c"}
+    def fake_llm(prompt):
+        return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)
+    out = generate_content(cfg, generate_fn=fake_llm)
+    assert len(out["pages"]) == 4 and out["character_anchor"].startswith("a child")

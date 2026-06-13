@@ -48,12 +48,14 @@ def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
 
 def _verify_cover_dimensions(pdf: Path, pages: int, trim_w: float = specs.TRIM_W_IN,
                              trim_h: float = specs.TRIM_H_IN,
+                             per_page: float = specs.SPINE_PER_PAGE_IN,
                              tol_in: float = 0.05) -> None:
     """Fail the build if the rendered cover's physical size doesn't match the page
-    count. The full-bleed wrap width encodes the spine (0.0025in/page on cream),
-    so a wrong trim, a renderer that ignores the requested size, or a spine that
-    doesn't fit the page count all surface here — and all get a KDP rejection.
-    Skips cleanly if the file isn't a real PDF (e.g. a test stub).
+    count. The full-bleed wrap width encodes the spine (0.0025in/page on cream,
+    0.002252in/page on white/colour stock), so a wrong trim, a renderer that ignores
+    the requested size, or a spine that doesn't fit the page count all surface here
+    — and all get a KDP rejection. Skips cleanly if the file isn't a real PDF
+    (e.g. a test stub).
     """
     import fitz
     try:
@@ -67,11 +69,11 @@ def _verify_cover_dimensions(pdf: Path, pages: int, trim_w: float = specs.TRIM_W
             f"overflow).")
     rect = doc[0].rect
     w_in, h_in = rect.width / 72, rect.height / 72
-    exp_w, exp_h = specs.cover_dimensions_in(pages, trim_w, trim_h)
+    exp_w, exp_h = specs.cover_dimensions_in(pages, trim_w, trim_h, per_page)
     errs = []
     if abs(w_in - exp_w) > tol_in:
         errs.append(f"width {w_in:.3f}in vs expected {exp_w:.3f}in "
-                    f"(spine {specs.spine_width_in(pages)}in for {pages}pp)")
+                    f"(spine {specs.spine_width_in(pages, per_page)}in for {pages}pp)")
     if abs(h_in - exp_h) > tol_in:
         errs.append(f"height {h_in:.3f}in vs expected {exp_h:.3f}in")
     if errs:
@@ -80,6 +82,7 @@ def _verify_cover_dimensions(pdf: Path, pages: int, trim_w: float = specs.TRIM_W
 
 
 def _verify_cover_text_zones(pdf: Path, pages: int, trim_w: float = specs.TRIM_W_IN,
+                             per_page: float = specs.SPINE_PER_PAGE_IN,
                              inset_in: float = 0.2) -> None:
     """Fail if any cover text strays outside its panel's safe area: into the bleed,
     across the spine, within ``inset_in`` of the trim, or into KDP's barcode
@@ -95,7 +98,7 @@ def _verify_cover_text_zones(pdf: Path, pages: int, trim_w: float = specs.TRIM_W
     W, H = pg.rect.width / 72, pg.rect.height / 72
     bleed, tw = specs.BLEED_IN, trim_w
     spine_l = bleed + tw
-    spine_c = spine_l + specs.spine_width_in(pages) / 2
+    spine_c = spine_l + specs.spine_width_in(pages, per_page) / 2
     top, bot = bleed + inset_in, H - bleed - inset_in
     back_x = (bleed + inset_in, spine_l - inset_in)
     front_x = (W - bleed - tw + inset_in, W - bleed - inset_in)
@@ -257,7 +260,9 @@ def render_cover_html(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path
         height_in = cfg.trim_h + 2 * specs.BLEED_IN
         name = "cover_front.html"
     else:
-        width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h)
+        per_page = specs.spine_per_page(cfg.book_type)
+        width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h,
+                                                        per_page)
         name = "cover_wrap.html"
         _compose_wrap_bg(art_local, out_dir, width_in, height_in, trim_w=cfg.trim_w)
     css = _css(width_in, height_in, art_local.name, fill=front_only, trim_w=cfg.trim_w)
@@ -285,19 +290,21 @@ def _recompress_jpg(path: Path, quality: int = 90) -> None:
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
                 runner=None, make_ebook_cover: bool = True) -> tuple[Path, Path | None]:
     out_dir = Path(out_dir)
+    per_page = specs.spine_per_page(cfg.book_type)
     # wraparound paperback PDF
     wrap_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=False)
-    width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h)
+    width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h,
+                                                    per_page)
     pdf = out_dir / "cover-paperback.pdf"
     html_to_pdf(wrap_html, pdf, width_in=width_in, height_in=height_in,
                 margins_in=0.0, runner=runner, prefer_css_page_size=True)
     # Regression guards: confirm the renderer placed the front-cover text and the
     # back-cover blurb, and that the cover's physical size matches the page count.
     _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
-    _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h)
+    _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
     _verify_cover_background(pdf)
     _verify_cover_no_white_edge(pdf)
-    _verify_cover_text_zones(pdf, pages, cfg.trim_w)
+    _verify_cover_text_zones(pdf, pages, cfg.trim_w, per_page=per_page)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None
