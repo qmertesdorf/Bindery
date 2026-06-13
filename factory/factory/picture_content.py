@@ -96,9 +96,10 @@ def generate_picture_content(cfg: BookConfig,
         bible = _generate_bible(cfg, generate_fn)
     except ContentError:
         bible = _generate_bible(cfg, generate_fn)
-    # A config-locked art_style always wins so the look never drifts run to run.
+    # Config-locked art_style / character_anchor always win so the look never
+    # drifts run to run (and let us pin SDXL-friendly, renderable character traits).
     art_style = cfg.art_style or bible["art_style"]
-    anchor = bible["character_anchor"]
+    anchor = cfg.character_anchor or bible["character_anchor"]
     try:
         story = _generate_story(cfg, anchor, generate_fn)
     except ContentError:

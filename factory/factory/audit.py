@@ -18,20 +18,36 @@ class AuditError(RuntimeError):
 
 def build_audit_prompt(*, anchor: str, scene: str | None,
                        image_path: Path, reference_path: Path | None) -> str:
-    ref = (f"\nRead the reference character sheet at {reference_path} — the child "
-           f"and pet in the new image MUST match it." if reference_path else "")
-    scene_line = f"\nIntended scene for this page: {scene}." if scene else ""
-    return f"""Read the image file at {image_path} and judge it strictly.{ref}
+    ref = (f"\nA reference image of the recurring character(s) is at {reference_path}. "
+           f"Read it: the character in the new image must be RECOGNISABLY THE SAME "
+           f"character (same kind of person/animal, same defining features and outfit "
+           f"colours) — it need NOT match the reference pose, angle, or background."
+           if reference_path else "")
+    scene_line = f"\nThis page is meant to depict, roughly: {scene}." if scene else ""
+    return f"""Read the image file at {image_path} and judge it for a children's
+picture book.{ref}
 
-The recurring characters must look like: {anchor}.{scene_line}
+The recurring character(s) should look like: {anchor}.{scene_line}
 
-Reject (ok=false) if ANY of these is true:
-- the child or the pet is NOT visually consistent with the reference/anchor
-  (different hair, skin, age, breed, colour, or markings);
-- any text, letters, words, or numbers are baked into the artwork;
-- anatomy is deformed (bad faces, extra/missing limbs);
-- the picture does not match the intended scene.
-Be strict — if you are unsure, set ok=false.
+This is a soft, stylised storybook, so judge GENEROUSLY. Apply a two-tier bar.
+
+REJECT (set ok=false) ONLY for a real defect that would break the book:
+- the character is the WRONG character, or characters are CONFLATED (e.g. a
+  different person/animal, an animal wearing the child's clothes, or an extra
+  subject/animal that should not be present);
+- any text, letters, words, or numbers are rendered in the artwork;
+- broken anatomy (malformed faces, extra or missing limbs/eyes);
+- the character's DEFINING outfit colours or key markings are clearly wrong
+  (e.g. a red coat where the character wears yellow, or a missing described marking).
+
+ACCEPT (set ok=true) — do NOT reject — for natural variation that keeps the
+character recognisable:
+- different hairstyle detail, expression, pose, camera angle, or framing;
+- a different or simpler background, lighting, or time of day;
+- missing or rearranged minor scene props; the scene only needs to be roughly right.
+
+When the character is recognisable and the art is clean, set ok=true even if such
+details differ. Reserve issues for genuine defects.
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""

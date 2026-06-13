@@ -32,6 +32,7 @@ class BookConfig:
     pet_name: str = ""               # picture only — the remembered pet's name
     page_count: int = 0              # picture only — number of story pages
     art_style: str = ""              # picture only — locked illustration style (optional)
+    character_anchor: str = ""       # picture only — pin the character design (optional)
 
     @property
     def makes_ebook(self) -> bool:
@@ -98,4 +99,5 @@ def load_config(path: str | Path) -> BookConfig:
         pet_name=str(data.get("pet_name", "")),
         page_count=int(data.get("page_count", 0)),
         art_style=str(data.get("art_style", "")),
+        character_anchor=str(data.get("character_anchor", "")),
     )
