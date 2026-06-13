@@ -143,3 +143,14 @@ def test_picture_page_count_even_and_min(tmp_path):
             "slug": "k", "title": "T", "subtitle": "S", "author": "A",
             "art_prompt": "x", "book_type": "picture", "pet_kind": "dog",
             "pet_name": "Sunny", "page_count": 21}))
+
+
+from pathlib import Path
+
+
+def test_dog_loss_kids_config_is_valid():
+    p = Path(__file__).resolve().parent.parent / "books" / "dog-loss-kids.config.json"
+    cfg = load_config(p)
+    assert cfg.book_type == "picture" and cfg.pet_kind == "dog"
+    assert cfg.trim_w == 8.5 and cfg.trim_h == 8.5
+    assert cfg.page_count >= 20 and cfg.page_count % 2 == 0
