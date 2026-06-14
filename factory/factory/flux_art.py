@@ -78,24 +78,31 @@ def _expression(mood: str) -> str:
 
 
 def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
-    """Return (prompt, loras) for a page. The page's `moment` selects the cast:
-    a "memory" page (when a companion exists) stacks the companion LoRA and names
-    both triggers; any other page is the hero alone with animals explicitly
-    excluded so the model never invents a live pet on a present-day page."""
+    """Return (prompt, loras) for a page. The page's `cast` selects who is in
+    frame and which LoRAs render: "child_and_pet" stacks both LoRAs and names both
+    triggers; "pet" renders the companion alone (a peaceful "where pets go" scene,
+    no child); "child" (default) is the hero alone with animals excluded so the
+    model never invents a live pet."""
     mood = page.get("mood", "tender")
     expr = _expression(mood)
-    memory = page.get("moment") == "memory"
-    if memory and companion is not None:
+    cast = page.get("cast", "child")
+    tail = "Richly detailed background, illustrated edge to edge."
+    if cast == "child_and_pet" and companion is not None:
         loras = [(hero.lora, hero.strength), (companion.lora, companion.strength)]
-        who = (f"{hero.trigger} {outfit}, together with {companion.trigger}")
-        guard = " Only the child and the pet, no other people."
+        prompt = (f"{style}. {hero.trigger} {outfit}, together with "
+                  f"{companion.trigger}. {page['scene']} The child shows {expr}, "
+                  f"clearly {mood}. Only the child and the pet, no other people. "
+                  f"{tail}")
+    elif cast == "pet" and companion is not None:
+        loras = [(companion.lora, companion.strength)]
+        prompt = (f"{style}. {companion.trigger}, peaceful and content, in "
+                  f"{page['scene']} No people, no other animals. Soft luminous "
+                  f"light. {tail}")
     else:
         loras = [(hero.lora, hero.strength)]
-        who = f"{hero.trigger} {outfit}, alone, no other people, no animals"
-        guard = ""
-    prompt = (f"{style}. {who}. {page['scene']} The child shows {expr}, "
-              f"clearly {mood}.{guard} Richly detailed background, illustrated "
-              f"edge to edge.")
+        prompt = (f"{style}. {hero.trigger} {outfit}, alone, no other people, no "
+                  f"animals. {page['scene']} The child shows {expr}, clearly "
+                  f"{mood}. {tail}")
     return prompt, loras
 
 
@@ -120,6 +127,10 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     # before the pet's name) so the auditor doesn't demand the absent pet.
     hero_anchor = (anchor.split(pet, 1)[0].rstrip(" .,;") if pet and pet in anchor
                    else anchor)
+    # For "pet"-cast pages (the companion alone), audit against just the pet's part
+    # of the anchor (the pet name onward) so the auditor doesn't demand the child.
+    pet_anchor = (pet + anchor.split(pet, 1)[1].rstrip() if pet and pet in anchor
+                  else anchor)
     pages = content["pages"]
     n = len(pages)
 
@@ -127,9 +138,10 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     for i, page in enumerate(pages, 1):
         prompt, loras = page_plan(page, hero=hero, companion=companion,
                                   style=style, outfit=outfit)
-        memory = page.get("moment") == "memory"
-        audit_anchor = anchor if memory else hero_anchor
-        _log(f"[flux] page {i}/{n} ({page.get('moment')},{page.get('mood')}): "
+        cast = page.get("cast", "child")
+        audit_anchor = {"child_and_pet": anchor, "pet": pet_anchor}.get(
+            cast, hero_anchor)
+        _log(f"[flux] page {i}/{n} ({cast},{page.get('mood')}): "
              f"{page['scene'][:60]}")
 
         def render(p, s, op, _loras=loras):

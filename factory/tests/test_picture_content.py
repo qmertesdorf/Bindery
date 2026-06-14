@@ -13,7 +13,7 @@ def _cfg(**kw):
 
 def _page(i):
     return {"text": f"line {i}", "scene": f"scene {i}",
-            "moment": "memory" if i % 2 else "present", "mood": "tender"}
+            "cast": "child_and_pet" if i % 2 else "child", "mood": "tender"}
 
 def test_bible_prompt_mentions_pet_name_and_audience():
     p = build_bible_prompt(_cfg())
@@ -28,17 +28,17 @@ def test_validate_story_rejects_wrong_page_count():
         validate_story({"pages": [{"text": "t", "scene": "s"}], "closing": "c"}, 4)
 
 def test_validate_story_rejects_empty_scene():
-    pages = [{"text": "t", "scene": "", "moment": "present", "mood": "sad"}] * 4
+    pages = [{"text": "t", "scene": "", "cast": "child", "mood": "sad"}] * 4
     with pytest.raises(ContentError, match="scene"):
         validate_story({"pages": pages, "closing": "c"}, 4)
 
-def test_validate_story_rejects_bad_moment():
-    pages = [{"text": "t", "scene": "s", "moment": "flashback", "mood": "sad"}] * 4
-    with pytest.raises(ContentError, match="moment"):
+def test_validate_story_rejects_bad_cast():
+    pages = [{"text": "t", "scene": "s", "cast": "flashback", "mood": "sad"}] * 4
+    with pytest.raises(ContentError, match="cast"):
         validate_story({"pages": pages, "closing": "c"}, 4)
 
 def test_validate_story_rejects_missing_mood():
-    pages = [{"text": "t", "scene": "s", "moment": "present", "mood": ""}] * 4
+    pages = [{"text": "t", "scene": "s", "cast": "child", "mood": ""}] * 4
     with pytest.raises(ContentError, match="mood"):
         validate_story({"pages": pages, "closing": "c"}, 4)
 
@@ -53,7 +53,7 @@ def test_generate_picture_content_assembles_schema():
     assert out["character_anchor"].startswith("a small girl")
     assert out["art_style"] == "soft flat storybook watercolor"
     assert len(out["pages"]) == 4 and out["closing"].startswith("We will")
-    assert out["pages"][0]["moment"] in ("memory", "present")
+    assert out["pages"][0]["cast"] in ("child", "child_and_pet", "pet")
 
 def test_config_art_style_overrides_bible():
     bible = {"character_anchor": "anchor", "art_style": "MODEL CHOICE", "dedication": "d"}

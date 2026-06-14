@@ -52,7 +52,7 @@ def test_generate_content_dispatches_picture():
     bible = {"character_anchor": "a child and a golden dog",
              "art_style": "soft watercolor", "dedication": "For Sunny"}
     story = {"pages": [{"text": f"t{i}", "scene": f"s{i}",
-                        "moment": "present", "mood": "tender"} for i in range(4)],
+                        "cast": "child", "mood": "tender"} for i in range(4)],
              "closing": "c"}
     def fake_llm(prompt):
         return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)

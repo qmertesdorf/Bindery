@@ -44,11 +44,11 @@ def picture_config_dict():
 def picture_content():
     _pages = (
         [{"text": "We walked every morning, Sunny and me.", "scene": "garden path at dawn",
-          "moment": "memory", "mood": "happy"},
+          "cast": "child_and_pet", "mood": "happy"},
          {"text": "Now the leash hangs still by the door.", "scene": "quiet hallway, leash on a hook",
-          "moment": "present", "mood": "sad"}]
+          "cast": "child", "mood": "sad"}]
         + [{"text": f"I remember you, page {i}.", "scene": f"memory scene {i}",
-            "moment": "memory" if i % 2 else "present", "mood": "wistful"}
+            "cast": "child_and_pet" if i % 2 else "child", "mood": "wistful"}
            for i in range(3, 21)]
     )
     return {

@@ -13,8 +13,8 @@ DOG = Character(role="companion", lora="dog.safetensors", trigger="b1scuitdog do
                 strength=0.85, appears_on="memory")
 
 
-def test_page_plan_memory_uses_both_loras_and_dog_trigger():
-    page = {"scene": "a sunny field", "moment": "memory", "mood": "happy"}
+def test_page_plan_child_and_pet_uses_both_loras_and_triggers():
+    page = {"scene": "a sunny field", "cast": "child_and_pet", "mood": "happy"}
     prompt, loras = page_plan(page, hero=HERO, companion=DOG,
                               style="watercolour", outfit="a red sweater")
     assert loras == [("boy.safetensors", 0.9), ("dog.safetensors", 0.85)]
@@ -22,9 +22,8 @@ def test_page_plan_memory_uses_both_loras_and_dog_trigger():
     assert "a red sweater" in prompt
     assert "warm gentle smile" in prompt          # happy mood -> smiling
 
-
-def test_page_plan_present_uses_hero_only_and_excludes_animals():
-    page = {"scene": "an empty hallway", "moment": "present", "mood": "sad"}
+def test_page_plan_child_uses_hero_only_and_excludes_animals():
+    page = {"scene": "an empty hallway", "cast": "child", "mood": "sad"}
     prompt, loras = page_plan(page, hero=HERO, companion=DOG,
                               style="watercolour", outfit="a red sweater")
     assert loras == [("boy.safetensors", 0.9)]
@@ -32,12 +31,21 @@ def test_page_plan_present_uses_hero_only_and_excludes_animals():
     assert "no animals" in prompt
     assert "not smiling" in prompt                # sad mood (in GRIEF) -> no smile
 
-
-def test_page_plan_no_companion_treats_memory_as_hero_only():
-    page = {"scene": "a field", "moment": "memory", "mood": "happy"}
+def test_page_plan_no_companion_treats_child_and_pet_as_hero_only():
+    page = {"scene": "a field", "cast": "child_and_pet", "mood": "happy"}
     prompt, loras = page_plan(page, hero=HERO, companion=None,
                               style="w", outfit="o")
     assert loras == [("boy.safetensors", 0.9)]
+
+def test_page_plan_pet_renders_companion_alone():
+    page = {"scene": "a luminous meadow", "cast": "pet", "mood": "peaceful"}
+    prompt, loras = page_plan(page, hero=HERO, companion=DOG,
+                              style="watercolour", outfit="a red sweater")
+    assert loras == [("dog.safetensors", 0.85)]      # companion only
+    assert "b1scuitdog dog" in prompt
+    assert "b1scuitboy boy" not in prompt            # no child
+    assert "a red sweater" not in prompt             # no outfit (no child)
+    assert "No people" in prompt
 
 
 def test_flux_workflow_puts_seed_on_noise_not_sampler():
@@ -86,8 +94,8 @@ def _flux_content():
             "art_style": "soft watercolour",
             "dedication": "For Biscuit",
             "pages": [
-                {"text": "t1", "scene": "the field", "moment": "memory", "mood": "happy"},
-                {"text": "t2", "scene": "the hallway", "moment": "present", "mood": "sad"}],
+                {"text": "t1", "scene": "the field", "cast": "child_and_pet", "mood": "happy"},
+                {"text": "t2", "scene": "the hallway", "cast": "child", "mood": "sad"}],
             "closing": "c"}
 
 def _fake_comfy():
@@ -125,6 +133,27 @@ def test_generate_flux_art_audits_present_page_against_boy_only_anchor(tmp_path)
     # the anchor is trimmed before the pet name so the auditor won't demand a dog
     assert "golden dog" in aud.anchors[0]
     assert "golden dog" not in aud.anchors[1]
+
+def test_generate_flux_art_audits_pet_page_against_pet_only_anchor(tmp_path):
+    content = {"character_anchor": "a little girl Posy. Mango is a ginger tabby cat",
+               "art_style": "soft watercolour", "dedication": "d",
+               "pages": [{"text": "t", "scene": "a meadow", "cast": "pet",
+                          "mood": "peaceful"}],
+               "closing": "c"}
+    cfg = BookConfig(slug="k", title="T", subtitle="S", author="A",
+                     art_prompt="cover", book_type="picture", pet_kind="cat",
+                     pet_name="Mango", page_count=4, trim_w=8.5, trim_h=8.5,
+                     art_engine="flux", flux_style="ws", flux_guidance=2.4,
+                     outfit="a blue dress", characters=(
+                         Character(role="hero", lora="posy.safetensors",
+                                   trigger="p0sygirl girl"),
+                         Character(role="companion", lora="mango.safetensors",
+                                   trigger="mang0cat cat", strength=0.85)))
+    aud = _Auditor()
+    generate_flux_art(cfg, content, tmp_path, _fake_comfy(), seed=7, auditor=aud)
+    # the pet page audits against the pet's part of the anchor, not the child's
+    assert "ginger tabby" in aud.anchors[0]
+    assert "Posy" not in aud.anchors[0]
 
 def test_generate_flux_art_regenerates_until_consistent(tmp_path):
     aud = _Auditor(fail_first=1)  # first page's first audit fails, then all pass
