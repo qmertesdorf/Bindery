@@ -62,3 +62,18 @@ def test_config_art_style_overrides_bible():
         return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)
     out = generate_picture_content(_cfg(page_count=4, art_style="LOCKED STYLE"), fake_llm)
     assert out["art_style"] == "LOCKED STYLE"
+
+def test_comfort_story_prompt_uses_all_three_casts_and_frame():
+    p = build_story_prompt(_cfg(theme="comfort"), anchor="a girl and a cat")
+    assert "child_and_pet" in p and "pet" in p and "child" in p
+    assert "peaceful" in p.lower()           # the luminous "beyond" framing
+    assert "heart" in p.lower()              # closes on "stays in your heart"
+    assert "GONE" not in p                   # not the grief framing
+
+def test_grief_story_prompt_still_grief_by_default():
+    p = build_story_prompt(_cfg(), anchor="a child and a dog")   # theme defaults grief
+    assert "GONE" in p and "grief book" in p
+
+def test_comfort_bible_prompt_framing():
+    p = build_bible_prompt(_cfg(theme="comfort"))
+    assert "Sunny" in p and "comfort" in p.lower()

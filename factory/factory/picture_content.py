@@ -7,9 +7,14 @@ from .content import ContentError, _strip_fences
 
 
 def build_bible_prompt(cfg: BookConfig) -> str:
-    return f"""You are designing a gentle children's picture book for a young child
-(ages 4-8) grieving the death of their {cfg.pet_kind}, named {cfg.pet_name}. The
-child narrates; {cfg.pet_name} appears in soft, remembered moments. Title: {cfg.title}.
+    premise = (
+        f"a gentle, comforting children's picture book that reassures a young child "
+        f"(ages 4-8) about where their {cfg.pet_kind}, named {cfg.pet_name}, has gone"
+        if cfg.theme == "comfort" else
+        f"a gentle children's picture book for a young child (ages 4-8) grieving the "
+        f"death of their {cfg.pet_kind}, named {cfg.pet_name}")
+    return f"""You are designing {premise}. The child narrates; {cfg.pet_name} appears
+in soft, tender moments. Title: {cfg.title}.
 
 First produce the STORY BIBLE. Return ONLY valid JSON (no markdown, no commentary):
 {{"character_anchor": "...", "art_style": "...", "dedication": "..."}}
@@ -24,6 +29,12 @@ Output the JSON and nothing else."""
 
 
 def build_story_prompt(cfg: BookConfig, anchor: str) -> str:
+    if cfg.theme == "comfort":
+        return _comfort_story_prompt(cfg, anchor)
+    return _grief_story_prompt(cfg, anchor)
+
+
+def _grief_story_prompt(cfg: BookConfig, anchor: str) -> str:
     return f"""You are writing the gentle children's picture book "{cfg.title}" for a
 child (ages 4-8) whose {cfg.pet_kind}, {cfg.pet_name}, has died. The child narrates.
 Warm, simple, honest, never clinical; never the "Rainbow Bridge" poem.
@@ -59,6 +70,48 @@ Return ONLY valid JSON:
   * Only "child_and_pet" pages show {cfg.pet_name} (alive, with the child).
   Keep objects simple. No words/letters in the picture.
 - "closing": one comforting closing line for the final page.
+Exactly {cfg.page_count} page objects. Output the JSON and nothing else."""
+
+
+def _comfort_story_prompt(cfg: BookConfig, anchor: str) -> str:
+    return f"""You are writing the gentle, comforting children's picture book
+"{cfg.title}" for a child (ages 4-8) whose {cfg.pet_kind}, {cfg.pet_name}, has died.
+The child narrates. Warm, simple, honest, reassuring; never the "Rainbow Bridge"
+poem; no religious afterlife claims.
+
+The recurring characters (keep every page consistent with this): {anchor}
+
+This is a COMFORT book answering a child's question: "where did {cfg.pet_name} go?"
+Structure the {cfg.page_count} pages as a gentle arc: the child misses {cfg.pet_name}
+(alone) → wonders where {cfg.pet_name} went → gentle, dreamlike VISIONS of
+{cfg.pet_name} safe and at peace in a luminous natural place (sunlit meadows, soft
+warm light, drifting stars) — sometimes {cfg.pet_name} alone, sometimes the child
+imagining herself THERE with {cfg.pet_name} → reassurance that {cfg.pet_name} is
+happy and safe → close on the comforting truth that {cfg.pet_name} stays in your
+HEART, in love and memory and the warm world around us.
+
+Return ONLY valid JSON:
+{{"pages": [{{"text": "...", "cast": "child|child_and_pet|pet", "mood": "...",
+            "scene": "..."}}], "closing": "..."}}
+- "text": 1-2 short child-friendly sentences for the page.
+- "cast": who is in THIS page's PICTURE —
+  * "child": the child ALONE (missing {cfg.pet_name}, wondering, or held in a warm
+    quiet moment of "they stay in your heart").
+  * "pet": {cfg.pet_name} ALONE, peaceful and content, in the luminous place — no
+    people at all. Use these for the "where {cfg.pet_name} is now" visions.
+  * "child_and_pet": the child AND {cfg.pet_name} together in that gentle place
+    (the child imagining herself there with {cfg.pet_name}).
+- "mood": the feeling on this page (e.g. wondering, wistful, gentle, peaceful,
+  tender, comforted, hopeful, warm) — vary it honestly with the cast.
+- "scene": a RICH, concrete visual — the SETTING and the subject's expression.
+  CRITICAL constraints (an image model can only reliably draw the child alone, the
+  child with {cfg.pet_name}, or {cfg.pet_name} alone):
+  * NEVER any other PEOPLE (no parent, no friends).
+  * On a "child" page show ONLY the child; do NOT depict {cfg.pet_name}.
+  * On a "pet" page show ONLY {cfg.pet_name} in the luminous place; NO people.
+  * On a "child_and_pet" page show the child and {cfg.pet_name} together.
+  Keep objects simple. No words/letters in the picture.
+- "closing": one comforting closing line about {cfg.pet_name} staying in your heart.
 Exactly {cfg.page_count} page objects. Output the JSON and nothing else."""
 
 
