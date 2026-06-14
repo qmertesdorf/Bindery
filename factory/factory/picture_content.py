@@ -13,8 +13,9 @@ def build_bible_prompt(cfg: BookConfig) -> str:
         if cfg.theme == "comfort" else
         f"a gentle children's picture book for a young child (ages 4-8) grieving the "
         f"death of their {cfg.pet_kind}, named {cfg.pet_name}")
+    appearance = "tender" if cfg.theme == "comfort" else "remembered"
     return f"""You are designing {premise}. The child narrates; {cfg.pet_name} appears
-in soft, tender moments. Title: {cfg.title}.
+in soft, {appearance} moments. Title: {cfg.title}.
 
 First produce the STORY BIBLE. Return ONLY valid JSON (no markdown, no commentary):
 {{"character_anchor": "...", "art_style": "...", "dedication": "..."}}

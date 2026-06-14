@@ -77,3 +77,10 @@ def test_grief_story_prompt_still_grief_by_default():
 def test_comfort_bible_prompt_framing():
     p = build_bible_prompt(_cfg(theme="comfort"))
     assert "Sunny" in p and "comfort" in p.lower()
+    assert "grieving the death" not in p    # comfort bible must not use grief framing
+
+
+def test_grief_bible_prompt_keeps_remembered_wording():
+    p = build_bible_prompt(_cfg())   # grief default
+    assert "remembered moments" in p
+    assert "grieving the death" in p
