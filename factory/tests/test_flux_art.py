@@ -136,3 +136,21 @@ def test_generate_flux_art_fails_when_never_consistent(tmp_path):
     with pytest.raises(ArtError, match="consistent"):
         generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
                           seed=7, auditor=_Auditor(fail_first=999), max_tries=3)
+
+def test_generate_flux_art_threads_seed_into_graph(tmp_path):
+    seeds = []
+    def http_post(url, json):
+        seeds.append(json["prompt"]["noise"]["inputs"]["noise_seed"])
+        return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+    generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, comfy,
+                      seed=1000, auditor=_Auditor())
+    # the caller's seed actually drives the graph (not a hardcoded constant)
+    assert 1000 + 1 * 17 in seeds   # page 1 seed = seed + i*17
+    assert 1000 + 42 in seeds       # cover seed = seed + 42
+    assert all(s >= 1000 for s in seeds)

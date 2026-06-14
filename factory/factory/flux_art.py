@@ -112,11 +112,13 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     outfit = cfg.outfit
     anchor = content["character_anchor"]
     pet = cfg.pet_name
-    hero = next(c for c in cfg.characters if c.role == "hero")
+    hero = next((c for c in cfg.characters if c.role == "hero"), None)
+    if hero is None:
+        raise ArtError("flux picture book has no 'hero' character in cfg.characters")
     companion = next((c for c in cfg.characters if c.role == "companion"), None)
     # On present pages, audit against just the human part of the anchor (the text
     # before the pet's name) so the auditor doesn't demand the absent pet.
-    hero_anchor = (anchor.split(pet)[0].rstrip(" .,;") if pet and pet in anchor
+    hero_anchor = (anchor.split(pet, 1)[0].rstrip(" .,;") if pet and pet in anchor
                    else anchor)
     pages = content["pages"]
     n = len(pages)
@@ -137,7 +139,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
         out_pages.append(run_audited_render(
             render, prompt, out_path=out_dir / f"page_{i:02d}.png", auditor=auditor,
             anchor=audit_anchor, scene=page["scene"], reference_path=None,
-            seed=500 + i * 17, max_tries=max_tries))
+            seed=seed + i * 17, max_tries=max_tries))
 
     # Cover: hero + companion (if any), the configured cover scene.
     _log("[flux] cover…")
@@ -157,7 +159,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
     cover = run_audited_render(
         cover_render, cover_prompt, out_path=out_dir / "art.png", auditor=auditor,
-        anchor=anchor, scene="front cover", reference_path=None, seed=42,
+        anchor=anchor, scene="front cover", reference_path=None, seed=seed + 42,
         max_tries=max_tries)
     _log(f"[flux] complete: {n} pages + cover")
     return {"pages": out_pages, "cover": Path(cover)}
