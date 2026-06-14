@@ -237,3 +237,13 @@ def test_invalid_theme_rejected(tmp_path):
             "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
             "book_type": "picture", "pet_kind": "cat", "pet_name": "Mango",
             "page_count": 22, "theme": "spooky"}))
+
+
+def test_where_does_mango_go_config_is_valid():
+    p = Path(__file__).resolve().parent.parent / "books" / "where-does-mango-go.config.json"
+    cfg = load_config(p)
+    assert cfg.book_type == "picture" and cfg.art_engine == "flux"
+    assert cfg.theme == "comfort" and cfg.pet_name == "Mango"
+    assert cfg.trim_w == 8.5 and cfg.page_count >= 20 and cfg.page_count % 2 == 0
+    assert len(cfg.characters) == 2
+    assert cfg.characters[0].role == "hero"

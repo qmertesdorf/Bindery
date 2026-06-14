@@ -1,0 +1,25 @@
+{
+  "slug": "where-does-mango-go",
+  "book_type": "picture",
+  "art_engine": "flux",
+  "theme": "comfort",
+  "title": "Where Does Mango Go?",
+  "subtitle": "A Gentle Story About Where Beloved Pets Go",
+  "author": "Eleanor Hartley",
+  "pet_kind": "cat",
+  "pet_name": "Mango",
+  "page_count": 22,
+  "flux_style": "Loose hand-painted watercolour storybook illustration, wet-on-wet washes with soft bleeding edges and gentle visible brushwork, pale muted palette, soft white space, delicate, dreamy and tender, minimal linework, textured watercolour paper, children's picture book art, no text",
+  "flux_guidance": 2.4,
+  "outfit": "wearing a soft sky-blue pinafore dress over a cream long-sleeved top and little red shoes",
+  "character_anchor": "A round-faced little blonde girl about five years old with fair skin and shoulder-length wavy honey-blonde hair with a small side braid, wearing a soft sky-blue pinafore dress over a cream long-sleeved top and little red shoes. Mango is a small soft ginger and orange tabby cat with a cream chest and paws, gentle amber-green eyes, a fluffy tail, and a little pink nose.",
+  "characters": [
+    {"role": "hero", "lora": "posy_flux.safetensors", "trigger": "p0sygirl girl", "strength": 0.9},
+    {"role": "companion", "lora": "mango_flux.safetensors", "trigger": "mang0cat cat", "strength": 0.85, "appears_on": "all"}
+  ],
+  "art_prompt": "soft storybook watercolour front cover, a little blonde girl and a gentle ginger tabby cat sitting close together on a sunlit grassy hill at golden hour, warm and hopeful, soft glowing light, no text, no words",
+  "trim_w": 8.5,
+  "trim_h": 8.5,
+  "price_usd": 10.99,
+  "blurb": "When a beloved cat is gone, a child's first question is the biggest one: where did they go? Through a little girl's eyes and soft, glowing watercolours, this gentle reassurance carries a family from missing Mango toward a tender, comforting answer — that those we love are safe, at peace, and always close in our hearts. A soothing read-aloud and a caring gift for any child saying goodbye to a cherished pet."
+}
