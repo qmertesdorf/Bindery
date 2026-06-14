@@ -68,3 +68,32 @@ def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
                  "inputs": {"filename_prefix": "flux", "images": ["up", 0]}},
     })
     return nodes
+
+
+def _expression(mood: str) -> str:
+    """Somber moods must not smile (the auditor hard-rejects a smiling child on a
+    sad page); everything else gets a gentle smile."""
+    return ("a quiet, gentle, not smiling face" if mood.lower() in GRIEF
+            else "a warm gentle smile")
+
+
+def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
+    """Return (prompt, loras) for a page. The page's `moment` selects the cast:
+    a "memory" page (when a companion exists) stacks the companion LoRA and names
+    both triggers; any other page is the hero alone with animals explicitly
+    excluded so the model never invents a live pet on a present-day page."""
+    mood = page.get("mood", "tender")
+    expr = _expression(mood)
+    memory = page.get("moment") == "memory"
+    if memory and companion is not None:
+        loras = [(hero.lora, hero.strength), (companion.lora, companion.strength)]
+        who = (f"{hero.trigger} {outfit}, together with {companion.trigger}")
+        guard = " Only the child and the pet, no other people."
+    else:
+        loras = [(hero.lora, hero.strength)]
+        who = f"{hero.trigger} {outfit}, alone, no other people, no animals"
+        guard = ""
+    prompt = (f"{style}. {who}. {page['scene']} The child shows {expr}, "
+              f"clearly {mood}.{guard} Richly detailed background, illustrated "
+              f"edge to edge.")
+    return prompt, loras
