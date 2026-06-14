@@ -72,11 +72,12 @@ class ComfyClient:
         self.poll_interval = poll_interval
         self.max_polls = max_polls
 
-    def generate(self, workflow: dict, *, positive_node: str, sampler_node: str,
-                 prompt: str, seed: int, out_path: Path) -> Path:
-        wf = inject_prompt(workflow, positive_node=positive_node,
-                           sampler_node=sampler_node, prompt=prompt, seed=seed)
-        resp = self.http_post(f"{self.base}/prompt", json={"prompt": wf})
+    def submit(self, workflow: dict, *, out_path: Path) -> Path:
+        """POST an already-complete workflow graph, poll until it finishes, and
+        download the first output image. Backend-agnostic (no prompt/seed
+        injection) so Flux graphs — which bake prompt+seed into their own nodes —
+        can reuse the same submit/poll/retrieve path and the same test fakes."""
+        resp = self.http_post(f"{self.base}/prompt", json={"prompt": workflow})
         pid = resp.get("prompt_id")
         if not pid:
             raise ArtError(f"ComfyUI did not return prompt_id: {resp}")
@@ -100,6 +101,12 @@ class ComfyClient:
         out_path.write_bytes(data)
         return out_path
 
+    def generate(self, workflow: dict, *, positive_node: str, sampler_node: str,
+                 prompt: str, seed: int, out_path: Path) -> Path:
+        wf = inject_prompt(workflow, positive_node=positive_node,
+                           sampler_node=sampler_node, prompt=prompt, seed=seed)
+        return self.submit(wf, out_path=out_path)
+
     @staticmethod
     def _first_image(outputs: dict) -> dict:
         for node in outputs.values():
@@ -110,20 +117,20 @@ class ComfyClient:
         raise ArtError("no image in ComfyUI outputs")
 
 
-def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
-                      seed, out_path, auditor, anchor, reference_path, scene,
-                      max_tries) -> Path:
-    """Generate an image, audit it, and regenerate (fresh seed + corrective hints)
-    until it passes or the try budget runs out — then fail the build loudly."""
+def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
+                       reference_path=None, seed=0, max_tries=4) -> Path:
+    """Render → audit → regenerate (fresh seed + corrective hints) until the
+    auditor passes or the try budget runs out, then fail loudly. `render` is a
+    callable (prompt, seed, out_path) -> None that writes the image. The seed is
+    bumped by attempt*1009 each retry so a fresh sample is drawn, and the last
+    attempt's issues are appended to the prompt as corrective guidance."""
     name = Path(out_path).name
     issues: list[str] = []
     for attempt in range(max_tries):
         p = prompt
         if issues:
             p = f"{prompt} Fix these problems from the last attempt: {'; '.join(issues)}"
-        comfy.generate(workflow, positive_node=positive_node,
-                       sampler_node=sampler_node, prompt=p,
-                       seed=seed + attempt * 1009, out_path=out_path)
+        render(p, seed + attempt * 1009, out_path)
         verdict = auditor.audit(out_path, anchor=anchor,
                                 reference_path=reference_path, scene=scene)
         if verdict.get("ok"):
@@ -137,6 +144,19 @@ def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
     raise ArtError(
         f"could not produce a consistent illustration for {name} "
         f"after {max_tries} tries; last issues: {issues}")
+
+
+def _generate_audited(comfy, workflow, *, positive_node, sampler_node, prompt,
+                      seed, out_path, auditor, anchor, reference_path, scene,
+                      max_tries) -> Path:
+    """SDXL adapter: drive run_audited_render with a ComfyClient.generate render."""
+    def render(p, s, op):
+        comfy.generate(workflow, positive_node=positive_node,
+                       sampler_node=sampler_node, prompt=p, seed=s, out_path=op)
+    return run_audited_render(render, prompt, out_path=out_path, auditor=auditor,
+                              anchor=anchor, scene=scene,
+                              reference_path=reference_path, seed=seed,
+                              max_tries=max_tries)
 
 
 def generate_picture_art(cfg, content, out_dir, comfy, workflow, *,
