@@ -1,5 +1,5 @@
 """Stage 3 for Flux picture books: per-page illustration via a trained character
-LoRA (plus an optional companion LoRA on memory pages), audited and regenerated
+LoRA (plus an optional companion LoRA on child_and_pet pages), audited and regenerated
 until consistent. Identity comes from the LoRA; scene, wardrobe, and the
 watercolour look come from the prompt. Mirrors the validated _flux_dual.py recipe.
 
@@ -108,7 +108,7 @@ def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
 
 def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
                       max_tries: int = 4) -> dict:
-    """Illustrate every page with the hero LoRA (companion LoRA added on memory
+    """Illustrate every page with the hero LoRA (companion LoRA added on child_and_pet
     pages), then a dual-cast cover — each audited and regenerated until it passes.
     Returns {"pages": [Path...], "cover": Path}. No reference sheet: the trained
     LoRA carries character identity, replacing the SDXL reference-image trick."""
@@ -123,7 +123,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     if hero is None:
         raise ArtError("flux picture book has no 'hero' character in cfg.characters")
     companion = next((c for c in cfg.characters if c.role == "companion"), None)
-    # On present pages, audit against just the human part of the anchor (the text
+    # On child-cast pages, audit against just the human part of the anchor (the text
     # before the pet's name) so the auditor doesn't demand the absent pet.
     hero_anchor = (anchor.split(pet, 1)[0].rstrip(" .,;") if pet and pet in anchor
                    else anchor)
