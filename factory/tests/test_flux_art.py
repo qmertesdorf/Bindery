@@ -1,6 +1,11 @@
 from factory.flux_art import flux_lora_workflow
 from factory.config import Character
 from factory.flux_art import page_plan
+from pathlib import Path
+import pytest
+from factory.config import BookConfig
+from factory.art import ComfyClient, ArtError
+from factory.flux_art import generate_flux_art
 
 HERO = Character(role="hero", lora="boy.safetensors", trigger="b1scuitboy boy",
                  strength=0.9)
@@ -65,3 +70,69 @@ def test_flux_workflow_stacks_two_loras_in_series():
     assert wf["lora1"]["inputs"]["strength_model"] == 0.85
     assert wf["sch"]["inputs"]["model"] == ["lora1", 0]        # chain head = last lora
     assert wf["gd"]["inputs"]["model"] == ["lora1", 0]
+
+
+def _flux_cfg():
+    return BookConfig(slug="k", title="T", subtitle="S", author="A",
+                      art_prompt="a boy and a dog on a sunset hill",
+                      book_type="picture", pet_kind="dog", pet_name="Biscuit",
+                      page_count=4, trim_w=8.5, trim_h=8.5, art_engine="flux",
+                      flux_style="watercolour storybook, no text",
+                      flux_guidance=2.4, outfit="a red sweater and blue overalls",
+                      characters=(HERO, DOG))
+
+def _flux_content():
+    return {"character_anchor": "a boy named Biscuit's friend; Biscuit is a golden dog",
+            "art_style": "soft watercolour",
+            "dedication": "For Biscuit",
+            "pages": [
+                {"text": "t1", "scene": "the field", "moment": "memory", "mood": "happy"},
+                {"text": "t2", "scene": "the hallway", "moment": "present", "mood": "sad"}],
+            "closing": "c"}
+
+def _fake_comfy():
+    def http_post(url, json): return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    return ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+
+class _Auditor:
+    def __init__(self, fail_first=0):
+        self.calls = 0; self.fail_first = fail_first; self.anchors = []
+    def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+        self.calls += 1; self.anchors.append(anchor)
+        ok = self.calls > self.fail_first
+        return {"ok": ok, "issues": [] if ok else ["dog colour off"]}
+
+def test_generate_flux_art_writes_pages_and_cover(tmp_path):
+    art = generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
+                            seed=7, auditor=_Auditor())
+    assert [Path(p).name for p in art["pages"]] == ["page_01.png", "page_02.png"]
+    assert Path(art["cover"]).name == "art.png"
+    for p in [*art["pages"], art["cover"]]:
+        assert Path(p).exists()
+    # flux books need NO SDXL-style reference sheet (the LoRA carries identity)
+    assert not (tmp_path / "reference.png").exists()
+
+def test_generate_flux_art_audits_present_page_against_boy_only_anchor(tmp_path):
+    aud = _Auditor()
+    generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
+                      seed=7, auditor=aud)
+    # page 1 is memory -> full anchor (mentions the dog); page 2 is present ->
+    # the anchor is trimmed before the pet name so the auditor won't demand a dog
+    assert "golden dog" in aud.anchors[0]
+    assert "golden dog" not in aud.anchors[1]
+
+def test_generate_flux_art_regenerates_until_consistent(tmp_path):
+    aud = _Auditor(fail_first=1)  # first page's first audit fails, then all pass
+    generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
+                      seed=7, auditor=aud)
+    assert aud.calls >= 4  # page1 (fail+pass) + page2 + cover
+
+def test_generate_flux_art_fails_when_never_consistent(tmp_path):
+    with pytest.raises(ArtError, match="consistent"):
+        generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
+                          seed=7, auditor=_Auditor(fail_first=999), max_tries=3)

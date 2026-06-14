@@ -97,3 +97,67 @@ def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
               f"clearly {mood}.{guard} Richly detailed background, illustrated "
               f"edge to edge.")
     return prompt, loras
+
+
+def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
+                      max_tries: int = 4) -> dict:
+    """Illustrate every page with the hero LoRA (companion LoRA added on memory
+    pages), then a dual-cast cover — each audited and regenerated until it passes.
+    Returns {"pages": [Path...], "cover": Path}. No reference sheet: the trained
+    LoRA carries character identity, replacing the SDXL reference-image trick."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    style = cfg.flux_style or content["art_style"]
+    guidance = cfg.flux_guidance
+    outfit = cfg.outfit
+    anchor = content["character_anchor"]
+    pet = cfg.pet_name
+    hero = next(c for c in cfg.characters if c.role == "hero")
+    companion = next((c for c in cfg.characters if c.role == "companion"), None)
+    # On present pages, audit against just the human part of the anchor (the text
+    # before the pet's name) so the auditor doesn't demand the absent pet.
+    hero_anchor = (anchor.split(pet)[0].rstrip(" .,;") if pet and pet in anchor
+                   else anchor)
+    pages = content["pages"]
+    n = len(pages)
+
+    out_pages = []
+    for i, page in enumerate(pages, 1):
+        prompt, loras = page_plan(page, hero=hero, companion=companion,
+                                  style=style, outfit=outfit)
+        memory = page.get("moment") == "memory"
+        audit_anchor = anchor if memory else hero_anchor
+        _log(f"[flux] page {i}/{n} ({page.get('moment')},{page.get('mood')}): "
+             f"{page['scene'][:60]}")
+
+        def render(p, s, op, _loras=loras):
+            comfy.submit(flux_lora_workflow(p, s, loras=_loras, guidance=guidance),
+                         out_path=op)
+
+        out_pages.append(run_audited_render(
+            render, prompt, out_path=out_dir / f"page_{i:02d}.png", auditor=auditor,
+            anchor=audit_anchor, scene=page["scene"], reference_path=None,
+            seed=500 + i * 17, max_tries=max_tries))
+
+    # Cover: hero + companion (if any), the configured cover scene.
+    _log("[flux] cover…")
+    if companion is not None:
+        cover_loras = [(hero.lora, hero.strength),
+                       (companion.lora, companion.strength)]
+        who = f"{hero.trigger} {outfit}, together with {companion.trigger}"
+    else:
+        cover_loras = [(hero.lora, hero.strength)]
+        who = f"{hero.trigger} {outfit}"
+    cover_prompt = (f"{style}. {who}. {cfg.art_prompt}. The child is a human child "
+                    f"and the pet is an animal; no other people.")
+
+    def cover_render(p, s, op):
+        comfy.submit(flux_lora_workflow(p, s, loras=cover_loras, guidance=guidance),
+                     out_path=op)
+
+    cover = run_audited_render(
+        cover_render, cover_prompt, out_path=out_dir / "art.png", auditor=auditor,
+        anchor=anchor, scene="front cover", reference_path=None, seed=42,
+        max_tries=max_tries)
+    _log(f"[flux] complete: {n} pages + cover")
+    return {"pages": out_pages, "cover": Path(cover)}
