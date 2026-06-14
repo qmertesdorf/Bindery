@@ -208,6 +208,11 @@ def test_flux_character_requires_lora_and_trigger(tmp_path):
         load_config(_write_d(tmp_path, _flux_dict(characters=[
             {"role": "hero", "trigger": "b1scuitboy boy"}])))
 
+def test_flux_character_requires_trigger_when_lora_present(tmp_path):
+    with pytest.raises(ConfigError, match="trigger"):
+        load_config(_write_d(tmp_path, _flux_dict(characters=[
+            {"role": "hero", "lora": "boy.safetensors"}])))
+
 def test_flux_requires_flux_style(tmp_path):
     with pytest.raises(ConfigError, match="flux_style"):
         load_config(_write_d(tmp_path, _flux_dict(flux_style="")))

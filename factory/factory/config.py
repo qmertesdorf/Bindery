@@ -71,6 +71,7 @@ def load_config(path: str | Path) -> BookConfig:
     if missing:
         raise ConfigError(f"{path}: missing required field(s): {', '.join(missing)}")
     book_type = str(data.get("book_type", "journal"))
+    art_engine = str(data.get("art_engine", "sdxl"))
     if book_type not in BOOK_TYPES:
         raise ConfigError(
             f"{path}: book_type must be one of {BOOK_TYPES}, got {book_type!r}")
@@ -92,7 +93,6 @@ def load_config(path: str | Path) -> BookConfig:
             raise ConfigError(
                 f"{path}: picture 'page_count' must be even and >= 20 "
                 f"(with fixed matter this clears KDP's 24-page floor); got {pc}")
-        art_engine = str(data.get("art_engine", "sdxl"))
         if art_engine not in ("sdxl", "flux"):
             raise ConfigError(
                 f"{path}: picture 'art_engine' must be 'sdxl' or 'flux', "
@@ -134,7 +134,7 @@ def load_config(path: str | Path) -> BookConfig:
         page_count=int(data.get("page_count", 0)),
         art_style=str(data.get("art_style", "")),
         character_anchor=str(data.get("character_anchor", "")),
-        art_engine=str(data.get("art_engine", "sdxl")),
+        art_engine=art_engine,
         flux_style=str(data.get("flux_style", "")),
         flux_guidance=float(data.get("flux_guidance", 2.4)),
         outfit=str(data.get("outfit", "")),
