@@ -128,3 +128,62 @@ def test_picture_build_paperback_only_with_pages(tmp_path, picture_config_dict, 
         assert (Path(out_dir) / f).exists(), f"missing {f}"
     assert not (Path(out_dir) / "interior.epub").exists()
     assert not (Path(out_dir) / "cover-ebook.jpg").exists()
+
+
+def test_picture_build_routes_to_flux_engine(tmp_path, picture_config_dict, picture_content):
+    # keep picture_config_dict's page_count (20) so it matches the 20-page
+    # picture_content fixture — content validation requires an exact match.
+    cfg_dict = {**picture_config_dict, "art_engine": "flux",
+                "flux_style": "watercolour storybook, no text",
+                "flux_guidance": 2.4,
+                "outfit": "a red sweater and blue overalls",
+                "characters": [
+                    {"role": "hero", "lora": "boy.safetensors",
+                     "trigger": "b1scuitboy boy", "strength": 0.9},
+                    {"role": "companion", "lora": "dog.safetensors",
+                     "trigger": "b1scuitdog dog", "strength": 0.85,
+                     "appears_on": "memory"}]}
+    cfgp = tmp_path / "book.config.json"
+    cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
+
+    bible = {"character_anchor": picture_content["character_anchor"],
+             "art_style": picture_content["art_style"],
+             "dedication": picture_content["dedication"]}
+    story = {"pages": picture_content["pages"], "closing": picture_content["closing"]}
+    def fake_llm(prompt):
+        return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)
+
+    def http_post(url, json): return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+
+    class FakeAuditor:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+            return {"ok": True, "issues": []}
+
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                import fitz
+                d = fitz.open()
+                for _ in range(26):
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+
+    # NOTE: no workflow passed — the flux path must not need the SDXL template.
+    out_dir = run_build(cfgp, out_root=tmp_path / "out", generate_fn=fake_llm,
+                        comfy=comfy, runner=runner, auditor=FakeAuditor())
+    for f in ["content.json", "page_01.png", "page_02.png", "art.png",
+              "interior.pdf", "cover-paperback.pdf", "upload-checklist.md"]:
+        assert (Path(out_dir) / f).exists(), f"missing {f}"
+    # flux path produces NO reference sheet
+    assert not (Path(out_dir) / "reference.png").exists()

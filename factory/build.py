@@ -8,6 +8,7 @@ from factory.config import load_config
 from factory.content import generate_content, claude_generate
 from factory.interior import render_interior_html, build_interior_pdf, build_epub
 from factory.art import ComfyClient, generate_picture_art
+from factory.flux_art import generate_flux_art
 from factory.audit import ClaudeVisionAuditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
@@ -26,27 +27,36 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     content = generate_content(cfg, generate_fn=generate_fn)
     (out_dir / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
 
-    # Resolve image backend + workflow up front (picture needs art before interior).
+    # Resolve image backend up front (picture needs art before interior).
     if comfy is None:
         comfy = ComfyClient()
-    if workflow is None:
-        workflow = json.loads((Path(__file__).parent / "comfyui" / "workflow.template.json")
-                              .read_text(encoding="utf-8"))
-    if "REPLACE_WITH_YOUR_CHECKPOINT" in json.dumps(workflow):
-        raise SystemExit(
-            "ComfyUI workflow still has the placeholder checkpoint. Edit "
-            "comfyui/workflow.template.json and set ckpt_name to a real checkpoint "
-            "from your ComfyUI install before running the factory.")
+
+    flux = cfg.book_type == "picture" and cfg.art_engine == "flux"
+    if not flux:
+        # The SDXL path needs the workflow template + a real checkpoint; the Flux
+        # path builds its own graph and needs neither.
+        if workflow is None:
+            workflow = json.loads((Path(__file__).parent / "comfyui" / "workflow.template.json")
+                                  .read_text(encoding="utf-8"))
+        if "REPLACE_WITH_YOUR_CHECKPOINT" in json.dumps(workflow):
+            raise SystemExit(
+                "ComfyUI workflow still has the placeholder checkpoint. Edit "
+                "comfyui/workflow.template.json and set ckpt_name to a real checkpoint "
+                "from your ComfyUI install before running the factory.")
 
     if cfg.book_type == "picture":
         # ②③ Picture books illustrate every page, so art runs BEFORE the interior
         # (the interior embeds page_NN.png). Consistency is enforced by the auditor.
         if auditor is None:
             auditor = ClaudeVisionAuditor()
-        art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
-                                   positive_node=positive_node,
-                                   sampler_node=sampler_node, seed=seed,
-                                   auditor=auditor)
+        if flux:
+            art = generate_flux_art(cfg, content, out_dir, comfy,
+                                    seed=seed, auditor=auditor)
+        else:
+            art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
+                                       positive_node=positive_node,
+                                       sampler_node=sampler_node, seed=seed,
+                                       auditor=auditor)
         html = render_interior_html(cfg, content, out_dir)
         _, pages = build_interior_pdf(html, out_dir, runner=runner,
                                       book_type=cfg.book_type,
