@@ -154,3 +154,60 @@ def test_dog_loss_kids_config_is_valid():
     assert cfg.book_type == "picture" and cfg.pet_kind == "dog"
     assert cfg.trim_w == 8.5 and cfg.trim_h == 8.5
     assert cfg.page_count >= 20 and cfg.page_count % 2 == 0
+
+
+def _flux_dict(**over):
+    d = {"slug": "k", "title": "T", "subtitle": "S", "author": "A",
+         "art_prompt": "cover scene", "book_type": "picture", "pet_kind": "dog",
+         "pet_name": "Biscuit", "page_count": 22, "trim_w": 8.5, "trim_h": 8.5,
+         "art_engine": "flux",
+         "flux_style": "watercolour storybook, no text",
+         "flux_guidance": 2.4,
+         "outfit": "a red sweater and blue overalls",
+         "characters": [
+             {"role": "hero", "lora": "boy.safetensors", "trigger": "b1scuitboy boy",
+              "strength": 0.9},
+             {"role": "companion", "lora": "dog.safetensors", "trigger": "b1scuitdog dog",
+              "strength": 0.85, "appears_on": "memory"}]}
+    d.update(over)
+    return d
+
+def test_flux_picture_config_parses(tmp_path):
+    cfg = load_config(_write_d(tmp_path, _flux_dict()))
+    assert cfg.art_engine == "flux"
+    assert cfg.flux_style.startswith("watercolour")
+    assert cfg.flux_guidance == 2.4
+    assert cfg.outfit == "a red sweater and blue overalls"
+    assert len(cfg.characters) == 2
+    hero = cfg.characters[0]
+    assert hero.role == "hero" and hero.lora == "boy.safetensors"
+    assert hero.trigger == "b1scuitboy boy" and hero.strength == 0.9
+    comp = cfg.characters[1]
+    assert comp.role == "companion" and comp.appears_on == "memory"
+
+def test_art_engine_defaults_to_sdxl(tmp_path):
+    cfg = load_config(_write_d(tmp_path, {
+        "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
+        "book_type": "picture", "pet_kind": "dog", "pet_name": "Sunny",
+        "page_count": 22}))
+    assert cfg.art_engine == "sdxl"
+    assert cfg.characters == ()
+
+def test_invalid_art_engine_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="art_engine"):
+        load_config(_write_d(tmp_path, _flux_dict(art_engine="midjourney")))
+
+def test_flux_requires_exactly_one_hero(tmp_path):
+    with pytest.raises(ConfigError, match="hero"):
+        load_config(_write_d(tmp_path, _flux_dict(characters=[
+            {"role": "companion", "lora": "dog.safetensors", "trigger": "d",
+             "appears_on": "memory"}])))
+
+def test_flux_character_requires_lora_and_trigger(tmp_path):
+    with pytest.raises(ConfigError, match="lora"):
+        load_config(_write_d(tmp_path, _flux_dict(characters=[
+            {"role": "hero", "trigger": "b1scuitboy boy"}])))
+
+def test_flux_requires_flux_style(tmp_path):
+    with pytest.raises(ConfigError, match="flux_style"):
+        load_config(_write_d(tmp_path, _flux_dict(flux_style="")))

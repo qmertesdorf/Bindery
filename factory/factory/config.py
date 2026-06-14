@@ -13,6 +13,17 @@ class ConfigError(ValueError):
 
 
 @dataclass(frozen=True)
+class Character:
+    """A LoRA-backed character in a Flux picture book. `appears_on` is "all"
+    (hero, every page) or "memory" (companion, only on flashback pages)."""
+    role: str            # "hero" or "companion"
+    lora: str            # LoRA filename in ComfyUI/models/loras
+    trigger: str         # the trained trigger phrase, e.g. "b1scuitboy boy"
+    strength: float = 0.9
+    appears_on: str = "all"
+
+
+@dataclass(frozen=True)
 class BookConfig:
     slug: str
     title: str
@@ -33,6 +44,11 @@ class BookConfig:
     page_count: int = 0              # picture only — number of story pages
     art_style: str = ""              # picture only — locked illustration style (optional)
     character_anchor: str = ""       # picture only — pin the character design (optional)
+    art_engine: str = "sdxl"              # picture only — "sdxl" (default) or "flux"
+    flux_style: str = ""                  # flux only — the rich style/look prompt
+    flux_guidance: float = 2.4            # flux only — FluxGuidance value
+    outfit: str = ""                      # flux only — locked character wardrobe
+    characters: tuple = ()                # flux only — tuple[Character, ...]
 
     @property
     def makes_ebook(self) -> bool:
@@ -76,6 +92,24 @@ def load_config(path: str | Path) -> BookConfig:
             raise ConfigError(
                 f"{path}: picture 'page_count' must be even and >= 20 "
                 f"(with fixed matter this clears KDP's 24-page floor); got {pc}")
+        art_engine = str(data.get("art_engine", "sdxl"))
+        if art_engine not in ("sdxl", "flux"):
+            raise ConfigError(
+                f"{path}: picture 'art_engine' must be 'sdxl' or 'flux', "
+                f"got {art_engine!r}")
+        if art_engine == "flux":
+            chars = data.get("characters", []) or []
+            heroes = [c for c in chars if c.get("role") == "hero"]
+            if len(heroes) != 1:
+                raise ConfigError(
+                    f"{path}: flux picture books require exactly one 'hero' "
+                    f"character (got {len(heroes)})")
+            for c in chars:
+                if not c.get("lora") or not c.get("trigger"):
+                    raise ConfigError(
+                        f"{path}: each flux character needs a 'lora' and a 'trigger'")
+            if not data.get("flux_style"):
+                raise ConfigError(f"{path}: flux picture books require 'flux_style'")
     trim_w = float(data.get("trim_w", 6.0))
     trim_h = float(data.get("trim_h", 9.0))
     if trim_w <= 0 or trim_h <= 0:
@@ -100,4 +134,14 @@ def load_config(path: str | Path) -> BookConfig:
         page_count=int(data.get("page_count", 0)),
         art_style=str(data.get("art_style", "")),
         character_anchor=str(data.get("character_anchor", "")),
+        art_engine=str(data.get("art_engine", "sdxl")),
+        flux_style=str(data.get("flux_style", "")),
+        flux_guidance=float(data.get("flux_guidance", 2.4)),
+        outfit=str(data.get("outfit", "")),
+        characters=tuple(
+            Character(role=str(c.get("role", "")), lora=str(c.get("lora", "")),
+                      trigger=str(c.get("trigger", "")),
+                      strength=float(c.get("strength", 0.9)),
+                      appears_on=str(c.get("appears_on", "all")))
+            for c in (data.get("characters", []) or [])),
     )
