@@ -9,6 +9,14 @@
   "page_count": 22,
   "art_style": "soft flat storybook watercolour, muted warm palette, gentle soft edges, simple iconic shapes, picture-book illustration, no text, no words, no letters",
   "character_anchor": "A round-faced little boy about five years old with short dark-brown hair and warm tan skin, wearing a bright red sweater and blue denim overalls. Biscuit is a small fluffy golden-brown dog with soft floppy ears and a curly tail.",
+  "art_engine": "flux",
+  "flux_style": "Loose hand-painted watercolour storybook illustration, wet-on-wet washes with soft bleeding edges and gentle visible brushwork, pale muted palette, soft white space, delicate, dreamy and tender, minimal linework, textured watercolour paper, children's picture book art, no text",
+  "flux_guidance": 2.4,
+  "outfit": "wearing a solid red knit sweater and blue denim overalls",
+  "characters": [
+    {"role": "hero", "lora": "biscuitboy_flux_v2-step00001000.safetensors", "trigger": "b1scuitboy boy", "strength": 0.9},
+    {"role": "companion", "lora": "biscuitdog_flux-step00000800.safetensors", "trigger": "b1scuitdog dog", "strength": 0.85, "appears_on": "memory"}
+  ],
   "art_prompt": "soft storybook watercolour front cover, a small child and a gentle golden dog sitting together on a grassy hill at warm sunset, tender and hopeful, no text, no words",
   "trim_w": 8.5,
   "trim_h": 8.5,
