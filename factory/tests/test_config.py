@@ -216,3 +216,24 @@ def test_flux_character_requires_trigger_when_lora_present(tmp_path):
 def test_flux_requires_flux_style(tmp_path):
     with pytest.raises(ConfigError, match="flux_style"):
         load_config(_write_d(tmp_path, _flux_dict(flux_style="")))
+
+def test_picture_theme_defaults_to_grief(tmp_path):
+    cfg = load_config(_write_d(tmp_path, {
+        "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
+        "book_type": "picture", "pet_kind": "dog", "pet_name": "Sunny",
+        "page_count": 22}))
+    assert cfg.theme == "grief"
+
+def test_picture_theme_comfort_parses(tmp_path):
+    cfg = load_config(_write_d(tmp_path, {
+        "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
+        "book_type": "picture", "pet_kind": "cat", "pet_name": "Mango",
+        "page_count": 22, "theme": "comfort"}))
+    assert cfg.theme == "comfort"
+
+def test_invalid_theme_rejected(tmp_path):
+    with pytest.raises(ConfigError, match="theme"):
+        load_config(_write_d(tmp_path, {
+            "slug": "k", "title": "T", "subtitle": "S", "author": "A", "art_prompt": "x",
+            "book_type": "picture", "pet_kind": "cat", "pet_name": "Mango",
+            "page_count": 22, "theme": "spooky"}))

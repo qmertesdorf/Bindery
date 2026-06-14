@@ -49,6 +49,7 @@ class BookConfig:
     flux_guidance: float = 2.4            # flux only — FluxGuidance value
     outfit: str = ""                      # flux only — locked character wardrobe
     characters: tuple = ()                # flux only — tuple[Character, ...]
+    theme: str = "grief"                  # picture only — content arc: "grief" or "comfort"
 
     @property
     def makes_ebook(self) -> bool:
@@ -72,6 +73,7 @@ def load_config(path: str | Path) -> BookConfig:
         raise ConfigError(f"{path}: missing required field(s): {', '.join(missing)}")
     book_type = str(data.get("book_type", "journal"))
     art_engine = str(data.get("art_engine", "sdxl"))
+    theme = str(data.get("theme", "grief"))
     if book_type not in BOOK_TYPES:
         raise ConfigError(
             f"{path}: book_type must be one of {BOOK_TYPES}, got {book_type!r}")
@@ -93,6 +95,10 @@ def load_config(path: str | Path) -> BookConfig:
             raise ConfigError(
                 f"{path}: picture 'page_count' must be even and >= 20 "
                 f"(with fixed matter this clears KDP's 24-page floor); got {pc}")
+        if theme not in ("grief", "comfort"):
+            raise ConfigError(
+                f"{path}: picture 'theme' must be 'grief' or 'comfort', "
+                f"got {theme!r}")
         if art_engine not in ("sdxl", "flux"):
             raise ConfigError(
                 f"{path}: picture 'art_engine' must be 'sdxl' or 'flux', "
@@ -144,4 +150,5 @@ def load_config(path: str | Path) -> BookConfig:
                       strength=float(c.get("strength", 0.9)),
                       appears_on=str(c.get("appears_on", "all")))
             for c in (data.get("characters", []) or [])),
+        theme=theme,
     )
