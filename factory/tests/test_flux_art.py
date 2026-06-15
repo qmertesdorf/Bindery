@@ -183,3 +183,32 @@ def test_generate_flux_art_threads_seed_into_graph(tmp_path):
     assert 1000 + 1 * 17 in seeds   # page 1 seed = seed + i*17
     assert 1000 + 42 in seeds       # cover seed = seed + 42
     assert all(s >= 1000 for s in seeds)
+
+def test_generate_flux_art_routes_all_three_casts_to_correct_anchors(tmp_path):
+    content = {"character_anchor": "a little girl Posy. Mango is a ginger tabby cat",
+               "art_style": "soft watercolour", "dedication": "d",
+               "pages": [
+                   {"text": "t", "scene": "alone in the kitchen",
+                    "cast": "child", "mood": "wistful"},
+                   {"text": "t", "scene": "together in a meadow",
+                    "cast": "child_and_pet", "mood": "happy"},
+                   {"text": "t", "scene": "a luminous field",
+                    "cast": "pet", "mood": "peaceful"}],
+               "closing": "c"}
+    cfg = BookConfig(slug="k", title="T", subtitle="S", author="A",
+                     art_prompt="cover", book_type="picture", pet_kind="cat",
+                     pet_name="Mango", page_count=4, trim_w=8.5, trim_h=8.5,
+                     art_engine="flux", theme="comfort", flux_style="ws",
+                     flux_guidance=2.4, outfit="a blue dress", characters=(
+                         Character(role="hero", lora="posy.safetensors",
+                                   trigger="p0sygirl girl"),
+                         Character(role="companion", lora="mango.safetensors",
+                                   trigger="mang0cat cat", strength=0.85)))
+    aud = _Auditor()
+    generate_flux_art(cfg, content, tmp_path, _fake_comfy(), seed=7, auditor=aud)
+    # page 1 (child)         -> hero-only anchor (no pet description)
+    assert "ginger tabby" not in aud.anchors[0] and "Posy" in aud.anchors[0]
+    # page 2 (child_and_pet) -> full anchor (both)
+    assert "ginger tabby" in aud.anchors[1] and "Posy" in aud.anchors[1]
+    # page 3 (pet)           -> pet-only anchor (no child)
+    assert "ginger tabby" in aud.anchors[2] and "Posy" not in aud.anchors[2]
