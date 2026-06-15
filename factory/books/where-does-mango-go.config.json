@@ -11,8 +11,8 @@
   "page_count": 22,
   "flux_style": "Loose hand-painted watercolour storybook illustration, wet-on-wet washes with soft bleeding edges and gentle visible brushwork, pale muted palette, soft white space, delicate, dreamy and tender, minimal linework, textured watercolour paper, children's picture book art, no text",
   "flux_guidance": 2.4,
-  "outfit": "wearing a soft sky-blue pinafore dress over a cream long-sleeved top and little red shoes",
-  "character_anchor": "A round-faced little blonde girl about five years old with fair skin and shoulder-length wavy honey-blonde hair with a small side braid, wearing a soft sky-blue pinafore dress over a cream long-sleeved top and little red shoes. Mango is a small soft ginger and orange tabby cat with a cream chest and paws, gentle amber-green eyes, a fluffy tail, and a little pink nose.",
+  "outfit": "wearing a soft sky-blue pinafore dress over a cream short-puff-sleeved collared top and little red shoes",
+  "character_anchor": "A round-faced little blonde girl about five years old with fair skin and honey-blonde hair in two small braids, wearing a soft sky-blue pinafore dress over a cream short-puff-sleeved collared top and little red shoes. Mango is a small soft ginger and orange tabby cat with a cream chest and paws, gentle amber-green eyes, a fluffy tail, and a little pink nose.",
   "characters": [
     {"role": "hero", "lora": "posy_flux.safetensors", "trigger": "p0sygirl girl", "strength": 0.9},
     {"role": "companion", "lora": "mango_flux.safetensors", "trigger": "mang0cat cat", "strength": 0.85, "appears_on": "all"}
