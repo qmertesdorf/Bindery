@@ -1,4 +1,4 @@
-# book-gen
+# Bindery
 
 A one-command pipeline that turns a small JSON config into a **publish-ready Amazon KDP
 bundle** — print interior PDF, EPUB, wraparound cover PDF, ebook cover, and an
