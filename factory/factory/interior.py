@@ -14,7 +14,8 @@ def render_interior_html(cfg: BookConfig, content: dict, out_dir: Path) -> Path:
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     template = {"standard": "interior/standard.html.j2",
-                "picture": "interior/picture.html.j2"}.get(
+                "picture": "interior/picture.html.j2",
+                "concept": "interior/picture.html.j2"}.get(
                     cfg.book_type, "interior/journal.html.j2")
     html = render(template, cfg=cfg, content=content)
     html_path = out_dir / "interior.html"
@@ -104,7 +105,7 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
                 width_in=trim_w, height_in=trim_h,
                 margins_in=0.0, runner=runner)
     _verify_interior_margins(pdf, trim_w, trim_h)
-    pages = (pdf_page_count(pdf) if book_type in ("standard", "picture")
+    pages = (pdf_page_count(pdf) if book_type in ("standard", "picture", "concept")
              else count_pages(html_path))
     if book_type == "standard" and pages < 1:
         # The standard page count is load-bearing: the cover spine width is derived
@@ -113,7 +114,7 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
         raise InteriorError(
             f"Standard interior {pdf.name} rendered 0 pages — the PDF failed to "
             f"open or is empty; the cover spine width would be wrong.")
-    if book_type == "picture":
+    if book_type in ("picture", "concept"):
         _verify_picture_page_count(pages)
     return pdf, pages
 
