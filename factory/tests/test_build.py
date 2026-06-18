@@ -99,7 +99,8 @@ def test_picture_build_paperback_only_with_pages(tmp_path, picture_config_dict, 
     comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
 
     class FakeAuditor:
-        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
             return {"ok": True, "issues": []}
 
     def runner(args):
@@ -162,7 +163,8 @@ def test_picture_build_routes_to_flux_engine(tmp_path, picture_config_dict, pict
     comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
 
     class FakeAuditor:
-        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
             return {"ok": True, "issues": []}
 
     def runner(args):
@@ -187,3 +189,58 @@ def test_picture_build_routes_to_flux_engine(tmp_path, picture_config_dict, pict
         assert (Path(out_dir) / f).exists(), f"missing {f}"
     # flux path produces NO reference sheet
     assert not (Path(out_dir) / "reference.png").exists()
+
+
+def test_run_build_concept_end_to_end(tmp_path):
+    cfg_dict = {
+        "slug": "tiny", "book_type": "concept", "art_engine": "flux",
+        "title": "Tiny Creatures", "subtitle": "sub", "author": "Eleanor Hartley",
+        "subject": "small animals", "flux_style": "soft watercolour, no text",
+        "art_prompt": "a meadow, soft watercolour, no text",
+        "page_count": 20, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+    }
+    cfgp = tmp_path / "tiny.config.json"
+    cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
+
+    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+              "scene": f"animal {i} in a meadow"} for i in range(20)]
+    bible = {"art_style": "soft watercolour", "dedication": "d"}
+    story = {"pages": pages, "closing": "bye"}
+    def fake_llm(prompt):
+        return json.dumps(bible) if "STYLE BIBLE" in prompt else json.dumps(story)
+
+    def http_post(url, json): return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+
+    class FakeAuditor:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
+            return {"ok": True, "issues": []}
+
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                import fitz
+                d = fitz.open()
+                for _ in range(26):
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+
+    # concept must use the Flux submit path and need NO SDXL workflow template.
+    out_dir = run_build(cfgp, out_root=tmp_path / "out", generate_fn=fake_llm,
+                        comfy=comfy, runner=runner, auditor=FakeAuditor())
+    for f in ["content.json", "page_01.png", "art.png", "interior.pdf",
+              "cover-paperback.pdf", "upload-checklist.md"]:
+        assert (Path(out_dir) / f).exists(), f"missing {f}"
+    # paperback-only: no Kindle edition
+    assert not (Path(out_dir) / "interior.epub").exists()

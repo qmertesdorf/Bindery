@@ -84,34 +84,49 @@ def main() -> int:
     comfy = ComfyClient()
     auditor = ClaudeVisionAuditor()
 
-    print("[book] 1/5 content (bible + pages)…", flush=True)
-    content = generate_picture_content(cfg, claude_generate)
-    (out / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
+    # Reuse a story we've already generated & reviewed rather than re-rolling it on
+    # every art pass — the LLM would otherwise hand back different text/scenes and
+    # silently change the book. Delete content.json to force a fresh story.
+    content_path = out / "content.json"
+    if content_path.exists():
+        print("[book] 1/5 content (reusing existing content.json)", flush=True)
+        content = json.loads(content_path.read_text(encoding="utf-8"))
+    else:
+        print("[book] 1/5 content (bible + pages)…", flush=True)
+        content = generate_picture_content(cfg, claude_generate)
+        content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
     anchor, style = content["character_anchor"], content["art_style"]
     child = anchor.split(cfg.pet_name)[0].rstrip(" .,;")
     dog_desc = (anchor.split(cfg.pet_name, 1)[1].lstrip(" is").strip().rstrip(".")
                 if cfg.pet_name in anchor else "a small dog")
     base_wf = json.loads((Path("comfyui") / "workflow.template.json").read_text(encoding="utf-8"))
 
-    print("[book] 2/5 hero A (child only)…", flush=True)
-    wfc = square_workflow(base_wf)
-    wfc["7"]["inputs"]["text"] = wfc["7"]["inputs"]["text"] + ", " + NO_ANIMALS
+    # The heroes are the identity anchors every page is conditioned on; once a pair
+    # is approved, reuse it so the whole book stays locked to the same boy & dog
+    # across art passes. Delete the hero PNGs to regenerate them.
     hero_child = out / "hero_child.png"
-    _generate_audited(
-        comfy, wfc, positive_node="6", sampler_node="3",
-        prompt=(f"{style}. A single young child, full body, standing, facing forward, "
-                f"calm gentle neutral expression, plain pale background, no animals. {child}"),
-        seed=777, out_path=hero_child, auditor=auditor, anchor=child,
-        reference_path=None, scene="a single child, full body, no animals", max_tries=5)
-    child_name = upload_image(hero_child)
-
-    print("[book] 3/5 hero B (child + dog, boy from hero A)…", flush=True)
     hero_pair = out / "hero_pair.png"
-    ipa_page(comfy, auditor, child_name, style=style,
-             scene=(f"the same boy with a calm gentle smile kneeling with his arm gently "
-                    f"around his {dog_desc}, both shown full body together, plain pale background"),
-             anchor=anchor, ref_path=hero_child, out=hero_pair, seed=555,
-             weight=0.55, end_at=0.7, max_tries=5)
+    if hero_child.exists() and hero_pair.exists():
+        print("[book] 2-3/5 heroes (reusing existing hero_child.png + hero_pair.png)", flush=True)
+    else:
+        print("[book] 2/5 hero A (child only)…", flush=True)
+        wfc = square_workflow(base_wf)
+        wfc["7"]["inputs"]["text"] = wfc["7"]["inputs"]["text"] + ", " + NO_ANIMALS
+        _generate_audited(
+            comfy, wfc, positive_node="6", sampler_node="3",
+            prompt=(f"{style}. A single young child, full body, standing, facing forward, "
+                    f"calm gentle neutral expression, plain pale background, no animals. {child}"),
+            seed=777, out_path=hero_child, auditor=auditor, anchor=child,
+            reference_path=None, scene="a single child, full body, no animals", max_tries=5)
+        child_name = upload_image(hero_child)
+
+        print("[book] 3/5 hero B (child + dog, boy from hero A)…", flush=True)
+        ipa_page(comfy, auditor, child_name, style=style,
+                 scene=(f"the same boy with a calm gentle smile kneeling with his arm gently "
+                        f"around his {dog_desc}, both shown full body together, plain pale background"),
+                 anchor=anchor, ref_path=hero_child, out=hero_pair, seed=555,
+                 weight=0.55, end_at=0.7, max_tries=5)
+    child_name = upload_image(hero_child)
     pair_name = upload_image(hero_pair)
 
     print("[book] 4/5 pages…", flush=True)
@@ -133,9 +148,11 @@ def main() -> int:
                      f"Richly illustrated, detailed background setting.")
         print(f"[book]   page {i}/{n} ({'memory+dog' if dog else 'present,no dog'}, "
               f"{mood}{'/no-smile' if somber else ''}): {scene[:40]}", flush=True)
-        # memory pages hold two characters → a touch more conditioning; present
-        # pages have only the boy → lower weight lets the setting compose richer.
-        w, e = (0.6, 0.8) if dog else (0.5, 0.6)
+        # Identity must hold across EVERY page (the boy was drifting in face and
+        # rendering style), so keep the IPAdapter active deep into denoising. Memory
+        # pages carry two characters → a touch more weight than the boy-only present
+        # pages. Higher end_at = stronger face+style lock at some cost to background.
+        w, e = (0.72, 0.9) if dog else (0.66, 0.85)
         ok = ipa_page(comfy, auditor, hero_name, style=style, scene=art_scene,
                       anchor=audit_anchor, ref_path=ref, out=out / f"page_{i:02d}.png",
                       seed=100 + i, suppress_animals=not dog, no_smile=somber,
@@ -144,12 +161,17 @@ def main() -> int:
             flagged.append(i)
 
     print("[book] 5/5 cover + interior + checklist…", flush=True)
+    # The cover has BOTH characters in one frame — the exact case bare SDXL fumbled
+    # (it gave the boy a dog's nose). Condition it on the child+dog hero and audit
+    # it like any page, so a conflated face is rejected and regenerated.
     cover = out / "art.png"
-    comfy.generate(
-        base_wf, positive_node="6", sampler_node="3",
-        prompt=(f"{style}. Front cover illustration, the boy and his {dog_desc} sitting "
-                f"together on a grassy hill at warm golden sunset, tender and hopeful. {anchor}"),
-        seed=42, out_path=cover)
+    ipa_page(comfy, auditor, pair_name, style=style,
+             scene=("Front cover illustration: the boy sitting close beside his dog on a "
+                    "grassy hill at warm golden sunset, both facing forward, tender and "
+                    "hopeful. Only the boy and his dog, no other people; the boy is a "
+                    "human child and the dog is a dog."),
+             anchor=anchor, ref_path=hero_pair, out=cover, seed=42,
+             weight=0.72, end_at=0.9, max_tries=5)
 
     html = render_interior_html(cfg, content, out)
     _, npages = build_interior_pdf(html, out, book_type=cfg.book_type,

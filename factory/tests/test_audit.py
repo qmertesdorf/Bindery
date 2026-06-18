@@ -1,7 +1,7 @@
 import json, pytest
 from pathlib import Path
-from factory.audit import (build_audit_prompt, parse_verdict, AuditError,
-                           ClaudeVisionAuditor)
+from factory.audit import (build_audit_prompt, build_concept_audit_prompt,
+                           parse_verdict, AuditError, ClaudeVisionAuditor)
 
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
@@ -9,6 +9,16 @@ def test_build_audit_prompt_includes_image_anchor_scene():
                            reference_path=Path("/out/reference.png"))
     assert "page_01.png" in p and "a girl + golden dog" in p
     assert "by the window" in p and "reference.png" in p
+
+def test_build_audit_prompt_rejects_animal_features_on_child():
+    # Guards the "boy with a dog's nose" defect: the auditor must be told to reject
+    # animal features bleeding onto the human child (two-character attribute bleed).
+    p = build_audit_prompt(anchor="a boy + golden dog", scene="cover",
+                           image_path=Path("/out/art.png"), reference_path=None)
+    low = p.lower()
+    assert "snout" in low or "muzzle" in low
+    assert "fully" in low and "human" in low
+
 
 def test_parse_verdict_ok():
     v = parse_verdict('{"ok": true, "issues": []}')
@@ -32,3 +42,26 @@ def test_auditor_uses_injected_judge_fn():
                       reference_path=Path("/out/reference.png"), scene="garden")
     assert v["ok"] is False and v["issues"] == ["child hair differs"]
     assert "page_02.png" in seen["prompt"]
+
+
+def test_concept_audit_prompt_is_character_free():
+    prompt = build_concept_audit_prompt(
+        anchor="a red fox in a meadow; no people, no text",
+        scene="a fox sitting in tall grass at dawn",
+        image_path=Path("/out/page_01.png"))
+    assert "no people" in prompt.lower()
+    assert "page_01.png" in prompt
+    # concept books must not carry the character-identity rules
+    assert "outfit" not in prompt.lower()
+
+
+def test_auditor_kind_selects_concept_prompt():
+    captured = {}
+    def judge(prompt):
+        captured["prompt"] = prompt
+        return '{"ok": true, "issues": []}'
+    auditor = ClaudeVisionAuditor(judge_fn=judge)
+    v = auditor.audit(Path("/out/page_01.png"), anchor="a red fox", scene="a fox",
+                      kind="concept")
+    assert v["ok"] is True
+    assert "no people" in captured["prompt"].lower()

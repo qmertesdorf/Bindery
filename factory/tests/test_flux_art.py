@@ -110,7 +110,8 @@ def _fake_comfy():
 class _Auditor:
     def __init__(self, fail_first=0):
         self.calls = 0; self.fail_first = fail_first; self.anchors = []
-    def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+    def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+              kind="character"):
         self.calls += 1; self.anchors.append(anchor)
         ok = self.calls > self.fail_first
         return {"ok": ok, "issues": [] if ok else ["dog colour off"]}
@@ -161,10 +162,15 @@ def test_generate_flux_art_regenerates_until_consistent(tmp_path):
                       seed=7, auditor=aud)
     assert aud.calls >= 4  # page1 (fail+pass) + page2 + cover
 
-def test_generate_flux_art_fails_when_never_consistent(tmp_path):
-    with pytest.raises(ArtError, match="consistent"):
-        generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
-                          seed=7, auditor=_Auditor(fail_first=999), max_tries=3)
+def test_generate_flux_art_keeps_best_and_flags_when_inconsistent(tmp_path):
+    # a never-consistent run keeps each page's best attempt and flags it for review,
+    # rather than raising and killing the whole book on one stubborn page
+    art = generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, _fake_comfy(),
+                            seed=7, auditor=_Auditor(fail_first=999), max_tries=3)
+    assert [Path(p).name for p in art["pages"]] == ["page_01.png", "page_02.png"]
+    for p in art["pages"]:
+        assert Path(p).exists()
+    assert art["flagged"] == [1, 2, "cover"]
 
 def test_generate_flux_art_threads_seed_into_graph(tmp_path):
     seeds = []

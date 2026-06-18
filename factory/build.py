@@ -8,7 +8,7 @@ from factory.config import load_config
 from factory.content import generate_content, claude_generate
 from factory.interior import render_interior_html, build_interior_pdf, build_epub
 from factory.art import ComfyClient, generate_picture_art
-from factory.flux_art import generate_flux_art
+from factory.flux_art import generate_flux_art, generate_concept_art
 from factory.audit import ClaudeVisionAuditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
@@ -23,15 +23,20 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     out_dir = Path(out_root) / cfg.slug
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ① content
-    content = generate_content(cfg, generate_fn=generate_fn)
-    (out_dir / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
+    # ① content — reuse an already-generated & reviewed content.json if present, so
+    # repeat art passes don't silently re-roll the story (delete it to force fresh).
+    content_path = out_dir / "content.json"
+    if content_path.exists():
+        content = json.loads(content_path.read_text(encoding="utf-8"))
+    else:
+        content = generate_content(cfg, generate_fn=generate_fn)
+        content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
 
     # Resolve image backend up front (picture needs art before interior).
     if comfy is None:
         comfy = ComfyClient()
 
-    flux = cfg.book_type == "picture" and cfg.art_engine == "flux"
+    flux = cfg.book_type in ("picture", "concept") and cfg.art_engine == "flux"
     if not flux:
         # The SDXL path needs the workflow template + a real checkpoint; the Flux
         # path builds its own graph and needs neither.
@@ -44,12 +49,15 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                 "comfyui/workflow.template.json and set ckpt_name to a real checkpoint "
                 "from your ComfyUI install before running the factory.")
 
-    if cfg.book_type == "picture":
-        # ②③ Picture books illustrate every page, so art runs BEFORE the interior
-        # (the interior embeds page_NN.png). Consistency is enforced by the auditor.
+    if cfg.book_type in ("picture", "concept"):
+        # ②③ Picture/concept books illustrate every page, so art runs BEFORE the
+        # interior (the interior embeds page_NN.png). The auditor enforces quality.
         if auditor is None:
             auditor = ClaudeVisionAuditor()
-        if flux:
+        if cfg.book_type == "concept":
+            art = generate_concept_art(cfg, content, out_dir, comfy,
+                                       seed=seed, auditor=auditor)
+        elif flux:
             art = generate_flux_art(cfg, content, out_dir, comfy,
                                     seed=seed, auditor=auditor)
         else:

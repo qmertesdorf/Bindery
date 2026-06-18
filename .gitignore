@@ -6,3 +6,4 @@ factory/__pycache__/
 factory/*.egg-info/
 factory/out_build.log
 .gstack/
+.superpowers/

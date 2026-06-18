@@ -35,10 +35,15 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the character is the WRONG character, or characters are CONFLATED (e.g. a
   different person/animal, an animal wearing the child's clothes, or an extra
   subject/animal that should not be present);
+- the CHILD has any animal features bleeding onto its face or body — a dog or
+  animal nose/snout/muzzle, fur, whiskers, paws, a tail, or animal ears in place
+  of human ones. The child must be fully, recognisably human;
 - any text, letters, words, or numbers are rendered in the artwork;
 - broken anatomy (malformed faces, extra or missing limbs/eyes);
-- the character's DEFINING outfit colours or key markings are clearly wrong
-  (e.g. a red coat where the character wears yellow, or a missing described marking);
+- the character's DEFINING outfit is clearly wrong — wrong colours, OR a clearly
+  different GARMENT than the one described above for this character, OR a
+  described key piece is missing or replaced. The described outfit (whatever it
+  is) must be recognisably present;
 - the child's expression clearly CONTRADICTS the mood the scene calls for — in
   particular a smiling, grinning, or visibly happy child on a sad, lonely,
   wistful, or grieving page (the face must read at least quiet/subdued there).
@@ -53,6 +58,37 @@ character recognisable:
 
 When the character is recognisable and the art is clean, set ok=true even if such
 details differ. Reserve issues for genuine defects.
+
+Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
+Output the JSON and nothing else."""
+
+
+def build_concept_audit_prompt(*, anchor: str, scene: str | None,
+                               image_path: Path) -> str:
+    scene_line = f"\nThis page is meant to depict, roughly: {scene}." if scene else ""
+    return f"""Read the image file at {image_path} and judge it for a character-free
+children's picture book.
+
+This page should show: {anchor}.{scene_line}
+
+This is a soft, stylised storybook, so judge GENEROUSLY. Apply a two-tier bar.
+
+REJECT (set ok=false) ONLY for a real defect that would break the book:
+- the WRONG subject (a clearly different animal or thing than described above);
+- ANY people or human figures appear (this book has no people);
+- any text, letters, words, or numbers are rendered in the artwork;
+- broken anatomy (malformed faces, extra or missing limbs/eyes);
+- the art is clearly the wrong medium (photographic, cluttered collage, or
+  otherwise not a soft storybook illustration).
+
+ACCEPT (set ok=true) — do NOT reject — for natural variation:
+- different pose, camera angle, framing, or composition;
+- a different or simpler background, lighting, time of day, or season;
+- extra incidental natural scenery (plants, sky, water) around the subject;
+- stylistic differences that still read as the same soft storybook look.
+
+When the subject is right and the art is clean, set ok=true even if such details
+differ. Reserve issues for genuine defects.
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""
@@ -88,8 +124,12 @@ class ClaudeVisionAuditor:
         self.judge_fn = judge_fn or _claude_vision
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
-              scene: str | None = None) -> dict:
-        prompt = build_audit_prompt(
-            anchor=anchor, scene=scene, image_path=Path(image_path),
-            reference_path=Path(reference_path) if reference_path else None)
+              scene: str | None = None, kind: str = "character") -> dict:
+        if kind == "concept":
+            prompt = build_concept_audit_prompt(
+                anchor=anchor, scene=scene, image_path=Path(image_path))
+        else:
+            prompt = build_audit_prompt(
+                anchor=anchor, scene=scene, image_path=Path(image_path),
+                reference_path=Path(reference_path) if reference_path else None)
         return parse_verdict(self.judge_fn(prompt))

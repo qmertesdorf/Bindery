@@ -247,3 +247,68 @@ def test_where_does_mango_go_config_is_valid():
     assert cfg.trim_w == 8.5 and cfg.page_count >= 20 and cfg.page_count % 2 == 0
     assert len(cfg.characters) == 2
     assert cfg.characters[0].role == "hero"
+
+
+def _concept_data(**over):
+    data = {
+        "slug": "tiny-creatures",
+        "book_type": "concept",
+        "art_engine": "flux",
+        "title": "Tiny Creatures",
+        "subtitle": "A First Look at Little Animals",
+        "author": "Eleanor Hartley",
+        "subject": "small animals and where they live",
+        "flux_style": "soft storybook watercolour, warm natural palette, no text",
+        "art_prompt": "a sunlit meadow full of small creatures, soft storybook watercolour, no text",
+        "page_count": 22,
+        "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+    }
+    data.update(over)
+    return data
+
+
+def test_concept_config_loads(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(_concept_data()), encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg.book_type == "concept"
+    assert cfg.subject == "small animals and where they live"
+    assert cfg.art_engine == "flux"
+    assert cfg.makes_ebook is False
+
+
+def test_concept_config_topics_parsed(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(_concept_data(topics=["a fox", "a snail"])), encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg.topics == ("a fox", "a snail")
+
+
+def test_concept_requires_subject(tmp_path):
+    p = tmp_path / "c.json"
+    d = _concept_data(); d.pop("subject")
+    p.write_text(json.dumps(d), encoding="utf-8")
+    with pytest.raises(ConfigError, match="subject"):
+        load_config(p)
+
+
+def test_concept_requires_flux_engine(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(_concept_data(art_engine="sdxl")), encoding="utf-8")
+    with pytest.raises(ConfigError, match="flux"):
+        load_config(p)
+
+
+def test_concept_requires_flux_style(tmp_path):
+    p = tmp_path / "c.json"
+    d = _concept_data(); d.pop("flux_style")
+    p.write_text(json.dumps(d), encoding="utf-8")
+    with pytest.raises(ConfigError, match="flux_style"):
+        load_config(p)
+
+
+def test_concept_page_count_floor(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(_concept_data(page_count=18)), encoding="utf-8")
+    with pytest.raises(ConfigError, match="page_count"):
+        load_config(p)

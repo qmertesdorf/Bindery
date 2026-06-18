@@ -118,7 +118,8 @@ class ComfyClient:
 
 
 def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
-                       reference_path=None, seed=0, max_tries=4) -> Path:
+                       reference_path=None, seed=0, max_tries=4,
+                       audit_kind="character") -> Path:
     """Render → audit → regenerate (fresh seed + corrective hints) until the
     auditor passes or the try budget runs out, then fail loudly. `render` is a
     callable (prompt, seed, out_path) -> None that writes the image. The seed is
@@ -132,7 +133,8 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
             p = f"{prompt} Fix these problems from the last attempt: {'; '.join(issues)}"
         render(p, seed + attempt * 1009, out_path)
         verdict = auditor.audit(out_path, anchor=anchor,
-                                reference_path=reference_path, scene=scene)
+                                reference_path=reference_path, scene=scene,
+                                kind=audit_kind)
         if verdict.get("ok"):
             _log(f"  [audit] {name}: OK"
                  + (f" on attempt {attempt + 1}/{max_tries}" if attempt else ""))
