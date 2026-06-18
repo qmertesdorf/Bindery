@@ -110,7 +110,8 @@ def _fake_comfy():
 class _Auditor:
     def __init__(self, fail_first=0):
         self.calls = 0; self.fail_first = fail_first; self.anchors = []
-    def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+    def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+              kind="character"):
         self.calls += 1; self.anchors.append(anchor)
         ok = self.calls > self.fail_first
         return {"ok": ok, "issues": [] if ok else ["dog colour off"]}

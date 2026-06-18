@@ -99,7 +99,8 @@ def test_picture_build_paperback_only_with_pages(tmp_path, picture_config_dict, 
     comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
 
     class FakeAuditor:
-        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
             return {"ok": True, "issues": []}
 
     def runner(args):
@@ -162,7 +163,8 @@ def test_picture_build_routes_to_flux_engine(tmp_path, picture_config_dict, pict
     comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
 
     class FakeAuditor:
-        def audit(self, image_path, *, anchor, reference_path=None, scene=None):
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
             return {"ok": True, "issues": []}
 
     def runner(args):
