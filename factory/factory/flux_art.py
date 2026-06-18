@@ -106,6 +106,75 @@ def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
     return prompt, loras
 
 
+def concept_page_prompt(page: dict, *, style: str) -> str:
+    """Prompt for one character-free spread: locked style + the page's scene, with
+    hard 'no people / no text' steering. No LoRA triggers — identity is irrelevant."""
+    return (f"{style}. {page['scene']} A single clear subject. No people, no "
+            f"unrelated extra animals, no text. Richly detailed natural setting, "
+            f"illustrated edge to edge.")
+
+
+def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
+                         max_tries: int = 4) -> dict:
+    """Illustrate every spread with a locked Flux style and an EMPTY LoRA stack
+    (no character identity to carry), each audited under the concept bar and
+    regenerated until it passes — keeping the best and flagging a stubborn page
+    rather than failing the whole book. Returns {"pages", "cover", "flagged"}."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    style = cfg.flux_style or content["art_style"]
+    guidance = cfg.flux_guidance
+    pages = content["pages"]
+    n = len(pages)
+
+    out_pages, flagged = [], []
+    for i, page in enumerate(pages, 1):
+        prompt = concept_page_prompt(page, style=style)
+        subject = page.get("subject", "the subject")
+        _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}")
+
+        def render(p, s, op):
+            comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance),
+                         out_path=op)
+
+        op = out_dir / f"page_{i:02d}.png"
+        anchor = (f"a {subject} in its natural setting, in a consistent soft "
+                  f"storybook illustration style; no people and no text")
+        try:
+            out_pages.append(run_audited_render(
+                render, prompt, out_path=op, auditor=auditor, anchor=anchor,
+                scene=page["scene"], reference_path=None, seed=seed + i * 17,
+                max_tries=max_tries, audit_kind="concept"))
+        except ArtError:
+            _log(f"[concept] page {i}: kept best after {max_tries} tries (REVIEW)")
+            flagged.append(i)
+            out_pages.append(op)
+
+    _log("[concept] cover…")
+    cover_prompt = f"{style}. {cfg.art_prompt}. No people, no text."
+
+    def cover_render(p, s, op):
+        comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance),
+                     out_path=op)
+
+    cover_path = out_dir / "art.png"
+    cover_anchor = (f"a {cfg.subject} scene in a soft storybook illustration style; "
+                    f"no people, no text")
+    try:
+        cover = run_audited_render(
+            cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
+            anchor=cover_anchor, scene="front cover", reference_path=None,
+            seed=seed + 42, max_tries=max_tries, audit_kind="concept")
+    except ArtError:
+        _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW)")
+        flagged.append("cover")
+        cover = cover_path
+    if flagged:
+        _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")
+    _log(f"[concept] complete: {n} pages + cover")
+    return {"pages": out_pages, "cover": Path(cover), "flagged": flagged}
+
+
 def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
                       max_tries: int = 4) -> dict:
     """Illustrate every page with the hero LoRA (companion LoRA added on child_and_pet
