@@ -109,9 +109,10 @@ def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
 def concept_page_prompt(page: dict, *, style: str) -> str:
     """Prompt for one character-free spread: locked style + the page's scene, with
     hard 'no people / no text' steering. No LoRA triggers — identity is irrelevant."""
-    return (f"{style}. {page['scene']} A single clear subject. No people, no "
-            f"unrelated extra animals, no text. Richly detailed natural setting, "
-            f"illustrated edge to edge.")
+    return (f"{style}. {page['scene']} A single clear subject, painted as a soft, "
+            f"hand-drawn children's storybook illustration — loose, simplified and "
+            f"whimsical, NOT a photograph and NOT photorealistic. No people, no "
+            f"unrelated extra animals, no text. Illustrated edge to edge.")
 
 
 def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
@@ -127,11 +128,17 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     pages = content["pages"]
     n = len(pages)
 
+    # The first page that passes the (reference-free) style bar becomes the STYLE
+    # ANCHOR; every later page and the cover are audited against it, so the auditor
+    # enforces a cohesive look across the whole book — re-rendering until each page
+    # matches that one reference, not just a text description.
     out_pages, flagged = [], []
+    style_ref = None
     for i, page in enumerate(pages, 1):
         prompt = concept_page_prompt(page, style=style)
         subject = page.get("subject", "the subject")
-        _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}")
+        _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}"
+             + (f" [vs anchor {style_ref.name}]" if style_ref else " [style anchor]"))
 
         def render(p, s, op):
             comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance),
@@ -141,10 +148,13 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
         anchor = (f"a {subject} in its natural setting, in a consistent soft "
                   f"storybook illustration style; no people and no text")
         try:
-            out_pages.append(run_audited_render(
+            done = run_audited_render(
                 render, prompt, out_path=op, auditor=auditor, anchor=anchor,
-                scene=page["scene"], reference_path=None, seed=seed + i * 17,
-                max_tries=max_tries, audit_kind="concept"))
+                scene=page["scene"], reference_path=style_ref, seed=seed + i * 17,
+                max_tries=max_tries, audit_kind="concept")
+            out_pages.append(done)
+            if style_ref is None:
+                style_ref = done  # first cohesive page anchors the rest
         except ArtError:
             _log(f"[concept] page {i}: kept best after {max_tries} tries (REVIEW)")
             flagged.append(i)
@@ -163,7 +173,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     try:
         cover = run_audited_render(
             cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
-            anchor=cover_anchor, scene="front cover", reference_path=None,
+            anchor=cover_anchor, scene="front cover", reference_path=style_ref,
             seed=seed + 42, max_tries=max_tries, audit_kind="concept")
     except ArtError:
         _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW)")

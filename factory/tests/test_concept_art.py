@@ -36,9 +36,11 @@ class _Comfy:
 class _OKAuditor:
     def __init__(self):
         self.kinds = []
+        self.refs = []
     def audit(self, image_path, *, anchor, reference_path=None, scene=None,
               kind="character"):
         self.kinds.append(kind)
+        self.refs.append(reference_path)
         return {"ok": True, "issues": []}
 
 
@@ -49,6 +51,9 @@ def test_concept_page_prompt_excludes_people_and_text():
     assert "a fox in grass" in p
     assert "no people" in p.lower()
     assert "no text" in p.lower()
+    # steer away from photoreal toward storybook illustration
+    assert "not photorealistic" in p.lower() or "not a photograph" in p.lower()
+    assert "storybook" in p.lower()
 
 
 def test_generate_concept_art_uses_empty_lora_stack_and_concept_audit(tmp_path):
@@ -60,6 +65,11 @@ def test_generate_concept_art_uses_empty_lora_stack_and_concept_audit(tmp_path):
     assert art["flagged"] == []
     # every page audited under the concept (character-free) bar
     assert set(auditor.kinds) == {"concept"}
+    # style cohesion: page 1 is the anchor (no reference); later pages + cover are
+    # audited AGAINST page_01.png so the whole book matches one style
+    assert auditor.refs[0] is None
+    later = [r for r in auditor.refs[1:] if r is not None]
+    assert later and all(r.name == "page_01.png" for r in later)
     # empty LoRA stack => no LoraLoaderModelOnly nodes in any submitted graph
     for wf in comfy.workflows:
         assert not any(n.get("class_type") == "LoraLoaderModelOnly"

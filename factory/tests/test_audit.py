@@ -55,6 +55,33 @@ def test_concept_audit_prompt_is_character_free():
     assert "outfit" not in prompt.lower()
 
 
+def test_concept_audit_prompt_rejects_photorealism():
+    # the auditor must gate out photo-real renders so the regenerate loop
+    # self-corrects toward the storybook illustration style
+    prompt = build_concept_audit_prompt(
+        anchor="a bee on a flower", scene="a bee",
+        image_path=Path("/out/p.png")).lower()
+    assert "photo" in prompt          # rejects photographic / photorealistic
+    assert "storybook" in prompt      # must read as a storybook painting
+
+
+def test_concept_audit_prompt_enforces_style_cohesion_vs_reference():
+    # with a style reference, the auditor must require the new page to MATCH it
+    prompt = build_concept_audit_prompt(
+        anchor="a snail on a leaf", scene="a snail",
+        image_path=Path("/out/page_11.png"),
+        reference_path=Path("/out/page_01.png"))
+    assert "page_01.png" in prompt          # the reference is named
+    assert "reference" in prompt.lower()
+    assert "cohesive" in prompt.lower() or "match" in prompt.lower()
+
+
+def test_concept_audit_prompt_without_reference_has_no_cohesion_clause():
+    prompt = build_concept_audit_prompt(
+        anchor="a fox", scene="a fox", image_path=Path("/out/p.png")).lower()
+    assert "style reference" not in prompt
+
+
 def test_auditor_kind_selects_concept_prompt():
     captured = {}
     def judge(prompt):

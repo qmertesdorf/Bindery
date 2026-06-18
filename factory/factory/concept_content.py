@@ -36,8 +36,10 @@ concrete, never scary.
 Return ONLY valid JSON:
 {{"pages": [{{"subject": "...", "text": "...", "scene": "..."}}], "closing": "..."}}
 - "subject": the single subject of this spread (e.g. an animal name).
-- "text": 1-2 short, simple sentences an early reader can read aloud — gentle and
-  concrete, a light rhyme or one easy true fact about the subject.
+- "text": a SHORT rhyming couplet — exactly TWO lines that rhyme (AABB), separated
+  by a single newline ("\\n") — that an early reader can read aloud. Keep it gentle,
+  simple and concrete, weaving in one easy true thing about the subject. The rhyme
+  must be natural, never forced or nonsensical. Vary the rhymes across pages.
 - "scene": a RICH, concrete visual of the subject in its natural setting — what it
   looks like and where it is. CRITICAL: NO people, NO unrelated extra animals, and
   NO words/letters/numbers in the picture. One clear subject per page.
