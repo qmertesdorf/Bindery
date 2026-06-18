@@ -94,3 +94,6 @@ def test_concept_checklist_is_colour_nature_and_not_grief(tmp_path):
     assert "Nature" in text
     assert "pet loss grief journal" not in text
     assert "{{" not in text  # template fully rendered
+    # markdown checklist must NOT be HTML-escaped (it's pasted into KDP verbatim)
+    assert "&#39;" not in text and "&amp;" not in text
+    assert "children's animal book" in text
