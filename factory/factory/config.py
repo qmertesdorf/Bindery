@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REQUIRED = ["slug", "title", "subtitle", "author", "art_prompt"]
-BOOK_TYPES = ("journal", "standard", "picture")
+BOOK_TYPES = ("journal", "standard", "picture", "concept")
 
 
 class ConfigError(ValueError):
@@ -50,6 +50,8 @@ class BookConfig:
     outfit: str = ""                      # flux only — locked character wardrobe
     characters: tuple = ()                # flux only — tuple[Character, ...]
     theme: str = "grief"                  # picture only — content arc: "grief" or "comfort"
+    subject: str = ""                     # concept only — the book's subject
+    topics: tuple = ()                    # concept only — explicit per-spread subjects
 
     @property
     def makes_ebook(self) -> bool:
@@ -116,6 +118,18 @@ def load_config(path: str | Path) -> BookConfig:
                         f"{path}: each flux character needs a 'lora' and a 'trigger'")
             if not data.get("flux_style"):
                 raise ConfigError(f"{path}: flux picture books require 'flux_style'")
+    if book_type == "concept":
+        if not data.get("subject"):
+            raise ConfigError(f"{path}: concept books require 'subject'")
+        if art_engine != "flux":
+            raise ConfigError(
+                f"{path}: concept books require art_engine 'flux', got {art_engine!r}")
+        if not data.get("flux_style"):
+            raise ConfigError(f"{path}: concept books require 'flux_style'")
+        pc = int(data.get("page_count", 0))
+        if pc < 20 or pc % 2 != 0:
+            raise ConfigError(
+                f"{path}: concept 'page_count' must be even and >= 20; got {pc}")
     trim_w = float(data.get("trim_w", 6.0))
     trim_h = float(data.get("trim_h", 9.0))
     if trim_w <= 0 or trim_h <= 0:
@@ -151,4 +165,6 @@ def load_config(path: str | Path) -> BookConfig:
                       appears_on=str(c.get("appears_on", "all")))
             for c in (data.get("characters", []) or [])),
         theme=theme,
+        subject=str(data.get("subject", "")),
+        topics=tuple(str(t) for t in (data.get("topics", []) or [])),
     )
