@@ -23,9 +23,14 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     out_dir = Path(out_root) / cfg.slug
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # ① content
-    content = generate_content(cfg, generate_fn=generate_fn)
-    (out_dir / "content.json").write_text(json.dumps(content, indent=2), encoding="utf-8")
+    # ① content — reuse an already-generated & reviewed content.json if present, so
+    # repeat art passes don't silently re-roll the story (delete it to force fresh).
+    content_path = out_dir / "content.json"
+    if content_path.exists():
+        content = json.loads(content_path.read_text(encoding="utf-8"))
+    else:
+        content = generate_content(cfg, generate_fn=generate_fn)
+        content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
 
     # Resolve image backend up front (picture needs art before interior).
     if comfy is None:

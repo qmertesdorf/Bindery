@@ -10,6 +10,16 @@ def test_build_audit_prompt_includes_image_anchor_scene():
     assert "page_01.png" in p and "a girl + golden dog" in p
     assert "by the window" in p and "reference.png" in p
 
+def test_build_audit_prompt_rejects_animal_features_on_child():
+    # Guards the "boy with a dog's nose" defect: the auditor must be told to reject
+    # animal features bleeding onto the human child (two-character attribute bleed).
+    p = build_audit_prompt(anchor="a boy + golden dog", scene="cover",
+                           image_path=Path("/out/art.png"), reference_path=None)
+    low = p.lower()
+    assert "snout" in low or "muzzle" in low
+    assert "fully" in low and "human" in low
+
+
 def test_parse_verdict_ok():
     v = parse_verdict('{"ok": true, "issues": []}')
     assert v == {"ok": True, "issues": []}

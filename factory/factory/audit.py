@@ -35,10 +35,15 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the character is the WRONG character, or characters are CONFLATED (e.g. a
   different person/animal, an animal wearing the child's clothes, or an extra
   subject/animal that should not be present);
+- the CHILD has any animal features bleeding onto its face or body — a dog or
+  animal nose/snout/muzzle, fur, whiskers, paws, a tail, or animal ears in place
+  of human ones. The child must be fully, recognisably human;
 - any text, letters, words, or numbers are rendered in the artwork;
 - broken anatomy (malformed faces, extra or missing limbs/eyes);
-- the character's DEFINING outfit colours or key markings are clearly wrong
-  (e.g. a red coat where the character wears yellow, or a missing described marking);
+- the character's DEFINING outfit is clearly wrong — wrong colours, OR a clearly
+  different GARMENT than the one described above for this character, OR a
+  described key piece is missing or replaced. The described outfit (whatever it
+  is) must be recognisably present;
 - the child's expression clearly CONTRADICTS the mood the scene calls for — in
   particular a smiling, grinning, or visibly happy child on a sad, lonely,
   wistful, or grieving page (the face must read at least quiet/subdued there).

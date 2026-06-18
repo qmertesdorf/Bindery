@@ -23,6 +23,15 @@ def test_picture_interior_has_image_per_page_and_text(tmp_path):
     # no fill-in ruled lines in a picture book
     assert 'class="lines"' not in html
 
+def test_picture_interior_feathers_all_four_edges(tmp_path):
+    # Guards the "stapled photo box" defect: art must fade on all four straight
+    # edges (crossed gradients intersected), not the old single radial that left
+    # the side-centres hard.
+    html = render_interior_html(_cfg(), _content(), tmp_path).read_text(encoding="utf-8")
+    assert "mask-composite: intersect" in html
+    assert "linear-gradient(to right" in html and "linear-gradient(to bottom" in html
+    assert "radial-gradient" not in html  # the old hard-edged mask is gone
+
 def test_picture_page_count_guard_rejects_under_24():
     with pytest.raises(InteriorError, match="24"):
         _verify_picture_page_count(20)

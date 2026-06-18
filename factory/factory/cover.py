@@ -203,7 +203,15 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     except Exception:
         return
     W, H = round(width_in * dpi), round(height_in * dpi)
-    art = art.resize((max(1, round(art.width * H / art.height)), H))
+    # Overscan: scale a touch larger than the wrap and crop the (often pale,
+    # watercolour-faded) top/bottom margins so a near-white paper edge never lands
+    # on the trim/bleed edge — which KDP would print as a white line and the
+    # cover guard rejects. A few % zoom drops the faded border, not the subject.
+    overscan = 1.08
+    hs = round(H * overscan)
+    art = art.resize((max(1, round(art.width * hs / art.height)), hs))
+    top = (hs - H) // 2
+    art = art.crop((0, top, art.width, top + H))
     aw = art.width
     shift = round(front_x * W - subject_x * aw)
     canvas = Image.new("RGB", (W, H))

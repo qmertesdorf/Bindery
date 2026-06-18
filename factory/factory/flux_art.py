@@ -134,7 +134,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     pages = content["pages"]
     n = len(pages)
 
-    out_pages = []
+    out_pages, flagged = [], []
     for i, page in enumerate(pages, 1):
         prompt, loras = page_plan(page, hero=hero, companion=companion,
                                   style=style, outfit=outfit)
@@ -148,10 +148,18 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
             comfy.submit(flux_lora_workflow(p, s, loras=_loras, guidance=guidance),
                          out_path=op)
 
-        out_pages.append(run_audited_render(
-            render, prompt, out_path=out_dir / f"page_{i:02d}.png", auditor=auditor,
-            anchor=audit_anchor, scene=page["scene"], reference_path=None,
-            seed=seed + i * 17, max_tries=max_tries))
+        op = out_dir / f"page_{i:02d}.png"
+        # Keep the best attempt and flag it rather than failing the whole book on one
+        # stubborn page (a 22-page run shouldn't die because one page won't pass).
+        try:
+            out_pages.append(run_audited_render(
+                render, prompt, out_path=op, auditor=auditor, anchor=audit_anchor,
+                scene=page["scene"], reference_path=None, seed=seed + i * 17,
+                max_tries=max_tries))
+        except ArtError:
+            _log(f"[flux] page {i}: kept best after {max_tries} tries (REVIEW)")
+            flagged.append(i)
+            out_pages.append(op)  # the final attempt was written before auditing
 
     # Cover: hero + companion (if any), the configured cover scene.
     _log("[flux] cover…")
@@ -169,9 +177,17 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
         comfy.submit(flux_lora_workflow(p, s, loras=cover_loras, guidance=guidance),
                      out_path=op)
 
-    cover = run_audited_render(
-        cover_render, cover_prompt, out_path=out_dir / "art.png", auditor=auditor,
-        anchor=anchor, scene="front cover", reference_path=None, seed=seed + 42,
-        max_tries=max_tries)
+    cover_path = out_dir / "art.png"
+    try:
+        cover = run_audited_render(
+            cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
+            anchor=anchor, scene="front cover", reference_path=None, seed=seed + 42,
+            max_tries=max_tries)
+    except ArtError:
+        _log(f"[flux] cover: kept best after {max_tries} tries (REVIEW)")
+        flagged.append("cover")
+        cover = cover_path
+    if flagged:
+        _log(f"[flux] REVIEW these (audit not fully passed): {flagged}")
     _log(f"[flux] complete: {n} pages + cover")
-    return {"pages": out_pages, "cover": Path(cover)}
+    return {"pages": out_pages, "cover": Path(cover), "flagged": flagged}
