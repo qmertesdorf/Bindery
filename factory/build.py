@@ -52,19 +52,29 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     if cfg.book_type in ("picture", "concept"):
         # ②③ Picture/concept books illustrate every page, so art runs BEFORE the
         # interior (the interior embeds page_NN.png). The auditor enforces quality.
-        if auditor is None:
-            auditor = ClaudeVisionAuditor()
-        if cfg.book_type == "concept":
-            art = generate_concept_art(cfg, content, out_dir, comfy,
-                                       seed=seed, auditor=auditor)
-        elif flux:
-            art = generate_flux_art(cfg, content, out_dir, comfy,
-                                    seed=seed, auditor=auditor)
+        # Reuse already-rendered (and reviewed) art if every page + cover exists, so
+        # a rerun to fix metadata or the cover doesn't re-roll every illustration —
+        # symmetric to the content.json reuse above. Delete the page_*.png to force
+        # a fresh render.
+        existing_pages = [out_dir / f"page_{i:02d}.png"
+                          for i in range(1, len(content["pages"]) + 1)]
+        cover_png = out_dir / "art.png"
+        if all(p.exists() for p in existing_pages) and cover_png.exists():
+            art = {"pages": existing_pages, "cover": cover_png, "flagged": []}
         else:
-            art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
-                                       positive_node=positive_node,
-                                       sampler_node=sampler_node, seed=seed,
-                                       auditor=auditor)
+            if auditor is None:
+                auditor = ClaudeVisionAuditor()
+            if cfg.book_type == "concept":
+                art = generate_concept_art(cfg, content, out_dir, comfy,
+                                           seed=seed, auditor=auditor)
+            elif flux:
+                art = generate_flux_art(cfg, content, out_dir, comfy,
+                                        seed=seed, auditor=auditor)
+            else:
+                art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
+                                           positive_node=positive_node,
+                                           sampler_node=sampler_node, seed=seed,
+                                           auditor=auditor)
         html = render_interior_html(cfg, content, out_dir)
         _, pages = build_interior_pdf(html, out_dir, runner=runner,
                                       book_type=cfg.book_type,

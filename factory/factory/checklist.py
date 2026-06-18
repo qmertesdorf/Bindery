@@ -7,6 +7,12 @@ from . import specs
 
 
 def _keywords(cfg: BookConfig) -> str:
+    if cfg.book_type == "concept":
+        base = ["children's animal book", "nature book for kids",
+                "toddler animal picture book", "early reader animals",
+                "bedtime animal book", "wildlife book for children",
+                "preschool nature picture book"]
+        return ", ".join(base[:7])
     if cfg.book_type == "picture":
         base = [f"{cfg.pet_kind} loss children's book",
                 f"pet loss book for kids", "grief picture book",
@@ -33,9 +39,9 @@ def make_checklist(cfg: BookConfig, pages: int, out_dir: Path) -> Path:
                 cfg=cfg, pages=pages,
                 spine=specs.spine_width_in(pages, specs.spine_per_page(cfg.book_type)),
                 royalty=specs.royalty_usd(cfg.price_usd, pages,
-                                          colour=cfg.book_type == "picture"),
+                                          colour=cfg.book_type in ("picture", "concept")),
                 print_cost=specs.printing_cost_usd(pages,
-                                                   colour=cfg.book_type == "picture"),
+                                                   colour=cfg.book_type in ("picture", "concept")),
                 keywords=_keywords(cfg))
     out = out_dir / "upload-checklist.md"
     out.write_text(md, encoding="utf-8")

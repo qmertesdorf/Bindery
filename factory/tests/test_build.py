@@ -244,3 +244,58 @@ def test_run_build_concept_end_to_end(tmp_path):
         assert (Path(out_dir) / f).exists(), f"missing {f}"
     # paperback-only: no Kindle edition
     assert not (Path(out_dir) / "interior.epub").exists()
+
+
+def test_run_build_reuses_existing_art(tmp_path):
+    # A rerun must NOT re-render when every page + cover already exists (symmetric
+    # to content.json reuse) — e.g. regenerating only the cover/checklist after a
+    # metadata fix should preserve the reviewed illustrations.
+    cfg_dict = {
+        "slug": "tiny", "book_type": "concept", "art_engine": "flux",
+        "title": "Tiny Creatures", "subtitle": "sub", "author": "Eleanor Hartley",
+        "subject": "small animals", "flux_style": "soft watercolour, no text",
+        "art_prompt": "a meadow, soft watercolour, no text",
+        "page_count": 20, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+    }
+    cfgp = tmp_path / "tiny.config.json"
+    cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
+
+    # Pre-seed reviewed content + art so the build should reuse, not render.
+    out = tmp_path / "out" / "tiny"
+    out.mkdir(parents=True)
+    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+              "scene": f"animal {i} in a meadow"} for i in range(20)]
+    (out / "content.json").write_text(json.dumps({
+        "art_style": "x", "character_anchor": "", "dedication": "d",
+        "pages": pages, "closing": "bye"}), encoding="utf-8")
+    for i in range(1, 21):
+        (out / f"page_{i:02d}.png").write_bytes(b"\x89PNG")
+    (out / "art.png").write_bytes(b"\x89PNG")
+
+    class BoomComfy:
+        def submit(self, *a, **k):
+            raise AssertionError("must not render — existing art should be reused")
+        def generate(self, *a, **k):
+            raise AssertionError("must not render — existing art should be reused")
+
+    def boom_llm(prompt):
+        raise AssertionError("must not regenerate content — content.json exists")
+
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                import fitz
+                d = fitz.open()
+                for _ in range(26):
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+
+    out_dir = run_build(cfgp, out_root=tmp_path / "out", generate_fn=boom_llm,
+                        comfy=BoomComfy(), runner=runner)
+    for f in ["interior.pdf", "cover-paperback.pdf", "upload-checklist.md"]:
+        assert (Path(out_dir) / f).exists(), f"missing {f}"
