@@ -62,6 +62,9 @@ def generate_content(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict
     if cfg.book_type == "picture":
         from .picture_content import generate_picture_content
         return generate_picture_content(cfg, generate_fn)
+    if cfg.book_type == "concept":
+        from .concept_content import generate_concept_content
+        return generate_concept_content(cfg, generate_fn)
     raw = generate_fn(build_prompt(cfg))
     try:
         data = json.loads(_strip_fences(raw))
