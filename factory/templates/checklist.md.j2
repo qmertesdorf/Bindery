@@ -22,6 +22,12 @@
 ```text
 {{ cfg.author }}
 ```
+{% if cfg.illustrator -%}
+**Illustrator** (add a contributor, role “Illustrator”)
+```text
+{{ cfg.illustrator }}
+```
+{% endif -%}
 **Description** (Description box — HTML is allowed)
 ```text
 <p>{{ blurb }}</p>

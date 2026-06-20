@@ -512,7 +512,8 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
                 margins_in=0.0, runner=runner, prefer_css_page_size=True)
     # Regression guards: confirm the renderer placed the front-cover text and the
     # back-cover blurb, and that the cover's physical size matches the page count.
-    _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)])
+    _verify_cover_pdf(pdf, [cfg.title, cfg.subtitle, cfg.author, book_blurb(cfg)]
+                      + ([cfg.illustrator] if cfg.illustrator else []))
     _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
     _verify_cover_background(pdf)
     _verify_cover_no_white_edge(pdf)

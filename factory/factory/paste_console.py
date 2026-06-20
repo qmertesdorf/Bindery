@@ -33,6 +33,9 @@ def build_steps(cfg: BookConfig, pages: int) -> list[dict]:
     first, _, last = cfg.author.rpartition(" ")
     if not first:
         first, last = last, ""
+    ill_first, _, ill_last = cfg.illustrator.rpartition(" ")
+    if not ill_first:
+        ill_first, ill_last = ill_last, ""
     spine = specs.spine_width_in(pages, specs.spine_per_page(cfg.book_type))
     royalty = specs.royalty_usd(cfg.price_usd, pages, colour=colour)
     print_cost = specs.printing_cost_usd(pages, colour=colour)
@@ -41,6 +44,17 @@ def build_steps(cfg: BookConfig, pages: int) -> list[dict]:
         {"type": "copy", "field": "Subtitle", "value": cfg.subtitle},
         {"type": "copy", "field": "Author — First name", "value": first},
         {"type": "copy", "field": "Author — Last name", "value": last},
+    ]
+    if cfg.illustrator:
+        steps += [
+            {"type": "act", "field": "Add a contributor → role: Illustrator",
+             "value": "Contributors → Add → Role: Illustrator",
+             "hint": "In KDP's Contributors section, add a second person with the "
+                     "Illustrator role, then paste the next two fields."},
+            {"type": "copy", "field": "Illustrator — First name", "value": ill_first},
+            {"type": "copy", "field": "Illustrator — Last name", "value": ill_last},
+        ]
+    steps += [
         {"type": "copy", "field": "Description", "value": f"<p>{book_blurb(cfg)}</p>",
          "hint": "Switch the Description box to HTML view if available, then paste."},
     ]
