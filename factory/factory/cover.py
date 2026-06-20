@@ -271,11 +271,15 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     art = art.crop((0, top, art.width, top + H))
     aw = art.width
     shift = round(front_x * W - subject_x * aw)
-    # Make sure the sharp art reaches the RIGHT (front) edge. If it falls short, the
-    # exposed strip gets a blurred mirror fill — which looks soft/wrong on the sharp
-    # FRONT cover. Push the art right to cover it; the resulting larger LEFT (back)
-    # gap is fine because the back is blurred into a soft backdrop anyway.
-    if 0 < shift + aw < W:
+    spine_left_px = round((specs.BLEED_IN + trim_w) * dpi)
+    # Keep the sharp foreground OFF the back cover: start the art at the spine so the
+    # entire BACK is just the soft mirror-fill (no dark tree/subject bleeding onto the
+    # back-right, which unbalances it and makes centred blurb text read as off-centre).
+    # The art must still cover the full FRONT — if it's too narrow to both clear the
+    # spine and fill the front, fall back to right-aligning (cover the front).
+    if spine_left_px + aw >= W:
+        shift = spine_left_px
+    elif 0 < shift + aw < W:
         shift = W - aw
     canvas = Image.new("RGB", (W, H))
     canvas.paste(art, (shift, 0))
@@ -296,8 +300,10 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     # spine into the back trim, so centred blurb text looks off against the sharp
     # content on one side. Blur the whole back region into a clean backdrop so the
     # centred blurb actually reads as centred.
-    spine_left_px = round((specs.BLEED_IN + trim_w) * dpi)
-    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 1.8) * dpi))
+    # Blur the whole back into a uniform soft backdrop. Only a small feather at the
+    # spine is needed now (the sharp foreground starts at the spine, so nothing
+    # straddles the fold to create a half-blurred seam).
+    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 0.3) * dpi))
     if spine_left_px > 1:
         # Feathered blur: FULL behind the centred blurb (outer back), then ramp back
         # to SHARP as it reaches the spine — so foreground that crosses the fold stays

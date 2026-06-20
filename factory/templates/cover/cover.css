@@ -49,4 +49,13 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
   text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85);
   /* Scrim baked into cover_bg.png (soft ellipse behind the blurb). */
 }
-.back .blurb { font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0; }
+/* Blurb sits in a defined, centred panel so its boundaries — and its equal left/
+   right margins — are unmistakable, independent of the soft backdrop behind it.
+   Soft rounded semi-opaque card; the radius + box-shadow feather the edges so it
+   still reads gently against the watercolour back. */
+.back .blurb {
+  font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0;
+  background: rgba(20, 24, 18, 0.46);
+  padding: 0.5in 0.55in; border-radius: 0.28in;
+  box-shadow: 0 0 0.5in 0.5in rgba(20, 24, 18, 0.46);
+}
