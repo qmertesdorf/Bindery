@@ -291,10 +291,22 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     # content on one side. Blur the whole back region into a clean backdrop so the
     # centred blurb actually reads as centred.
     spine_left_px = round((specs.BLEED_IN + trim_w) * dpi)
+    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 1.8) * dpi))
     if spine_left_px > 1:
-        back = canvas.crop((0, 0, spine_left_px, H)).filter(
-            ImageFilter.GaussianBlur(round(0.22 * dpi)))
-        canvas.paste(back, (0, 0))
+        # Feathered blur: FULL behind the centred blurb (outer back), then ramp back
+        # to SHARP as it reaches the spine — so foreground that crosses the fold stays
+        # continuous (no hard half-blurred/half-sharp seam at the spine) and the front
+        # cover is left entirely untouched.
+        blurred = canvas.filter(ImageFilter.GaussianBlur(round(0.22 * dpi)))
+        mask = Image.new("L", (W, H), 0)
+        if full_blur_px > 0:
+            mask.paste(255, (0, 0, full_blur_px, H))
+        ramp = spine_left_px - full_blur_px
+        if ramp > 0:
+            grad = Image.new("L", (ramp, 1))
+            grad.putdata([round(255 * (1 - i / ramp)) for i in range(ramp)])
+            mask.paste(grad.resize((ramp, H)), (full_blur_px, 0))
+        canvas = Image.composite(blurred, canvas, mask)
 
     # Soft, localised scrims baked ONLY behind the title (top-front) and blurb
     # (mid-back): blurred ellipses, so the darkening has no hard rectangular
