@@ -12,6 +12,7 @@ from factory.flux_art import generate_flux_art, generate_concept_art
 from factory.audit import ClaudeVisionAuditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
+from factory.paste_console import make_paste_console
 
 DEFAULT_SEED = 12345
 
@@ -98,8 +99,10 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     if cfg.makes_ebook:
         build_epub(cfg, content, out_dir, cover_path=cover_jpg)
 
-    # ⑤ checklist
+    # ⑤ checklist + interactive HTML paste console (the house standard for the
+    #    manual KDP upload — one field at a time, copy-to-clipboard)
     make_checklist(cfg, pages, out_dir)
+    make_paste_console(cfg, pages, out_dir)
     return out_dir
 
 
