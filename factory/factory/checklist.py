@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from .config import BookConfig
 from .templating import render
+from .copy import book_blurb
 from . import specs
 
 
@@ -42,7 +43,7 @@ def make_checklist(cfg: BookConfig, pages: int, out_dir: Path) -> Path:
                                           colour=cfg.book_type in ("picture", "concept")),
                 print_cost=specs.printing_cost_usd(pages,
                                                    colour=cfg.book_type in ("picture", "concept")),
-                keywords=_keywords(cfg))
+                keywords=_keywords(cfg), blurb=book_blurb(cfg))
     out = out_dir / "upload-checklist.md"
     out.write_text(md, encoding="utf-8")
     return out
