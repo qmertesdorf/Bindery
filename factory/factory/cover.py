@@ -271,6 +271,12 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     art = art.crop((0, top, art.width, top + H))
     aw = art.width
     shift = round(front_x * W - subject_x * aw)
+    # Make sure the sharp art reaches the RIGHT (front) edge. If it falls short, the
+    # exposed strip gets a blurred mirror fill — which looks soft/wrong on the sharp
+    # FRONT cover. Push the art right to cover it; the resulting larger LEFT (back)
+    # gap is fine because the back is blurred into a soft backdrop anyway.
+    if 0 < shift + aw < W:
+        shift = W - aw
     canvas = Image.new("RGB", (W, H))
     canvas.paste(art, (shift, 0))
     # Mirror-extend to fill exposed edges, but BLUR the mirrored strips so the
