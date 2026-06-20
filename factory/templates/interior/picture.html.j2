@@ -31,7 +31,7 @@
 
 <section class="pp"><h1 class="title-main">{{ cfg.title }}</h1>
   <p class="title-sub">{{ cfg.subtitle }}</p>
-  <p class="byline">{{ cfg.author }}</p></section>
+  <p class="byline">Written by {{ cfg.author }}{% if cfg.illustrator %}<br>Illustrated by {{ cfg.illustrator }}{% endif %}</p></section>
 
 <section class="pp copyright">
   <p>{{ cfg.title }}<br>Copyright &copy; {{ cfg.author }}. All rights reserved.<br>

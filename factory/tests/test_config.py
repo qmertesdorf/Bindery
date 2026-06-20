@@ -312,3 +312,11 @@ def test_concept_page_count_floor(tmp_path):
     p.write_text(json.dumps(_concept_data(page_count=18)), encoding="utf-8")
     with pytest.raises(ConfigError, match="page_count"):
         load_config(p)
+
+
+def test_illustrator_optional_and_parsed(tmp_path):
+    p = tmp_path / "c.json"
+    p.write_text(json.dumps(_concept_data()), encoding="utf-8")
+    assert load_config(p).illustrator == ""          # optional, defaults empty
+    p.write_text(json.dumps(_concept_data(illustrator="Grace Sullivan")), encoding="utf-8")
+    assert load_config(p).illustrator == "Grace Sullivan"

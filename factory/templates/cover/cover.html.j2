@@ -9,6 +9,6 @@
   <div class="front">
     <h1>{{ cfg.title }}</h1>
     <p class="sub">{{ cfg.subtitle }}</p>
-    <div class="author">{{ cfg.author }}</div>
+    <div class="author">Written by {{ cfg.author }}{% if cfg.illustrator %}<br><span class="illus">Illustrated by {{ cfg.illustrator }}</span>{% endif %}</div>
   </div>
 </div></body></html>

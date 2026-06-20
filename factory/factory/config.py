@@ -52,6 +52,7 @@ class BookConfig:
     theme: str = "grief"                  # picture only — content arc: "grief" or "comfort"
     subject: str = ""                     # concept only — the book's subject
     topics: tuple = ()                    # concept only — explicit per-spread subjects
+    illustrator: str = ""                 # optional — "Illustrated by" credit (≠ author)
 
     @property
     def makes_ebook(self) -> bool:
@@ -167,4 +168,5 @@ def load_config(path: str | Path) -> BookConfig:
         theme=theme,
         subject=str(data.get("subject", "")),
         topics=tuple(str(t) for t in (data.get("topics", []) or [])),
+        illustrator=str(data.get("illustrator", "")),
     )

@@ -33,6 +33,7 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
    drops this element when it's pushed to the bottom (position:absolute+bottom
    OR margin-top:auto), so keep it in flow with the title block. */
 .front .author { margin: 0.55in 0.4in 0; font-variant: small-caps; font-size: 14pt; }
+.front .author .illus { font-size: 11pt; }
 
 /* Back cover (paperback wrap only): blurb centred in the left panel over a soft
    scrim. Bottom kept clear for KDP's barcode (~2 x 1.2in, lower-right). */

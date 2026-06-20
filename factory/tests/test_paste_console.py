@@ -32,6 +32,28 @@ def test_build_steps_concept_fields(tmp_path):
     assert desc == "<p>Step into a wild little world.</p>"
 
 
+def test_illustrator_contributor_steps(tmp_path):
+    p = tmp_path / "c.config.json"
+    p.write_text(json.dumps({
+        "slug": "wlw", "title": "Wild Little World", "subtitle": "A First Look",
+        "author": "Hannah Whitfield", "illustrator": "Grace Sullivan",
+        "art_prompt": "meadow, no text", "book_type": "concept", "art_engine": "flux",
+        "subject": "animals and nature", "flux_style": "soft watercolour, no text",
+        "page_count": 24, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99}),
+        encoding="utf-8")
+    steps = build_steps(load_config(p), 24)
+    by = {s["field"]: s["value"] for s in steps}
+    assert by["Author — First name"] == "Hannah" and by["Author — Last name"] == "Whitfield"
+    assert by["Illustrator — First name"] == "Grace"
+    assert by["Illustrator — Last name"] == "Sullivan"
+    assert any("role: Illustrator" in s["field"] for s in steps)
+
+
+def test_no_illustrator_steps_when_unset(tmp_path):
+    steps = build_steps(_concept_cfg(tmp_path), 24)  # _concept_cfg has no illustrator
+    assert not any("Illustrator" in s["field"] for s in steps)
+
+
 def test_make_paste_console_writes_self_contained_html(tmp_path):
     out = make_paste_console(_concept_cfg(tmp_path), 24, tmp_path)
     html = out.read_text(encoding="utf-8")
