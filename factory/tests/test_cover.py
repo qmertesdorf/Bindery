@@ -93,6 +93,27 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     _verify_cover_pdf(stub, ["anything"])
 
 
+def test_flatten_cover_pdf_makes_single_image(tmp_path):
+    import fitz
+    from factory.cover import _flatten_cover_pdf
+    d = fitz.open(); pg = d.new_page(width=600, height=400)
+    pg.draw_rect(fitz.Rect(0, 0, 600, 400), fill=(0.2, 0.4, 0.2))
+    pg.insert_text((100, 200), "Hello cover")
+    p = tmp_path / "v.pdf"; d.save(str(p)); d.close()
+
+    _flatten_cover_pdf(p, dpi=96)
+    out = fitz.open(str(p))
+    assert out.page_count == 1
+    assert len(out[0].get_images()) == 1            # one embedded image
+    assert out[0].get_text().strip() == ""          # text is now rasterised
+    assert abs(out[0].rect.width - 600) < 1 and abs(out[0].rect.height - 400) < 1
+    out.close()
+
+    # non-PDF stub is skipped, not an error
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _flatten_cover_pdf(stub)
+
+
 def test_verify_cover_pdf_tolerates_linebreak_hyphenation(tmp_path):
     import fitz
     doc = fitz.open()

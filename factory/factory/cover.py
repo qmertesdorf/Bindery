@@ -306,6 +306,35 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     canvas.save(out_dir / "cover_bg.png")
 
 
+def _flatten_cover_pdf(pdf: Path, dpi: int = 300) -> None:
+    """Rewrite the cover PDF as a single full-page raster image at print DPI.
+
+    Chromium embeds the full-page CSS background in a way some PDF viewers (notably
+    Adobe Acrobat) silently fail to render — showing a blank page with floating
+    white text that reads as 'text bleeding off the page'. Baking the whole cover
+    (art + text) into one embedded image makes it render identically in EVERY viewer
+    and in KDP's previewer. The cost is vector-text crispness, which is invisible at
+    300 DPI print resolution. MUST run AFTER the text/geometry guards (they need the
+    vector text). Page dimensions are preserved. Skips a non-PDF stub."""
+    import fitz
+    try:
+        src = fitz.open(str(pdf))
+    except Exception:
+        return
+    if src.page_count < 1:
+        src.close()
+        return
+    page = src[0]
+    w_pt, h_pt = page.rect.width, page.rect.height
+    pix = page.get_pixmap(dpi=dpi)
+    src.close()
+    out = fitz.open()
+    npg = out.new_page(width=w_pt, height=h_pt)
+    npg.insert_image(npg.rect, pixmap=pix)
+    out.save(str(pdf), deflate=True)
+    out.close()
+
+
 def _css(width_in: float, height_in: float, art_file: str, fill: bool = False,
          trim_w: float = specs.TRIM_W_IN) -> str:
     return Template(_CSS_TEMPLATE).render(
@@ -371,6 +400,11 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     _verify_cover_no_white_edge(pdf)
     _verify_cover_text_zones(pdf, pages, cfg.trim_w, per_page=per_page)
     _verify_cover_back_text_centered(pdf, pages, cfg.trim_w, per_page=per_page)
+    # Bake the validated cover to a single image so it renders in every viewer
+    # (Acrobat doesn't render the vector full-page background). Guards above ran on
+    # the vector text; this must come after them. Re-check size survived the bake.
+    _flatten_cover_pdf(pdf)
+    _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None
