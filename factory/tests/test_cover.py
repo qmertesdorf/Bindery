@@ -93,6 +93,19 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     _verify_cover_pdf(stub, ["anything"])
 
 
+def test_verify_cover_pdf_tolerates_linebreak_hyphenation(tmp_path):
+    import fitz
+    doc = fitz.open()
+    page = doc.new_page()
+    # simulate the renderer wrapping a hyphenated word across two lines
+    page.insert_text((72, 72), "a soft read-")
+    page.insert_text((72, 90), "aloud nature book")
+    p = tmp_path / "hy.pdf"
+    doc.save(str(p)); doc.close()
+    # the verbatim blurb still matches despite the line-break hyphen
+    _verify_cover_pdf(p, ["a soft read-aloud nature book"])
+
+
 def _pdf_of_size(path, w_in, h_in):
     import fitz
     doc = fitz.open()
@@ -154,6 +167,42 @@ def test_verify_cover_background(tmp_path):
     # non-PDF stub is skipped
     stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
     _verify_cover_background(stub)
+
+
+def test_verify_cover_back_text_centered(tmp_path):
+    import fitz
+    from factory.cover import _verify_cover_back_text_centered
+    pages = 84
+    W, H = specs.cover_dimensions_in(pages)
+    back_cx = specs.BLEED_IN + specs.TRIM_W_IN / 2
+
+    text = "A short back blurb."
+    fs = 12
+    tw_in = fitz.get_text_length(text, fontsize=fs) / 72  # rendered width in inches
+
+    def pdf_back_text(cx_in, cy_in):
+        p = tmp_path / f"c_{cx_in:.2f}_{cy_in:.2f}.pdf"
+        d = fitz.open(); pg = d.new_page(width=W * 72, height=H * 72)
+        # insert_text takes the LEFT/baseline; place the left so the bbox centre
+        # lands at cx_in, baseline at cy_in (bbox centre ~ cy_in)
+        pg.insert_text(((cx_in - tw_in / 2) * 72, cy_in * 72), text, fontsize=fs)
+        d.save(str(p)); d.close()
+        return p
+
+    # blurb centred on the back panel -> passes
+    _verify_cover_back_text_centered(pdf_back_text(back_cx, H / 2), pages)
+
+    # blurb shoved high (the old asymmetric-padding defect) -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_text_centered(pdf_back_text(back_cx, H / 2 - 1.0), pages)
+
+    # blurb off to one side -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_text_centered(pdf_back_text(back_cx - 1.5, H / 2), pages)
+
+    # non-PDF stub is skipped, not an error
+    stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
+    _verify_cover_back_text_centered(stub, pages)
 
 
 def test_verify_cover_text_zones(tmp_path):

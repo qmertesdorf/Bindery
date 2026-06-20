@@ -38,8 +38,14 @@ def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
     for ln in raw.splitlines():
         if not dedup or dedup[-1] != ln:
             dedup.append(ln)
-    norm = " ".join(" ".join(dedup).split())
-    missing = [s for s in required if " ".join(s.split()) not in norm]
+    # De-hyphenate line-break hyphenation: the renderer may wrap a hyphenated word
+    # ("read-aloud" -> "read-\naloud"), which normalises to "read- aloud"; collapse
+    # "- " back to "-" so a verbatim blurb still matches (em-dashes are U+2014 and
+    # untouched).
+    def _norm(t: str) -> str:
+        return " ".join(t.split()).replace("- ", "-")
+    norm = _norm(" ".join(dedup))
+    missing = [s for s in required if _norm(s) not in norm]
     if missing:
         raise CoverError(
             f"Cover PDF {pdf.name} is missing expected text: {missing}. The HTML "
@@ -119,6 +125,57 @@ def _verify_cover_text_zones(pdf: Path, pages: int, trim_w: float = specs.TRIM_W
     if bad:
         raise CoverError(f"Cover PDF {pdf.name} has text outside KDP safe zones: "
                          + "; ".join(sorted(set(bad))))
+
+
+def _verify_cover_back_text_centered(pdf: Path, pages: int,
+                                     trim_w: float = specs.TRIM_W_IN,
+                                     per_page: float = specs.SPINE_PER_PAGE_IN,
+                                     tol_in: float = 0.25) -> None:
+    """Fail if the back-cover text block isn't centred in the back panel.
+
+    Composition guard: the back blurb is meant to sit centred over its scrim. An
+    asymmetric padding or a layout regression that shoves it high/low or off to one
+    side is a defect KDP won't catch but a reader will — so check that the bounding
+    box of all back-panel text is centred (within ``tol_in``) on the back panel's
+    centre, horizontally and vertically. Front-cover text (an intentionally
+    top-aligned title block) is excluded by the spine split. Skips a non-PDF stub
+    or a cover with no back text (front-only)."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    pg = doc[0]
+    W, H = pg.rect.width / 72, pg.rect.height / 72
+    spine_l = specs.BLEED_IN + trim_w
+    spine_c = spine_l + specs.spine_width_in(pages, per_page) / 2
+    back_cx = specs.BLEED_IN + trim_w / 2
+    x0 = y0 = x1 = y1 = None
+    for b in pg.get_text("dict")["blocks"]:
+        for l in b.get("lines", []):
+            for s in l["spans"]:
+                if not s["text"].strip():
+                    continue
+                bx0, by0, bx1, by1 = (v / 72 for v in s["bbox"])
+                if (bx0 + bx1) / 2 > spine_c:
+                    continue  # front-cover text
+                x0 = bx0 if x0 is None else min(x0, bx0)
+                y0 = by0 if y0 is None else min(y0, by0)
+                x1 = bx1 if x1 is None else max(x1, bx1)
+                y1 = by1 if y1 is None else max(y1, by1)
+    if x0 is None:
+        return  # no back-cover text (e.g. front-only)
+    dx = abs((x0 + x1) / 2 - back_cx)
+    dy = abs((y0 + y1) / 2 - H / 2)
+    errs = []
+    if dx > tol_in:
+        errs.append(f"horizontally off-centre by {dx:.2f}in")
+    if dy > tol_in:
+        errs.append(f"vertically off-centre by {dy:.2f}in")
+    if errs:
+        raise CoverError(
+            f"Cover PDF {pdf.name} back-cover text is not centred in its panel: "
+            + "; ".join(errs) + " — check the .back padding / scrim placement.")
 
 
 def _verify_cover_background(pdf: Path) -> None:
@@ -238,7 +295,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
-        (back_cx, round(0.43 * H), round(2.7 * dpi), round(1.6 * dpi), 0.42),   # blurb
+        (back_cx, round(0.50 * H), round(2.7 * dpi), round(1.7 * dpi), 0.42),   # blurb (panel centre)
     ]
     overlay = Image.new("L", (W, H), 0)
     draw = ImageDraw.Draw(overlay)
@@ -313,6 +370,7 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     _verify_cover_background(pdf)
     _verify_cover_no_white_edge(pdf)
     _verify_cover_text_zones(pdf, pages, cfg.trim_w, per_page=per_page)
+    _verify_cover_back_text_centered(pdf, pages, cfg.trim_w, per_page=per_page)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None
