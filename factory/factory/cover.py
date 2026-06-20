@@ -178,6 +178,47 @@ def _verify_cover_back_text_centered(pdf: Path, pages: int,
             + "; ".join(errs) + " — check the .back padding / scrim placement.")
 
 
+def _verify_cover_back_balanced(pdf: Path, pages: int,
+                                trim_w: float = specs.TRIM_W_IN,
+                                per_page: float = specs.SPINE_PER_PAGE_IN,
+                                max_diff: float = 25.0) -> None:
+    """Fail if the BACK cover backdrop is lopsided left-vs-right.
+
+    A heavy/dark mass on one side — e.g. sharp foreground (a tree) bleeding past the
+    spine onto the back — gives the back cover uneven visual weight, which makes an
+    otherwise-centred blurb read as off-centre. The position guard can't see this
+    and the vision auditor missed it, so check it deterministically: compare the mean
+    luminance of the back cover's left third vs right third. Skips a non-PDF stub."""
+    import io
+    from PIL import Image, ImageStat
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    if doc.page_count < 1:
+        doc.close()
+        return
+    pg = doc[0]
+    dpi = 72
+    im = Image.open(io.BytesIO(pg.get_pixmap(dpi=dpi).tobytes("png"))).convert("L")
+    bl = specs.BLEED_IN
+    br = specs.BLEED_IN + trim_w
+    third = (br - bl) / 3
+    H = im.height
+
+    def lum(x0, x1):
+        return ImageStat.Stat(im.crop((round(x0 * dpi), 0, round(x1 * dpi), H))).mean[0]
+
+    left, right = lum(bl, bl + third), lum(br - third, br)
+    if abs(left - right) > max_diff:
+        raise CoverError(
+            f"Cover {pdf.name} back cover is lopsided (left-third luminance "
+            f"{left:.0f} vs right-third {right:.0f}, diff {abs(left - right):.0f} > "
+            f"{max_diff:.0f}): a heavy element on one side makes the centred blurb "
+            f"read as off-centre. Keep foreground off the back; use a uniform backdrop.")
+
+
 def _verify_cover_background(pdf: Path) -> None:
     """Fail the build if the cover's full-bleed background didn't render (a mostly
     white page) or if MULTIPLE background images are present (per-panel CSS crops,
@@ -482,6 +523,7 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     # the vector text; this must come after them. Re-check size survived the bake.
     _flatten_cover_pdf(pdf)
     _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
+    _verify_cover_back_balanced(pdf, pages, cfg.trim_w, per_page=per_page)
     # Vision composition check (legibility/placement) on the finished cover.
     _audit_cover_composition(pdf, auditor)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.

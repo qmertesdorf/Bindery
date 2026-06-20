@@ -93,6 +93,32 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     _verify_cover_pdf(stub, ["anything"])
 
 
+def test_verify_cover_back_balanced(tmp_path):
+    import fitz
+    from factory.cover import _verify_cover_back_balanced
+    pages = 84
+    W, H = specs.cover_dimensions_in(pages)
+    br = specs.BLEED_IN + specs.TRIM_W_IN
+
+    def make(dark_right):
+        d = fitz.open(); pg = d.new_page(width=W * 72, height=H * 72)
+        pg.draw_rect(fitz.Rect(0, 0, W * 72, H * 72), fill=(0.6, 0.6, 0.6))
+        if dark_right:  # heavy dark mass on the back-right (foreground bleeding in)
+            pg.draw_rect(fitz.Rect((br - 2.5) * 72, 0, br * 72, H * 72),
+                         fill=(0.04, 0.04, 0.04))
+        p = tmp_path / f"bal_{dark_right}.pdf"; d.save(str(p)); d.close()
+        return p
+
+    # balanced back -> passes
+    _verify_cover_back_balanced(make(False), pages)
+    # heavy dark mass on the back-right -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_balanced(make(True), pages)
+    # non-PDF stub -> skipped
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _verify_cover_back_balanced(stub, pages)
+
+
 def test_audit_cover_composition(tmp_path):
     import fitz
     from factory.cover import _audit_cover_composition
