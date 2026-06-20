@@ -14,6 +14,11 @@ def book_blurb(cfg: BookConfig) -> str:
             f"tender pictures, it holds space for big feelings and helps a family "
             f"remember {cfg.pet_name} with love. A comforting read-aloud and a "
             f"caring gift.")
+    if cfg.book_type == "concept":
+        return cfg.blurb or (
+            f"A gentle, beautifully illustrated picture book that takes early readers "
+            f"on a tour of {cfg.subject}. Soft watercolours and simple, read-aloud "
+            f"lines make every page a warm discovery for curious little ones.")
     return (f"A gentle, guided journal to help you grieve and remember your beloved "
             f"{cfg.pet_kind}. Undated reflective prompts, memory pages, and milestone "
             f"reflections give you a private space to process loss at your own pace. "

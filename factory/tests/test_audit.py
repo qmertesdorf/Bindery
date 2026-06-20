@@ -1,7 +1,16 @@
 import json, pytest
 from pathlib import Path
 from factory.audit import (build_audit_prompt, build_concept_audit_prompt,
+                           build_cover_audit_prompt,
                            parse_verdict, AuditError, ClaudeVisionAuditor)
+
+
+def test_cover_audit_prompt_checks_legibility():
+    p = build_cover_audit_prompt(image_path=Path("/o/c.png")).lower()
+    assert "legib" in p or "contrast" in p
+    assert "c.png" in p
+    assert "blurb" in p
+    assert "centred" in p or "centered" in p or "balance" in p  # checks centering too
 
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
@@ -53,6 +62,33 @@ def test_concept_audit_prompt_is_character_free():
     assert "page_01.png" in prompt
     # concept books must not carry the character-identity rules
     assert "outfit" not in prompt.lower()
+
+
+def test_concept_audit_prompt_rejects_photorealism():
+    # the auditor must gate out photo-real renders so the regenerate loop
+    # self-corrects toward the storybook illustration style
+    prompt = build_concept_audit_prompt(
+        anchor="a bee on a flower", scene="a bee",
+        image_path=Path("/out/p.png")).lower()
+    assert "photo" in prompt          # rejects photographic / photorealistic
+    assert "storybook" in prompt      # must read as a storybook painting
+
+
+def test_concept_audit_prompt_enforces_style_cohesion_vs_reference():
+    # with a style reference, the auditor must require the new page to MATCH it
+    prompt = build_concept_audit_prompt(
+        anchor="a snail on a leaf", scene="a snail",
+        image_path=Path("/out/page_11.png"),
+        reference_path=Path("/out/page_01.png"))
+    assert "page_01.png" in prompt          # the reference is named
+    assert "reference" in prompt.lower()
+    assert "cohesive" in prompt.lower() or "match" in prompt.lower()
+
+
+def test_concept_audit_prompt_without_reference_has_no_cohesion_clause():
+    prompt = build_concept_audit_prompt(
+        anchor="a fox", scene="a fox", image_path=Path("/out/p.png")).lower()
+    assert "style reference" not in prompt
 
 
 def test_auditor_kind_selects_concept_prompt():

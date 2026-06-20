@@ -1,7 +1,7 @@
 # KDP Upload Checklist — {{ cfg.title }}
 
 ## Files to upload
-- Paperback interior: `interior.pdf` ({{ pages }} pages, {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }}", {% if cfg.book_type == "picture" %}colour{% else %}cream{% endif %})
+- Paperback interior: `interior.pdf` ({{ pages }} pages, {{ "%g"|format(cfg.trim_w) }}x{{ "%g"|format(cfg.trim_h) }}", {% if cfg.book_type in ("picture", "concept") %}colour{% else %}cream{% endif %})
 - Paperback cover (wraparound): `cover-paperback.pdf` (spine {{ spine }}in)
 {%- if cfg.makes_ebook %}
 - Ebook manuscript: `interior.epub`
@@ -17,6 +17,8 @@
   <p>{{ cfg.blurb or cfg.synopsis }}</p>
 {%- elif cfg.book_type == "picture" %}
   <p>{{ cfg.blurb or "A gentle, beautifully illustrated picture book for a child saying goodbye to a beloved " ~ cfg.pet_kind ~ ", helping a family remember " ~ cfg.pet_name ~ " with love." }}</p>
+{%- elif cfg.book_type == "concept" %}
+  <p>{{ cfg.blurb or "A gentle, beautifully illustrated picture book for early readers." }}</p>
 {%- else %}
   <p>A gentle, guided journal to help you grieve and remember your beloved {{ cfg.pet_kind }}.
   Undated reflective prompts, memory pages, and milestone reflections give you a private
@@ -27,7 +29,7 @@
 
 ## Paperback print settings (must match the generated files)
 - **Trim size:** {{ "%g"|format(cfg.trim_w) }} x {{ "%g"|format(cfg.trim_h) }} in
-{%- if cfg.book_type == "picture" %}
+{%- if cfg.book_type in ("picture", "concept") %}
 - **Interior:** Standard Color (full-colour illustrations)
 - **Paper:** White — ⚠ select white; the spine width ({{ spine }}in) was computed for white/colour stock.
 {%- else %}
@@ -46,6 +48,9 @@
 {%- elif cfg.book_type == "picture" %}
 1. Children's Books › Growing Up & Facts of Life › Difficult Discussions › Death & Dying
 2. Children's Books › Animals › Dogs   (Juvenile Nonfiction/Fiction › Social Themes › Death & Dying)
+{%- elif cfg.book_type == "concept" %}
+1. Children's Books › Animals (Juvenile Nonfiction › Animals)
+2. Children's Books › Science, Nature & How It Works › Nature
 {%- else %}
 1. Self-Help › Death & Grief
 2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)

@@ -19,9 +19,10 @@ MARGIN_TOPBOTTOM_IN = 0.5
 
 
 def spine_per_page(book_type: str = "journal") -> float:
-    """Per-page spine caliper: colour picture books print on white/colour stock,
-    which is thinner per sheet than the cream stock journals/standard use."""
-    return SPINE_PER_PAGE_WHITE_IN if book_type == "picture" else SPINE_PER_PAGE_IN
+    """Per-page spine caliper: colour picture/concept books print on white/colour
+    stock, which is thinner per sheet than the cream stock journals/standard use."""
+    return (SPINE_PER_PAGE_WHITE_IN if book_type in ("picture", "concept")
+            else SPINE_PER_PAGE_IN)
 
 
 def spine_width_in(pages: int, per_page: float = SPINE_PER_PAGE_IN) -> float:

@@ -56,3 +56,8 @@ def test_concept_story_requires_scene():
 def test_concept_story_prompt_includes_explicit_topics():
     prompt = build_concept_story_prompt(_cfg(topics=("a fox", "a snail")))
     assert "a fox" in prompt and "a snail" in prompt
+
+
+def test_concept_story_prompt_requires_rhyme():
+    prompt = build_concept_story_prompt(_cfg()).lower()
+    assert "rhym" in prompt  # text must be a rhyming couplet

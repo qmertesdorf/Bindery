@@ -40,8 +40,22 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
   position: absolute; top: 0; left: {{ bleed }}in; width: {{ trim_w }}in; height: 100%;
   box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  text-align: center; padding: 1.2in 0.7in 1.9in;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  /* Symmetric vertical padding so justify-content:center lands the blurb on the
+     panel's true vertical centre (asymmetric padding pushed it ~0.34in high). A
+     centred short blurb still clears KDP's lower-right barcode keep-out. */
+  text-align: center; padding: 0.8in 0.7in;
+  /* Strong dark halo so white blurb text stays legible even over bright art
+     (the baked scrim alone wasn't enough over the sunlit areas). */
+  text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85);
   /* Scrim baked into cover_bg.png (soft ellipse behind the blurb). */
 }
-.back .blurb { font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0; }
+/* Blurb sits in a defined, centred panel so its boundaries — and its equal left/
+   right margins — are unmistakable, independent of the soft backdrop behind it.
+   Soft rounded semi-opaque card; the radius + box-shadow feather the edges so it
+   still reads gently against the watercolour back. */
+.back .blurb {
+  font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0;
+  background: rgba(20, 24, 18, 0.46);
+  padding: 0.5in 0.55in; border-radius: 0.28in;
+  box-shadow: 0 0 0.5in 0.5in rgba(20, 24, 18, 0.46);
+}

@@ -64,10 +64,24 @@ Output the JSON and nothing else."""
 
 
 def build_concept_audit_prompt(*, anchor: str, scene: str | None,
-                               image_path: Path) -> str:
+                               image_path: Path,
+                               reference_path: Path | None = None) -> str:
     scene_line = f"\nThis page is meant to depict, roughly: {scene}." if scene else ""
+    ref = (f"\nA STYLE REFERENCE image from this SAME book is at {reference_path}. "
+           f"Read it. The new image must share the SAME illustration STYLE as the "
+           f"reference — the same medium and finish (soft hand-painted storybook "
+           f"watercolour), the same degree of stylisation vs realism, and a similar "
+           f"brushwork/linework and palette feel — so every page looks like one "
+           f"artist made one cohesive book. It need NOT match the reference's "
+           f"subject, pose, composition, or colours; ONLY the style must match."
+           if reference_path else "")
+    cohesion_reject = (
+        "\n- the illustration STYLE does NOT MATCH the style reference above "
+        "(a different medium, finish, or level of realism — e.g. the reference is "
+        "flat and painterly but this is glossy or photoreal): the book must look "
+        "stylistically cohesive page to page;" if reference_path else "")
     return f"""Read the image file at {image_path} and judge it for a character-free
-children's picture book.
+children's picture book.{ref}
 
 This page should show: {anchor}.{scene_line}
 
@@ -78,19 +92,49 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - ANY people or human figures appear (this book has no people);
 - any text, letters, words, or numbers are rendered in the artwork;
 - broken anatomy (malformed faces, extra or missing limbs/eyes);
-- the art is clearly the wrong medium (photographic, cluttered collage, or
-  otherwise not a soft storybook illustration).
+- the picture looks PHOTOGRAPHIC or photorealistic — a real photo, a macro or
+  close-up photograph, or a glossy 3D / CGI render — instead of a hand-painted,
+  soft, simplified children's storybook illustration. It MUST clearly read as a
+  storybook PAINTING (visible brushwork / drawn linework, stylised, not lifelike);
+  realistic insects, fur, feathers, or water that look like a photo are a defect.{cohesion_reject}
 
 ACCEPT (set ok=true) — do NOT reject — for natural variation:
 - different pose, camera angle, framing, or composition;
 - a different or simpler background, lighting, time of day, or season;
 - extra incidental natural scenery (plants, sky, water) around the subject;
+- loose, painterly, flat, or simplified rendering — that illustrated look is GOOD;
 - stylistic differences that still read as the same soft storybook look.
 
 When the subject is right and the art is clean, set ok=true even if such details
 differ. Reserve issues for genuine defects.
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
+Output the JSON and nothing else."""
+
+
+def build_cover_audit_prompt(*, image_path: Path) -> str:
+    return f"""Read the image file at {image_path}. It is a wraparound children's
+picture-book cover laid flat: the BACK cover is the LEFT half, a thin SPINE runs
+down the middle, and the FRONT cover is the RIGHT half.
+
+Judge it for defects a publisher would fix. REJECT (set ok=false) for any real
+problem:
+- TEXT LEGIBILITY: any text hard to read — low contrast against the art behind it
+  (e.g. pale or white text over a bright, light, or busy area), washed out, or too
+  faint. The back-cover blurb must be clearly readable from its first line to its
+  last; the front title and author must be clearly legible.
+- TEXT PLACEMENT: text cut off, running off the page, crossing onto the wrong
+  panel / over the spine, or crammed into a corner.
+- BACK BLURB BALANCE: the back-cover blurb must look CENTRED and balanced within
+  the back cover (the left panel). Reject if it reads as off-centre — including
+  when the background behind it is lopsided (e.g. a bright pool on one side, darker
+  on the other) so the text appears pushed to one side even if technically centred.
+- broken or garbled text, or obvious layout breakage.
+
+ACCEPT (set ok=true) if the front title/author and the entire back blurb are
+clearly legible and the layout is clean — natural art-style variation is fine.
+
+Return ONLY JSON: {{"ok": true|false, "issues": ["short issue", ...]}}
 Output the JSON and nothing else."""
 
 
@@ -125,9 +169,12 @@ class ClaudeVisionAuditor:
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
               scene: str | None = None, kind: str = "character") -> dict:
-        if kind == "concept":
+        if kind == "cover":
+            prompt = build_cover_audit_prompt(image_path=Path(image_path))
+        elif kind == "concept":
             prompt = build_concept_audit_prompt(
-                anchor=anchor, scene=scene, image_path=Path(image_path))
+                anchor=anchor, scene=scene, image_path=Path(image_path),
+                reference_path=Path(reference_path) if reference_path else None)
         else:
             prompt = build_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),

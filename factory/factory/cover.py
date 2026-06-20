@@ -38,8 +38,14 @@ def _verify_cover_pdf(pdf: Path, required: list[str]) -> None:
     for ln in raw.splitlines():
         if not dedup or dedup[-1] != ln:
             dedup.append(ln)
-    norm = " ".join(" ".join(dedup).split())
-    missing = [s for s in required if " ".join(s.split()) not in norm]
+    # De-hyphenate line-break hyphenation: the renderer may wrap a hyphenated word
+    # ("read-aloud" -> "read-\naloud"), which normalises to "read- aloud"; collapse
+    # "- " back to "-" so a verbatim blurb still matches (em-dashes are U+2014 and
+    # untouched).
+    def _norm(t: str) -> str:
+        return " ".join(t.split()).replace("- ", "-")
+    norm = _norm(" ".join(dedup))
+    missing = [s for s in required if _norm(s) not in norm]
     if missing:
         raise CoverError(
             f"Cover PDF {pdf.name} is missing expected text: {missing}. The HTML "
@@ -119,6 +125,98 @@ def _verify_cover_text_zones(pdf: Path, pages: int, trim_w: float = specs.TRIM_W
     if bad:
         raise CoverError(f"Cover PDF {pdf.name} has text outside KDP safe zones: "
                          + "; ".join(sorted(set(bad))))
+
+
+def _verify_cover_back_text_centered(pdf: Path, pages: int,
+                                     trim_w: float = specs.TRIM_W_IN,
+                                     per_page: float = specs.SPINE_PER_PAGE_IN,
+                                     tol_in: float = 0.25) -> None:
+    """Fail if the back-cover text block isn't centred in the back panel.
+
+    Composition guard: the back blurb is meant to sit centred over its scrim. An
+    asymmetric padding or a layout regression that shoves it high/low or off to one
+    side is a defect KDP won't catch but a reader will — so check that the bounding
+    box of all back-panel text is centred (within ``tol_in``) on the back panel's
+    centre, horizontally and vertically. Front-cover text (an intentionally
+    top-aligned title block) is excluded by the spine split. Skips a non-PDF stub
+    or a cover with no back text (front-only)."""
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    pg = doc[0]
+    W, H = pg.rect.width / 72, pg.rect.height / 72
+    spine_l = specs.BLEED_IN + trim_w
+    spine_c = spine_l + specs.spine_width_in(pages, per_page) / 2
+    back_cx = specs.BLEED_IN + trim_w / 2
+    x0 = y0 = x1 = y1 = None
+    for b in pg.get_text("dict")["blocks"]:
+        for l in b.get("lines", []):
+            for s in l["spans"]:
+                if not s["text"].strip():
+                    continue
+                bx0, by0, bx1, by1 = (v / 72 for v in s["bbox"])
+                if (bx0 + bx1) / 2 > spine_c:
+                    continue  # front-cover text
+                x0 = bx0 if x0 is None else min(x0, bx0)
+                y0 = by0 if y0 is None else min(y0, by0)
+                x1 = bx1 if x1 is None else max(x1, bx1)
+                y1 = by1 if y1 is None else max(y1, by1)
+    if x0 is None:
+        return  # no back-cover text (e.g. front-only)
+    dx = abs((x0 + x1) / 2 - back_cx)
+    dy = abs((y0 + y1) / 2 - H / 2)
+    errs = []
+    if dx > tol_in:
+        errs.append(f"horizontally off-centre by {dx:.2f}in")
+    if dy > tol_in:
+        errs.append(f"vertically off-centre by {dy:.2f}in")
+    if errs:
+        raise CoverError(
+            f"Cover PDF {pdf.name} back-cover text is not centred in its panel: "
+            + "; ".join(errs) + " — check the .back padding / scrim placement.")
+
+
+def _verify_cover_back_balanced(pdf: Path, pages: int,
+                                trim_w: float = specs.TRIM_W_IN,
+                                per_page: float = specs.SPINE_PER_PAGE_IN,
+                                max_diff: float = 25.0) -> None:
+    """Fail if the BACK cover backdrop is lopsided left-vs-right.
+
+    A heavy/dark mass on one side — e.g. sharp foreground (a tree) bleeding past the
+    spine onto the back — gives the back cover uneven visual weight, which makes an
+    otherwise-centred blurb read as off-centre. The position guard can't see this
+    and the vision auditor missed it, so check it deterministically: compare the mean
+    luminance of the back cover's left third vs right third. Skips a non-PDF stub."""
+    import io
+    from PIL import Image, ImageStat
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    if doc.page_count < 1:
+        doc.close()
+        return
+    pg = doc[0]
+    dpi = 72
+    im = Image.open(io.BytesIO(pg.get_pixmap(dpi=dpi).tobytes("png"))).convert("L")
+    bl = specs.BLEED_IN
+    br = specs.BLEED_IN + trim_w
+    third = (br - bl) / 3
+    H = im.height
+
+    def lum(x0, x1):
+        return ImageStat.Stat(im.crop((round(x0 * dpi), 0, round(x1 * dpi), H))).mean[0]
+
+    left, right = lum(bl, bl + third), lum(br - third, br)
+    if abs(left - right) > max_diff:
+        raise CoverError(
+            f"Cover {pdf.name} back cover is lopsided (left-third luminance "
+            f"{left:.0f} vs right-third {right:.0f}, diff {abs(left - right):.0f} > "
+            f"{max_diff:.0f}): a heavy element on one side makes the centred blurb "
+            f"read as off-centre. Keep foreground off the back; use a uniform backdrop.")
 
 
 def _verify_cover_background(pdf: Path) -> None:
@@ -214,6 +312,16 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     art = art.crop((0, top, art.width, top + H))
     aw = art.width
     shift = round(front_x * W - subject_x * aw)
+    spine_left_px = round((specs.BLEED_IN + trim_w) * dpi)
+    # Keep the sharp foreground OFF the back cover: start the art at the spine so the
+    # entire BACK is just the soft mirror-fill (no dark tree/subject bleeding onto the
+    # back-right, which unbalances it and makes centred blurb text read as off-centre).
+    # The art must still cover the full FRONT — if it's too narrow to both clear the
+    # spine and fill the front, fall back to right-aligning (cover the front).
+    if spine_left_px + aw >= W:
+        shift = spine_left_px
+    elif 0 < shift + aw < W:
+        shift = W - aw
     canvas = Image.new("RGB", (W, H))
     canvas.paste(art, (shift, 0))
     # Mirror-extend to fill exposed edges, but BLUR the mirrored strips so the
@@ -228,6 +336,38 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         strip = art.crop((aw - min(gap, aw), 0, aw, H)).transpose(Image.FLIP_LEFT_RIGHT)
         canvas.paste(strip.filter(blur), (shift + aw, 0))
 
+    # The BACK cover (everything left of the spine) should read as a soft, uniform
+    # blurred backdrop. The chosen art's sharp foreground often extends past the
+    # spine into the back trim, so centred blurb text looks off against the sharp
+    # content on one side. Blur the whole back region into a clean backdrop so the
+    # centred blurb actually reads as centred.
+    # Blur the whole back into a uniform soft backdrop. Only a small feather at the
+    # spine is needed now (the sharp foreground starts at the spine, so nothing
+    # straddles the fold to create a half-blurred seam).
+    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 0.3) * dpi))
+    if spine_left_px > 1:
+        # Feathered blur: FULL behind the centred blurb (outer back), then ramp back
+        # to SHARP as it reaches the spine — so foreground that crosses the fold stays
+        # continuous (no hard half-blurred/half-sharp seam at the spine) and the front
+        # cover is left entirely untouched.
+        blurred = canvas.filter(ImageFilter.GaussianBlur(round(0.22 * dpi)))
+        # Even out the backdrop behind the blurb: a bright pool on one side makes the
+        # perfectly-centred blurb read as off-centre (a real defect the vision auditor
+        # flags). Blend the blurred back toward its own average colour for a balanced,
+        # uniform soft backdrop so centred text actually reads as centred.
+        if full_blur_px > 0:
+            avg = blurred.crop((0, 0, full_blur_px, H)).resize((1, 1)).getpixel((0, 0))
+            blurred = Image.blend(blurred, Image.new("RGB", (W, H), avg), 0.55)
+        mask = Image.new("L", (W, H), 0)
+        if full_blur_px > 0:
+            mask.paste(255, (0, 0, full_blur_px, H))
+        ramp = spine_left_px - full_blur_px
+        if ramp > 0:
+            grad = Image.new("L", (ramp, 1))
+            grad.putdata([round(255 * (1 - i / ramp)) for i in range(ramp)])
+            mask.paste(grad.resize((ramp, H)), (full_blur_px, 0))
+        canvas = Image.composite(blurred, canvas, mask)
+
     # Soft, localised scrims baked ONLY behind the title (top-front) and blurb
     # (mid-back): blurred ellipses, so the darkening has no hard rectangular
     # edges or spine seam and leaves the rest of the scene (incl. the subject)
@@ -238,7 +378,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
-        (back_cx, round(0.43 * H), round(2.7 * dpi), round(1.6 * dpi), 0.42),   # blurb
+        (back_cx, round(0.50 * H), round(2.9 * dpi), round(2.0 * dpi), 0.62),   # blurb (panel centre) — darker so white text stays legible over bright art
     ]
     overlay = Image.new("L", (W, H), 0)
     draw = ImageDraw.Draw(overlay)
@@ -247,6 +387,69 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     overlay = overlay.filter(ImageFilter.GaussianBlur(round(0.6 * dpi)))
     canvas = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), canvas, overlay)
     canvas.save(out_dir / "cover_bg.png")
+
+
+def _audit_cover_composition(pdf: Path, auditor, dpi: int = 150) -> None:
+    """Vision-audit the rendered cover for legibility/composition defects a
+    geometry guard can't see — e.g. pale text over a bright area, text crammed or
+    cut off. Renders the cover to an image and asks the injected vision auditor
+    (kind='cover'); raises CoverError if it reports a problem, so a bad cover is
+    caught at build time instead of by the human. No-op when no auditor is provided
+    or the file isn't a real PDF (tests)."""
+    if auditor is None:
+        return
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    if doc.page_count < 1:
+        doc.close()
+        return
+    img = Path(pdf).parent / "_cover_audit.png"
+    doc[0].get_pixmap(dpi=dpi).save(str(img))
+    doc.close()
+    try:
+        verdict = auditor.audit(img, anchor="", scene=None, kind="cover")
+    finally:
+        try:
+            img.unlink()
+        except OSError:
+            pass
+    if not verdict.get("ok"):
+        raise CoverError(
+            f"Cover {pdf.name} failed the composition audit: "
+            + "; ".join(verdict.get("issues", []) or ["no reason given"])
+            + ". Fix the cover (e.g. scrim/contrast/placement) and rebuild.")
+
+
+def _flatten_cover_pdf(pdf: Path, dpi: int = 300) -> None:
+    """Rewrite the cover PDF as a single full-page raster image at print DPI.
+
+    Chromium embeds the full-page CSS background in a way some PDF viewers (notably
+    Adobe Acrobat) silently fail to render — showing a blank page with floating
+    white text that reads as 'text bleeding off the page'. Baking the whole cover
+    (art + text) into one embedded image makes it render identically in EVERY viewer
+    and in KDP's previewer. The cost is vector-text crispness, which is invisible at
+    300 DPI print resolution. MUST run AFTER the text/geometry guards (they need the
+    vector text). Page dimensions are preserved. Skips a non-PDF stub."""
+    import fitz
+    try:
+        src = fitz.open(str(pdf))
+    except Exception:
+        return
+    if src.page_count < 1:
+        src.close()
+        return
+    page = src[0]
+    w_pt, h_pt = page.rect.width, page.rect.height
+    pix = page.get_pixmap(dpi=dpi)
+    src.close()
+    out = fitz.open()
+    npg = out.new_page(width=w_pt, height=h_pt)
+    npg.insert_image(npg.rect, pixmap=pix)
+    out.save(str(pdf), deflate=True)
+    out.close()
 
 
 def _css(width_in: float, height_in: float, art_file: str, fill: bool = False,
@@ -296,7 +499,8 @@ def _recompress_jpg(path: Path, quality: int = 90) -> None:
 
 
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
-                runner=None, make_ebook_cover: bool = True) -> tuple[Path, Path | None]:
+                runner=None, make_ebook_cover: bool = True,
+                auditor=None) -> tuple[Path, Path | None]:
     out_dir = Path(out_dir)
     per_page = specs.spine_per_page(cfg.book_type)
     # wraparound paperback PDF
@@ -313,6 +517,15 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     _verify_cover_background(pdf)
     _verify_cover_no_white_edge(pdf)
     _verify_cover_text_zones(pdf, pages, cfg.trim_w, per_page=per_page)
+    _verify_cover_back_text_centered(pdf, pages, cfg.trim_w, per_page=per_page)
+    # Bake the validated cover to a single image so it renders in every viewer
+    # (Acrobat doesn't render the vector full-page background). Guards above ran on
+    # the vector text; this must come after them. Re-check size survived the bake.
+    _flatten_cover_pdf(pdf)
+    _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
+    _verify_cover_back_balanced(pdf, pages, cfg.trim_w, per_page=per_page)
+    # Vision composition check (legibility/placement) on the finished cover.
+    _audit_cover_composition(pdf, auditor)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None

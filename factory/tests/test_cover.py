@@ -93,6 +93,93 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     _verify_cover_pdf(stub, ["anything"])
 
 
+def test_verify_cover_back_balanced(tmp_path):
+    import fitz
+    from factory.cover import _verify_cover_back_balanced
+    pages = 84
+    W, H = specs.cover_dimensions_in(pages)
+    br = specs.BLEED_IN + specs.TRIM_W_IN
+
+    def make(dark_right):
+        d = fitz.open(); pg = d.new_page(width=W * 72, height=H * 72)
+        pg.draw_rect(fitz.Rect(0, 0, W * 72, H * 72), fill=(0.6, 0.6, 0.6))
+        if dark_right:  # heavy dark mass on the back-right (foreground bleeding in)
+            pg.draw_rect(fitz.Rect((br - 2.5) * 72, 0, br * 72, H * 72),
+                         fill=(0.04, 0.04, 0.04))
+        p = tmp_path / f"bal_{dark_right}.pdf"; d.save(str(p)); d.close()
+        return p
+
+    # balanced back -> passes
+    _verify_cover_back_balanced(make(False), pages)
+    # heavy dark mass on the back-right -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_balanced(make(True), pages)
+    # non-PDF stub -> skipped
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _verify_cover_back_balanced(stub, pages)
+
+
+def test_audit_cover_composition(tmp_path):
+    import fitz
+    from factory.cover import _audit_cover_composition
+    d = fitz.open(); pg = d.new_page(width=600, height=400)
+    pg.draw_rect(fitz.Rect(0, 0, 600, 400), fill=(0.3, 0.5, 0.3))
+    pg.insert_text((50, 200), "Cover")
+    p = tmp_path / "c.pdf"; d.save(str(p)); d.close()
+
+    class Aud:
+        def __init__(self, ok): self.ok = ok; self.kinds = []
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
+            self.kinds.append(kind)
+            return {"ok": self.ok, "issues": [] if self.ok else ["pale text, hard to read"]}
+
+    # vision auditor flags a legibility problem -> hard failure
+    with pytest.raises(CoverError):
+        _audit_cover_composition(p, Aud(False))
+    # auditor OK -> no raise, and it was asked with the cover prompt
+    a = Aud(True); _audit_cover_composition(p, a); assert a.kinds == ["cover"]
+    # no auditor injected -> skipped
+    _audit_cover_composition(p, None)
+    # non-PDF stub -> skipped
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _audit_cover_composition(stub, Aud(False))
+
+
+def test_flatten_cover_pdf_makes_single_image(tmp_path):
+    import fitz
+    from factory.cover import _flatten_cover_pdf
+    d = fitz.open(); pg = d.new_page(width=600, height=400)
+    pg.draw_rect(fitz.Rect(0, 0, 600, 400), fill=(0.2, 0.4, 0.2))
+    pg.insert_text((100, 200), "Hello cover")
+    p = tmp_path / "v.pdf"; d.save(str(p)); d.close()
+
+    _flatten_cover_pdf(p, dpi=96)
+    out = fitz.open(str(p))
+    assert out.page_count == 1
+    assert len(out[0].get_images()) == 1            # one embedded image
+    assert out[0].get_text().strip() == ""          # text is now rasterised
+    assert abs(out[0].rect.width - 600) < 1 and abs(out[0].rect.height - 400) < 1
+    out.close()
+
+    # non-PDF stub is skipped, not an error
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _flatten_cover_pdf(stub)
+
+
+def test_verify_cover_pdf_tolerates_linebreak_hyphenation(tmp_path):
+    import fitz
+    doc = fitz.open()
+    page = doc.new_page()
+    # simulate the renderer wrapping a hyphenated word across two lines
+    page.insert_text((72, 72), "a soft read-")
+    page.insert_text((72, 90), "aloud nature book")
+    p = tmp_path / "hy.pdf"
+    doc.save(str(p)); doc.close()
+    # the verbatim blurb still matches despite the line-break hyphen
+    _verify_cover_pdf(p, ["a soft read-aloud nature book"])
+
+
 def _pdf_of_size(path, w_in, h_in):
     import fitz
     doc = fitz.open()
@@ -154,6 +241,42 @@ def test_verify_cover_background(tmp_path):
     # non-PDF stub is skipped
     stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
     _verify_cover_background(stub)
+
+
+def test_verify_cover_back_text_centered(tmp_path):
+    import fitz
+    from factory.cover import _verify_cover_back_text_centered
+    pages = 84
+    W, H = specs.cover_dimensions_in(pages)
+    back_cx = specs.BLEED_IN + specs.TRIM_W_IN / 2
+
+    text = "A short back blurb."
+    fs = 12
+    tw_in = fitz.get_text_length(text, fontsize=fs) / 72  # rendered width in inches
+
+    def pdf_back_text(cx_in, cy_in):
+        p = tmp_path / f"c_{cx_in:.2f}_{cy_in:.2f}.pdf"
+        d = fitz.open(); pg = d.new_page(width=W * 72, height=H * 72)
+        # insert_text takes the LEFT/baseline; place the left so the bbox centre
+        # lands at cx_in, baseline at cy_in (bbox centre ~ cy_in)
+        pg.insert_text(((cx_in - tw_in / 2) * 72, cy_in * 72), text, fontsize=fs)
+        d.save(str(p)); d.close()
+        return p
+
+    # blurb centred on the back panel -> passes
+    _verify_cover_back_text_centered(pdf_back_text(back_cx, H / 2), pages)
+
+    # blurb shoved high (the old asymmetric-padding defect) -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_text_centered(pdf_back_text(back_cx, H / 2 - 1.0), pages)
+
+    # blurb off to one side -> hard failure
+    with pytest.raises(CoverError):
+        _verify_cover_back_text_centered(pdf_back_text(back_cx - 1.5, H / 2), pages)
+
+    # non-PDF stub is skipped, not an error
+    stub = tmp_path / "stub.pdf"; stub.write_bytes(b"x")
+    _verify_cover_back_text_centered(stub, pages)
 
 
 def test_verify_cover_text_zones(tmp_path):

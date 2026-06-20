@@ -70,3 +70,30 @@ def test_picture_checklist_is_colour_and_juvenile(tmp_path):
     assert "Color" in text  # interior is colour, not "Black & white"
     assert "Juvenile" in text  # juvenile category, not Self-Help
     assert "cream" not in text.lower()  # colour books print on white stock
+
+
+def test_concept_checklist_is_colour_nature_and_not_grief(tmp_path):
+    import json
+    from factory.config import load_config
+    cfgp = tmp_path / "c.config.json"
+    cfgp.write_text(json.dumps({
+        "slug": "wlw", "title": "Wild Little World", "subtitle": "S", "author": "A",
+        "art_prompt": "meadow, no text", "book_type": "concept", "art_engine": "flux",
+        "subject": "animals and nature", "flux_style": "soft watercolour, no text",
+        "page_count": 24, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+        "blurb": "Step into a wild little world of friendly animals."}),
+        encoding="utf-8")
+    cfg = load_config(cfgp)
+    text = make_checklist(cfg, 28, tmp_path).read_text(encoding="utf-8")
+    # colour picture book, NOT a B&W cream journal
+    assert "Color" in text and "Black & white" not in text
+    assert "cream" not in text.lower()
+    # nature/animal kids metadata, NOT grief
+    assert "Step into a wild little world of friendly animals." in text  # blurb wins
+    assert "Death & Grief" not in text and "Death & Dying" not in text
+    assert "Nature" in text
+    assert "pet loss grief journal" not in text
+    assert "{{" not in text  # template fully rendered
+    # markdown checklist must NOT be HTML-escaped (it's pasted into KDP verbatim)
+    assert "&#39;" not in text and "&amp;" not in text
+    assert "children's animal book" in text
