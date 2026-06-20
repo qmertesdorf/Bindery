@@ -8,24 +8,32 @@
 - Ebook cover: `cover-ebook.jpg`
 {%- endif %}
 
-## Listing metadata
-- **Title:** {{ cfg.title }}
-- **Subtitle:** {{ cfg.subtitle }}
-- **Author:** {{ cfg.author }}
-- **Description:** (paste)
-{%- if cfg.book_type == "standard" %}
-  <p>{{ cfg.blurb or cfg.synopsis }}</p>
-{%- elif cfg.book_type == "picture" %}
-  <p>{{ cfg.blurb or "A gentle, beautifully illustrated picture book for a child saying goodbye to a beloved " ~ cfg.pet_kind ~ ", helping a family remember " ~ cfg.pet_name ~ " with love." }}</p>
-{%- elif cfg.book_type == "concept" %}
-  <p>{{ cfg.blurb or "A gentle, beautifully illustrated picture book for early readers." }}</p>
-{%- else %}
-  <p>A gentle, guided journal to help you grieve and remember your beloved {{ cfg.pet_kind }}.
-  Undated reflective prompts, memory pages, and milestone reflections give you a private
-  space to process loss at your own pace. A comforting keepsake and a thoughtful gift.</p>
-{%- endif %}
-- **Price:** ${{ "%.2f"|format(cfg.price_usd) }}{% if cfg.makes_ebook %} (same list price for paperback and Kindle — $9.99 earns 70% ebook / 60% paperback){% else %} (paperback){% endif %}
-- **Estimated royalty:** ${{ "%.2f"|format(royalty) }}/sale paperback (60% − ${{ "%.2f"|format(print_cost) }} print)
+## 📋 Paste console — copy each block straight into the matching KDP field
+
+**Title**
+```text
+{{ cfg.title }}
+```
+**Subtitle**
+```text
+{{ cfg.subtitle }}
+```
+**Author** (primary author)
+```text
+{{ cfg.author }}
+```
+**Description** (Description box — HTML is allowed)
+```text
+<p>{{ blurb }}</p>
+```
+**Keywords** — KDP has 7 separate boxes; paste one per box:
+{% for kw in keywords.split(", ") %}{{ loop.index }}. {{ kw }}
+{% endfor %}
+**Price (USD)**
+```text
+{{ "%.2f"|format(cfg.price_usd) }}
+```
+> Estimated royalty: ${{ "%.2f"|format(royalty) }}/sale paperback (60% − ${{ "%.2f"|format(print_cost) }} print).{% if cfg.makes_ebook %} eBook uses the same list price (70% ebook / 60% paperback).{% endif %}
 
 ## Paperback print settings (must match the generated files)
 - **Trim size:** {{ "%g"|format(cfg.trim_w) }} x {{ "%g"|format(cfg.trim_h) }} in
@@ -55,11 +63,8 @@
 1. Self-Help › Death & Grief
 2. Self-Help › Journaling   (or Crafts, Hobbies & Home › {{ cfg.pet_kind|capitalize }} care)
 {%- endif %}
-
-## 7 backend keywords
-{{ keywords }}
-
 {%- if cfg.book_type == "standard" %}
+
 > ⚠ Before upload: re-verify every link in the book's "Where to Turn for Support"
 > resources page is still live and correct. Do not ship a dead or wrong support link.
 {%- endif %}

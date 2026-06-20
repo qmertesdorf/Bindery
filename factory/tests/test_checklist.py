@@ -22,9 +22,30 @@ def test_make_checklist_has_disclosure_and_royalty(tmp_path):
     assert "AI" in text and "disclos" in text.lower()
     assert "Text: AI-generated" in text
     assert "Images: AI-generated" in text
-    assert "$9.99" in text
+    assert "9.99" in text                 # price in the paste console
     assert "Death & Grief" in text
     assert "3.70" in text  # royalty 9.99*0.6 - 2.29
+
+
+def test_checklist_has_paste_console(tmp_path):
+    import json
+    from factory.config import load_config
+    cfgp = tmp_path / "c.config.json"
+    cfgp.write_text(json.dumps({
+        "slug": "wlw", "title": "Wild Little World", "subtitle": "Sub", "author": "Eleanor Hartley",
+        "art_prompt": "meadow, no text", "book_type": "concept", "art_engine": "flux",
+        "subject": "animals and nature", "flux_style": "soft watercolour, no text",
+        "page_count": 24, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+        "blurb": "Step into a wild little world."}), encoding="utf-8")
+    text = make_checklist(load_config(cfgp), 28, tmp_path).read_text(encoding="utf-8")
+    assert "Paste console" in text
+    # each KDP field present as a paste block
+    assert "Wild Little World" in text and "Eleanor Hartley" in text
+    assert "<p>Step into a wild little world.</p>" in text   # description as HTML
+    # the 7 keywords are listed one per box (numbered), not just a comma string
+    assert "1. children's animal book" in text
+    assert "7. " in text
+    assert "{{" not in text   # fully rendered
 
 
 def test_journal_checklist_omits_ebook(tmp_path):
