@@ -304,6 +304,13 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         # continuous (no hard half-blurred/half-sharp seam at the spine) and the front
         # cover is left entirely untouched.
         blurred = canvas.filter(ImageFilter.GaussianBlur(round(0.22 * dpi)))
+        # Even out the backdrop behind the blurb: a bright pool on one side makes the
+        # perfectly-centred blurb read as off-centre (a real defect the vision auditor
+        # flags). Blend the blurred back toward its own average colour for a balanced,
+        # uniform soft backdrop so centred text actually reads as centred.
+        if full_blur_px > 0:
+            avg = blurred.crop((0, 0, full_blur_px, H)).resize((1, 1)).getpixel((0, 0))
+            blurred = Image.blend(blurred, Image.new("RGB", (W, H), avg), 0.55)
         mask = Image.new("L", (W, H), 0)
         if full_blur_px > 0:
             mask.paste(255, (0, 0, full_blur_px, H))

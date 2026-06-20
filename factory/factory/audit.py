@@ -125,6 +125,10 @@ problem:
   last; the front title and author must be clearly legible.
 - TEXT PLACEMENT: text cut off, running off the page, crossing onto the wrong
   panel / over the spine, or crammed into a corner.
+- BACK BLURB BALANCE: the back-cover blurb must look CENTRED and balanced within
+  the back cover (the left panel). Reject if it reads as off-centre — including
+  when the background behind it is lopsided (e.g. a bright pool on one side, darker
+  on the other) so the text appears pushed to one side even if technically centred.
 - broken or garbled text, or obvious layout breakage.
 
 ACCEPT (set ok=true) if the front title/author and the entire back blurb are

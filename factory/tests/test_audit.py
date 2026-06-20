@@ -10,6 +10,7 @@ def test_cover_audit_prompt_checks_legibility():
     assert "legib" in p or "contrast" in p
     assert "c.png" in p
     assert "blurb" in p
+    assert "centred" in p or "centered" in p or "balance" in p  # checks centering too
 
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
