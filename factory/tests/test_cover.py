@@ -93,6 +93,33 @@ def test_verify_cover_pdf_catches_dropped_text(tmp_path):
     _verify_cover_pdf(stub, ["anything"])
 
 
+def test_audit_cover_composition(tmp_path):
+    import fitz
+    from factory.cover import _audit_cover_composition
+    d = fitz.open(); pg = d.new_page(width=600, height=400)
+    pg.draw_rect(fitz.Rect(0, 0, 600, 400), fill=(0.3, 0.5, 0.3))
+    pg.insert_text((50, 200), "Cover")
+    p = tmp_path / "c.pdf"; d.save(str(p)); d.close()
+
+    class Aud:
+        def __init__(self, ok): self.ok = ok; self.kinds = []
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character"):
+            self.kinds.append(kind)
+            return {"ok": self.ok, "issues": [] if self.ok else ["pale text, hard to read"]}
+
+    # vision auditor flags a legibility problem -> hard failure
+    with pytest.raises(CoverError):
+        _audit_cover_composition(p, Aud(False))
+    # auditor OK -> no raise, and it was asked with the cover prompt
+    a = Aud(True); _audit_cover_composition(p, a); assert a.kinds == ["cover"]
+    # no auditor injected -> skipped
+    _audit_cover_composition(p, None)
+    # non-PDF stub -> skipped
+    stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
+    _audit_cover_composition(stub, Aud(False))
+
+
 def test_flatten_cover_pdf_makes_single_image(tmp_path):
     import fitz
     from factory.cover import _flatten_cover_pdf

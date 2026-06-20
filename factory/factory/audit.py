@@ -112,6 +112,28 @@ Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""
 
 
+def build_cover_audit_prompt(*, image_path: Path) -> str:
+    return f"""Read the image file at {image_path}. It is a wraparound children's
+picture-book cover laid flat: the BACK cover is the LEFT half, a thin SPINE runs
+down the middle, and the FRONT cover is the RIGHT half.
+
+Judge it for defects a publisher would fix. REJECT (set ok=false) for any real
+problem:
+- TEXT LEGIBILITY: any text hard to read — low contrast against the art behind it
+  (e.g. pale or white text over a bright, light, or busy area), washed out, or too
+  faint. The back-cover blurb must be clearly readable from its first line to its
+  last; the front title and author must be clearly legible.
+- TEXT PLACEMENT: text cut off, running off the page, crossing onto the wrong
+  panel / over the spine, or crammed into a corner.
+- broken or garbled text, or obvious layout breakage.
+
+ACCEPT (set ok=true) if the front title/author and the entire back blurb are
+clearly legible and the layout is clean — natural art-style variation is fine.
+
+Return ONLY JSON: {{"ok": true|false, "issues": ["short issue", ...]}}
+Output the JSON and nothing else."""
+
+
 def parse_verdict(raw: str) -> dict:
     try:
         data = json.loads(_strip_fences(raw))
@@ -143,7 +165,9 @@ class ClaudeVisionAuditor:
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
               scene: str | None = None, kind: str = "character") -> dict:
-        if kind == "concept":
+        if kind == "cover":
+            prompt = build_cover_audit_prompt(image_path=Path(image_path))
+        elif kind == "concept":
             prompt = build_concept_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),
                 reference_path=Path(reference_path) if reference_path else None)

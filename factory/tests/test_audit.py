@@ -1,7 +1,15 @@
 import json, pytest
 from pathlib import Path
 from factory.audit import (build_audit_prompt, build_concept_audit_prompt,
+                           build_cover_audit_prompt,
                            parse_verdict, AuditError, ClaudeVisionAuditor)
+
+
+def test_cover_audit_prompt_checks_legibility():
+    p = build_cover_audit_prompt(image_path=Path("/o/c.png")).lower()
+    assert "legib" in p or "contrast" in p
+    assert "c.png" in p
+    assert "blurb" in p
 
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",

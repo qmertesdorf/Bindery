@@ -94,7 +94,7 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     # ④ cover (paperback wrap; ebook JPG only for standard books), then EPUB
     #    embedding that JPG cover. Journals are paperback-only — no Kindle edition.
     _, cover_jpg = build_cover(cfg, pages, art_path, out_dir, runner=runner,
-                               make_ebook_cover=cfg.makes_ebook)
+                               make_ebook_cover=cfg.makes_ebook, auditor=auditor)
     if cfg.makes_ebook:
         build_epub(cfg, content, out_dir, cover_path=cover_jpg)
 

@@ -44,7 +44,9 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
      panel's true vertical centre (asymmetric padding pushed it ~0.34in high). A
      centred short blurb still clears KDP's lower-right barcode keep-out. */
   text-align: center; padding: 0.8in 0.7in;
-  text-shadow: 0 2px 10px rgba(0,0,0,0.7);
+  /* Strong dark halo so white blurb text stays legible even over bright art
+     (the baked scrim alone wasn't enough over the sunlit areas). */
+  text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85);
   /* Scrim baked into cover_bg.png (soft ellipse behind the blurb). */
 }
 .back .blurb { font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0; }

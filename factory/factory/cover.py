@@ -295,7 +295,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
-        (back_cx, round(0.50 * H), round(2.7 * dpi), round(1.7 * dpi), 0.42),   # blurb (panel centre)
+        (back_cx, round(0.50 * H), round(2.9 * dpi), round(2.0 * dpi), 0.62),   # blurb (panel centre) — darker so white text stays legible over bright art
     ]
     overlay = Image.new("L", (W, H), 0)
     draw = ImageDraw.Draw(overlay)
@@ -304,6 +304,40 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     overlay = overlay.filter(ImageFilter.GaussianBlur(round(0.6 * dpi)))
     canvas = Image.composite(Image.new("RGB", (W, H), (0, 0, 0)), canvas, overlay)
     canvas.save(out_dir / "cover_bg.png")
+
+
+def _audit_cover_composition(pdf: Path, auditor, dpi: int = 150) -> None:
+    """Vision-audit the rendered cover for legibility/composition defects a
+    geometry guard can't see — e.g. pale text over a bright area, text crammed or
+    cut off. Renders the cover to an image and asks the injected vision auditor
+    (kind='cover'); raises CoverError if it reports a problem, so a bad cover is
+    caught at build time instead of by the human. No-op when no auditor is provided
+    or the file isn't a real PDF (tests)."""
+    if auditor is None:
+        return
+    import fitz
+    try:
+        doc = fitz.open(str(pdf))
+    except Exception:
+        return
+    if doc.page_count < 1:
+        doc.close()
+        return
+    img = Path(pdf).parent / "_cover_audit.png"
+    doc[0].get_pixmap(dpi=dpi).save(str(img))
+    doc.close()
+    try:
+        verdict = auditor.audit(img, anchor="", scene=None, kind="cover")
+    finally:
+        try:
+            img.unlink()
+        except OSError:
+            pass
+    if not verdict.get("ok"):
+        raise CoverError(
+            f"Cover {pdf.name} failed the composition audit: "
+            + "; ".join(verdict.get("issues", []) or ["no reason given"])
+            + ". Fix the cover (e.g. scrim/contrast/placement) and rebuild.")
 
 
 def _flatten_cover_pdf(pdf: Path, dpi: int = 300) -> None:
@@ -382,7 +416,8 @@ def _recompress_jpg(path: Path, quality: int = 90) -> None:
 
 
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
-                runner=None, make_ebook_cover: bool = True) -> tuple[Path, Path | None]:
+                runner=None, make_ebook_cover: bool = True,
+                auditor=None) -> tuple[Path, Path | None]:
     out_dir = Path(out_dir)
     per_page = specs.spine_per_page(cfg.book_type)
     # wraparound paperback PDF
@@ -405,6 +440,8 @@ def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
     # the vector text; this must come after them. Re-check size survived the bake.
     _flatten_cover_pdf(pdf)
     _verify_cover_dimensions(pdf, pages, cfg.trim_w, cfg.trim_h, per_page=per_page)
+    # Vision composition check (legibility/placement) on the finished cover.
+    _audit_cover_composition(pdf, auditor)
     # Journals are paperback-only — skip the Kindle front-cover JPG entirely.
     if not make_ebook_cover:
         return pdf, None
