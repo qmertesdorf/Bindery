@@ -285,6 +285,17 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         strip = art.crop((aw - min(gap, aw), 0, aw, H)).transpose(Image.FLIP_LEFT_RIGHT)
         canvas.paste(strip.filter(blur), (shift + aw, 0))
 
+    # The BACK cover (everything left of the spine) should read as a soft, uniform
+    # blurred backdrop. The chosen art's sharp foreground often extends past the
+    # spine into the back trim, so centred blurb text looks off against the sharp
+    # content on one side. Blur the whole back region into a clean backdrop so the
+    # centred blurb actually reads as centred.
+    spine_left_px = round((specs.BLEED_IN + trim_w) * dpi)
+    if spine_left_px > 1:
+        back = canvas.crop((0, 0, spine_left_px, H)).filter(
+            ImageFilter.GaussianBlur(round(0.22 * dpi)))
+        canvas.paste(back, (0, 0))
+
     # Soft, localised scrims baked ONLY behind the title (top-front) and blurb
     # (mid-back): blurred ellipses, so the darkening has no hard rectangular
     # edges or spine seam and leaves the rest of the scene (incl. the subject)
