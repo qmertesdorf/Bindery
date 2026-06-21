@@ -25,10 +25,13 @@ never kills a book.
 
 ## Implementation status (branch `feature/qa-ensemble-phase1`)
 Phase 1 **scaffolding is built, unit-tested, and default-OFF** (221 tests pass; Claude-only path
-byte-for-byte unchanged). What remains is GPU/weights provisioning + a real end-to-end run.
-- **WS1a VQAScore** — `factory/factory/qa/vqascore.py`. Injectable `VQAScorer`; real adapter
-  lazy-loads `t2v_metrics` (CLIP-FlanT5). ☐ TODO: `pip install t2v_metrics` in the build venv,
-  verify scores on real pages, tune `qa_vqa_threshold`.
+byte-for-byte unchanged). WS1a (VQAScore) is now **wired to a real model and validated**; HADM and
+the Flux-Fill repair still need weights/provisioning.
+- **WS1a VQAScore** — ✅ DONE & VALIDATED. `factory/factory/qa/vqascore.py` + `vqa_worker.py` run
+  `clip-flant5-xl` in an isolated GPU venv (`~/.book-gen-vqa`, see `qa/VQA_SETUP.md`) via a
+  subprocess daemon (factory/.venv stays torch-free). 5/5 real pages discriminate right vs wrong
+  captions (right 6–15× wrong). Calibrated `qa_vqa_threshold` to a **coarse floor of 0.15** (correct
+  matches score ~0.19–0.97, gross mismatches ~0.05). ☐ Re-tune vs full rhyming captions in a live run.
 - **WS1b Best-of-N** — `qa/selection.py` + `art._render_best_of_n`. DONE & wired into the concept
   path (caption-gated). Set `qa_candidates` (3–9) per book to enable.
 - **WS1c HADM anatomy** — `qa/hadm.py`. Injectable `AnatomyDetector` + `Defect` boxes. ☐ TODO:
