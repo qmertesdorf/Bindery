@@ -64,6 +64,10 @@ def test_concept_audit_prompt_is_character_free():
     assert "outfit" not in prompt.lower()
     # rejects AI-slop hybrid/malformed animals (the cover deer/rabbit/fox blend)
     assert "hybrid" in prompt.lower() and "species" in prompt.lower()
+    # rejects artist signatures/watermarks (faint corner marks)
+    assert "signature" in prompt.lower() and "corner" in prompt.lower()
+    # rejects anatomical anomalies by counting features (the 3-eyed snail)
+    assert "count" in prompt.lower() and "eyes" in prompt.lower()
 
 
 def test_concept_audit_prompt_rejects_photorealism():
