@@ -47,8 +47,17 @@ the Flux-Fill repair still need weights/provisioning.
   ComfyUI; one real localized-defect run to verify the inpaint blends.
 - **Config** — `qa_vqa / qa_vqa_threshold / qa_anatomy / qa_anatomy_min_score / qa_candidates /
   qa_repair` on `BookConfig` (all default off).
-- **Not started:** WS1e (TIFA decomposition, Phase 2), WS3/WS4 (print fidelity), WS5 (FLUX.2),
-  WS6/WS7.
+- **WS4 KDP geometry** — ✅ DONE. `specs.py` now encodes the verified table: `gutter_in(pages)`,
+  `outside_margin_in(bleed)`, `interior_bleed_size_in`, per-stock spine calipers (incl. Premium
+  Color 0.002347), `min_pixels_for_dpi` @300 DPI. `gutter_in(pages)` wired into the interior margin
+  guard so >300pp books get the right gutter. Cover dims/bleed + 300-DPI cover render were already
+  correct. 17 tests.
+- **WS3 upscaler** — ☐ PARTIAL. The specs helpers (`min_pixels_for_dpi`, `interior_bleed_size_in`)
+  are ready to drive a DPI-derived upscale target (8.625" trim+bleed → **2588px**, vs the hardcoded
+  2560). Remaining: thread the target through `flux_lora_workflow` + add the ≥ceil(300×(trim+bleed))
+  guard; swap lanczos `ImageScale` for an ESRGAN `UpscaleModelLoader` — **no upscale model installed
+  in ComfyUI yet** (download a commercially-licensed one, e.g. 4x-UltraSharp; verify license).
+- **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6/WS7.
 
 ---
 
