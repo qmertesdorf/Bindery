@@ -62,10 +62,10 @@ the Flux-Fill repair still need weights/provisioning.
   `upscale_model`; when set it inserts `UpscaleModelLoader` → `ImageUpscaleWithModel` before the
   final exact-size `ImageScale` (learned ESRGAN detail vs plain lanczos interpolation). New
   `cfg.upscale_model` (default `""` = lanczos) threads through both generators. 248 tests pass.
-  **Only blocker:** no upscale model file installed in ComfyUI/models/upscale_models — download a
-  **commercially-licensed** one (4x-UltraSharp candidate; **verify its license** before paid use),
-  set `upscale_model` in a book config, and validate one live render. SUPIR is non-commercial — do
-  NOT use.
+  **Only blocker:** no upscale model file installed in ComfyUI/models/upscale_models. License
+  verified 2026-06-21 — use **Real-ESRGAN `RealESRGAN_x4plus`** (BSD-3-Clause, commercial-OK); **4x-
+  UltraSharp is CC BY-NC-SA → BANNED**, same as SUPIR. Download the BSD model, set `upscale_model`
+  in a book config, validate one live render.
 - **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6/WS7.
 
 ---
@@ -124,11 +124,17 @@ defects without rerolling the whole page. Today a single bad hand burns a full f
 
 ## WS3 — Real print-quality upscaler (replace naive lanczos)
 **Why:** `flux_lora_workflow`'s `up` node is a plain **lanczos `ImageScale` to 2560px** — fine for
-size, weak for print sharpness. **Refuted/avoid:** **SUPIR is non-commercial** (license verified,
-3-0) — must NOT be used for paid KDP paperbacks.
+size, weak for print sharpness. **Refuted/avoid (NON-COMMERCIAL — banned for paid KDP):**
+**SUPIR** (license verified, 3-0) AND **4x-UltraSharp / AnimeSharp** (Kim2091, **CC BY-NC-SA 4.0** —
+author confirms model *and outputs* are non-commercial; verified 2026-06-21 at the HF model card &
+discussion #4). Most popular community art upscalers are NC — do NOT assume a candidate is safe.
 
-- Swap the lanczos resize for a **commercially-licensed** ESRGAN/diffusion upscaler via ComfyUI
-  `UpscaleModelLoader` (e.g. 4x-UltraSharp / Nomos-family ESRGAN models — verify each license).
+- **VERIFIED-SAFE choice:** **Real-ESRGAN** `RealESRGAN_x4plus` (and `RealESRGAN_x4plus_anime_6B`
+  for line-heavy art) from `github.com/xinntao/Real-ESRGAN` — **BSD-3-Clause** (commercial use,
+  modification, redistribution all permitted; only keep the copyright notice). Verified at the
+  upstream LICENSE 2026-06-21. Drop the `.pth` into `ComfyUI/models/upscale_models`, set
+  `upscale_model` in the book config (code path already built, WS3b). Swap via ComfyUI
+  `UpscaleModelLoader`. A/B the general x4plus vs the anime_6B on real watercolour pages.
 - **Target 300 DPI at trim+bleed.** For 8.5"×8.5" + 0.125" bleed → 8.625"² → **≥2588px**; current
   2560px ≈ 297 DPI at trim (no bleed) — slightly under once bleed is included. Set the upscale
   target from the actual trim+bleed, not a hardcoded 2560.
