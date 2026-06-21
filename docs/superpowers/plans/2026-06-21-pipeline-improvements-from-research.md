@@ -62,10 +62,13 @@ the Flux-Fill repair still need weights/provisioning.
   `upscale_model`; when set it inserts `UpscaleModelLoader` → `ImageUpscaleWithModel` before the
   final exact-size `ImageScale` (learned ESRGAN detail vs plain lanczos interpolation). New
   `cfg.upscale_model` (default `""` = lanczos) threads through both generators. 248 tests pass.
-  **Only blocker:** no upscale model file installed in ComfyUI/models/upscale_models. License
-  verified 2026-06-21 — use **Real-ESRGAN `RealESRGAN_x4plus`** (BSD-3-Clause, commercial-OK); **4x-
-  UltraSharp is CC BY-NC-SA → BANNED**, same as SUPIR. Download the BSD model, set `upscale_model`
-  in a book config, validate one live render.
+  **3(b) DONE & VALIDATED LIVE (2026-06-21):** `RealESRGAN_x4plus.pth` (BSD-3-Clause, commercial-OK)
+  installed in the live models root (`D:\ComfyUI-models\upscale_models`, symlinked from
+  `~/ComfyUI/models`); ComfyUI lists it in `UpscaleModelLoader`. Smoke test ran the real chain
+  (LoadImage→ESRGAN→resize 2625) live and measured **1.57× the edge energy of plain lanczos** on a
+  representative 1152→2625 path. Enabled via `"upscale_model": "RealESRGAN_x4plus.pth"` in the
+  deep-blue-world + wild-little-world configs (only affects fresh renders; existing art is reused).
+  **4x-UltraSharp is CC BY-NC-SA → BANNED**, same as SUPIR.
 - **WS6a/6c DONE (no GPU):** `readability.py` (dependency-free Flesch–Kincaid) + a build-time
   `verify_readability` guard on kids' (picture/concept) text against `cfg.max_reading_grade`
   (default grade 6); `provenance.py` writes a per-book `provenance.json` (art recipe, seeds, LoRAs,

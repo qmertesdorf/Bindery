@@ -35,6 +35,7 @@
   "art_prompt": "a soft watercolour storybook front cover, a family of friendly red foxes — one adult fox and two small fox kits, all clearly foxes — sitting together in a sunlit wild meadow at the forest edge, butterflies and a little songbird, wildflowers and tall grass, warm golden light, bright and inviting, no text, no words",
   "trim_w": 8.5,
   "trim_h": 8.5,
+  "upscale_model": "RealESRGAN_x4plus.pth",
   "price_usd": 10.99,
   "blurb": "Step into a wild little world! From a red fox in a sunlit forest to fireflies glowing over a meadow at night, this gentle first nature book takes early readers on a tour of twenty animals and the beautiful places they call home. Soft, glowing watercolours and simple, read-aloud lines make every page a warm discovery — a perfect first nature adventure for curious little ones just beginning to read."
 }
