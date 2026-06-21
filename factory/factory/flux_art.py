@@ -131,6 +131,12 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     # when the ensemble/caption isn't enabled). cfg.qa_candidates defaults to 1.
     n_candidates = getattr(cfg, "qa_candidates", 1)
     selector = auditor.selector() if hasattr(auditor, "selector") else None
+    # WS2 repair-before-reroll: only fires on a localized reject (detector boxes),
+    # which only the anatomy ensemble produces — a no-op otherwise.
+    repair_fn = None
+    if getattr(cfg, "qa_repair", False):
+        from factory.repair import InpaintRepairer
+        repair_fn = InpaintRepairer(comfy).repair
 
     # The first page that passes the (reference-free) style bar becomes the STYLE
     # ANCHOR; every later page and the cover are audited against it, so the auditor
@@ -157,7 +163,8 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 scene=page["scene"], reference_path=style_ref, seed=seed + i * 17,
                 max_tries=max_tries, audit_kind="concept",
                 caption=page.get("text"),
-                n_candidates=n_candidates, selector=selector)
+                n_candidates=n_candidates, selector=selector,
+                repair_fn=repair_fn)
             out_pages.append(done)
             if style_ref is None:
                 style_ref = done  # first cohesive page anchors the rest
