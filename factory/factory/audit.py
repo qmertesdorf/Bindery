@@ -92,6 +92,10 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - ANY people or human figures appear (this book has no people);
 - any text, letters, words, or numbers are rendered in the artwork;
 - broken anatomy (malformed faces, extra or missing limbs/eyes);
+- a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
+  or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
+  parts, or a creature that doesn't read clearly as ONE real animal. Every animal
+  must be unmistakably a single, correct species;
 - the picture looks PHOTOGRAPHIC or photorealistic — a real photo, a macro or
   close-up photograph, or a glossy 3D / CGI render — instead of a hand-painted,
   soft, simplified children's storybook illustration. It MUST clearly read as a
