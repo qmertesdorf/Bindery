@@ -13,6 +13,8 @@ from factory.qa import build_ensemble_auditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
 from factory.paste_console import make_paste_console
+from factory.readability import verify_readability
+from factory.provenance import write_provenance
 
 DEFAULT_SEED = 12345
 
@@ -32,6 +34,14 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     else:
         content = generate_content(cfg, generate_fn=generate_fn)
         content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
+
+    # WS6a readability guard: kids' (picture/concept) text must read at/under the
+    # early-reader grade ceiling. Runs on cached content too (the LLM can't be
+    # trusted to self-level), and only for kids' books — adult grief prose is exempt.
+    if cfg.book_type in ("picture", "concept"):
+        rep = verify_readability(content, cfg.max_reading_grade)
+        print(f"[readability] kids' text grade {rep['grade']} "
+              f"(ease {rep['reading_ease']}), ceiling {cfg.max_reading_grade:g}")
 
     # Resolve image backend up front (picture needs art before interior).
     if comfy is None:
@@ -105,6 +115,11 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
     #    manual KDP upload — one field at a time, copy-to-clipboard)
     make_checklist(cfg, pages, out_dir)
     make_paste_console(cfg, pages, out_dir)
+
+    # ⑥ provenance + rights log (WS6c): records the art recipe, seeds, QA policy, and
+    #    the AI-disclosure / copyright notes for this title.
+    flagged = art.get("flagged", []) if cfg.book_type in ("picture", "concept") else []
+    write_provenance(cfg, content, out_dir, seed=seed, flagged=flagged)
     return out_dir
 
 

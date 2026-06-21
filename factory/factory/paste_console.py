@@ -65,7 +65,10 @@ def build_steps(cfg: BookConfig, pages: int) -> list[dict]:
          "hint": "Pick via KDP's category browser — not pasteable."},
         {"type": "act", "field": "AI content disclosure",
          "value": "Text: AI-generated\nImages: AI-generated\nTranslations: None",
-         "hint": "Answer when prompted. Private to Amazon."},
+         "hint": "Required. Images count as AI even if hand-edited; text is "
+                 "AI-assisted — disclose both. KDP's disclosure is private to "
+                 "Amazon and is NOT a US Copyright Office registration (separate "
+                 "step; see provenance.json)."},
         {"type": "act", "field": "ISBN", "value": "Get a free KDP ISBN",
          "hint": "Free, KDP-only. Don't buy one for a KDP-only title."},
         {"type": "act", "field": "Print — Ink & paper",

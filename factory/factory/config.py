@@ -55,6 +55,8 @@ class BookConfig:
     subject: str = ""                     # concept only — the book's subject
     topics: tuple = ()                    # concept only — explicit per-spread subjects
     illustrator: str = ""                 # optional — "Illustrated by" credit (≠ author)
+    max_reading_grade: float = 6.0        # WS6a — picture/concept kids' text must read
+                                          # at/under this Flesch–Kincaid grade; 0 = off
     # WS1 layered-QA ensemble (all default OFF → today's Claude-only path). Enable
     # per book once the GPU stages (VQAScore / HADM weights) are provisioned.
     qa_vqa: bool = False                  # VQAScore caption-fidelity gate (WS1a)
@@ -180,8 +182,11 @@ def load_config(path: str | Path) -> BookConfig:
         subject=str(data.get("subject", "")),
         topics=tuple(str(t) for t in (data.get("topics", []) or [])),
         illustrator=str(data.get("illustrator", "")),
+        max_reading_grade=float(data.get("max_reading_grade", 6.0)),
         qa_vqa=bool(data.get("qa_vqa", False)),
-        qa_vqa_threshold=float(data.get("qa_vqa_threshold", 0.6)),
+        # Default matches the calibrated coarse floor (see qa/VQA_SETUP.md); the old
+        # 0.6 here silently overrode the dataclass default for configs that omit it.
+        qa_vqa_threshold=float(data.get("qa_vqa_threshold", 0.15)),
         qa_anatomy=bool(data.get("qa_anatomy", False)),
         qa_anatomy_min_score=float(data.get("qa_anatomy_min_score", 0.5)),
         qa_candidates=int(data.get("qa_candidates", 1)),

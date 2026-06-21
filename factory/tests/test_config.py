@@ -32,6 +32,10 @@ def test_defaults_applied(tmp_path):
     # WS1 QA stages default OFF so behaviour is unchanged until provisioned
     assert cfg.qa_vqa is False and cfg.qa_anatomy is False
     assert cfg.qa_candidates == 1 and cfg.qa_repair is False
+    # the load_config default must match the calibrated dataclass default (0.15),
+    # not the old stray 0.6, so an omitting config gets the calibrated floor
+    assert cfg.qa_vqa_threshold == 0.15
+    assert cfg.max_reading_grade == 6.0   # WS6a default early-reader ceiling
 
 
 def test_qa_flags_loaded(tmp_path):

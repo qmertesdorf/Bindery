@@ -66,7 +66,14 @@ the Flux-Fill repair still need weights/provisioning.
   verified 2026-06-21 — use **Real-ESRGAN `RealESRGAN_x4plus`** (BSD-3-Clause, commercial-OK); **4x-
   UltraSharp is CC BY-NC-SA → BANNED**, same as SUPIR. Download the BSD model, set `upscale_model`
   in a book config, validate one live render.
-- **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6/WS7.
+- **WS6a/6c DONE (no GPU):** `readability.py` (dependency-free Flesch–Kincaid) + a build-time
+  `verify_readability` guard on kids' (picture/concept) text against `cfg.max_reading_grade`
+  (default grade 6); `provenance.py` writes a per-book `provenance.json` (art recipe, seeds, LoRAs,
+  upscale target/model, QA policy, KDP-disclosure vs USCO-registration rights note); paste-console
+  AI-disclosure hint strengthened (images count even if hand-edited; disclosure ≠ registration).
+  Also fixed a latent bug: `load_config` defaulted `qa_vqa_threshold` to 0.6, overriding the
+  calibrated 0.15 for configs that omit it. 260 tests pass.
+- **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6b (Rufus-era listing copy), WS7.
 
 ---
 
