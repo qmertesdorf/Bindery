@@ -56,7 +56,7 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
    still reads gently against the watercolour back. */
 .back .blurb {
   font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0;
-  background: rgba(20, 24, 18, 0.46);
+  background: rgba(18, 22, 17, 0.58);
   padding: 0.5in 0.55in; border-radius: 0.28in;
-  box-shadow: 0 0 0.5in 0.5in rgba(20, 24, 18, 0.46);
+  box-shadow: 0 0 0.5in 0.5in rgba(18, 22, 17, 0.58);
 }

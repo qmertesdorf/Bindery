@@ -17,7 +17,7 @@
     "a fluffy harbor seal pup resting on a smooth ocean rock",
     "a family of penguins on the ice beside the cold blue sea",
     "a little orange clownfish peeking out of a swaying sea anemone",
-    "a school of bright tropical fish swimming over a colourful reef",
+    "a bright blue tang fish gliding through clear sunlit blue water",
     "a friendly shark cruising through clear blue water",
     "a graceful manta ray gliding through the open blue ocean",
     "a sea otter floating on its back in calm blue water",
@@ -26,7 +26,7 @@
     "a round pufferfish among soft green seaweed",
     "a walrus resting on the ice at the edge of the sea",
     "a glowing jellyfish drifting through deep blue water",
-    "a colourful coral reef full of little fish in sunlit shallow water",
+    "a friendly sea lion resting on a smooth rock beside the calm blue sea",
     "a curious octopus among the rocks on the ocean floor",
     "a tiny seahorse holding onto green seagrass",
     "a gentle round manatee grazing on green seagrass in calm shallow water",
@@ -36,6 +36,8 @@
   "trim_w": 8.5,
   "trim_h": 8.5,
   "upscale_model": "RealESRGAN_x4plus.pth",
+  "qa_vqa": true,
+  "qa_candidates": 3,
   "price_usd": 10.99,
   "blurb": "Dive into a deep blue world! From a gentle blue whale gliding through the open sea to a tiny starfish resting in a sparkling tide pool, this gentle first ocean book takes early readers on a tour of twenty sea animals and the watery places they call home. Soft, glowing watercolours and simple, read-aloud rhymes make every page a warm discovery — a perfect first ocean adventure for curious little ones just beginning to read."
 }

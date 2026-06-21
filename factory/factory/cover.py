@@ -344,7 +344,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     # Blur the whole back into a uniform soft backdrop. Only a small feather at the
     # spine is needed now (the sharp foreground starts at the spine, so nothing
     # straddles the fold to create a half-blurred seam).
-    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 0.3) * dpi))
+    full_blur_px = max(0, round((specs.BLEED_IN + trim_w - 0.08) * dpi))
     if spine_left_px > 1:
         # Feathered blur: FULL behind the centred blurb (outer back), then ramp back
         # to SHARP as it reaches the spine — so foreground that crosses the fold stays
@@ -357,7 +357,9 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         # uniform soft backdrop so centred text actually reads as centred.
         if full_blur_px > 0:
             avg = blurred.crop((0, 0, full_blur_px, H)).resize((1, 1)).getpixel((0, 0))
-            blurred = Image.blend(blurred, Image.new("RGB", (W, H), avg), 0.55)
+            # Blend hard toward the panel's average so a bright pool (e.g. sunlit
+            # water near the spine) can't make the centred blurb read as off-centre.
+            blurred = Image.blend(blurred, Image.new("RGB", (W, H), avg), 0.85)
         mask = Image.new("L", (W, H), 0)
         if full_blur_px > 0:
             mask.paste(255, (0, 0, full_blur_px, H))
@@ -378,7 +380,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
-        (back_cx, round(0.50 * H), round(2.9 * dpi), round(2.0 * dpi), 0.62),   # blurb (panel centre) — darker so white text stays legible over bright art
+        (back_cx, round(0.50 * H), round(3.1 * dpi), round(2.4 * dpi), 0.38),   # blurb (panel centre) — GENTLE: the even backdrop + CSS card carry contrast; a heavy ellipse here read as an off-centre dark blob
     ]
     overlay = Image.new("L", (W, H), 0)
     draw = ImageDraw.Draw(overlay)
