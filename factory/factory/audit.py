@@ -97,11 +97,12 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   marks tucked into a corner (the bottom corners especially);
 - ANOMALOUS or UNREALISTIC ANATOMY: each animal must have anatomically CORRECT
   anatomy for its real species — the right features, the right NUMBER, AND in the
-  right PLACES. Count features (eyes, legs, ears, antennae, wings, tails) and check
-  WHERE they sit. Reject wrong counts (a snail/insect with three eyes, a mammal with
+  right PLACES. Count features (eyes, legs, ears, antennae, wings, tails, eye-stalks)
+  and check WHERE they sit and that NONE are extra, missing, blank, or malformed. Reject wrong counts (a snail/insect with three eyes, a mammal with
   five legs, a two-headed bird) AND misplaced features — e.g. a SNAIL's eyes are at
-  the TIPS of its two upper eye-stalks, NEVER on its face/cheeks (reject a snail with
-  a face-eye and bare stalk-tips). Also reject malformed or distorted faces and
+  the TIPS of its two upper eye-stalks, NEVER on its face/cheeks. A snail has EXACTLY
+  TWO upper eye-stalks, each tipped with one eye: reject a face-eye, a THIRD or extra
+  eye-stalk, or any stalk ending in a blank, eyeless bulb. Also reject malformed or distorted faces and
   extra, missing, or duplicated parts. Being "cute" does NOT excuse wrong anatomy;
 - a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
   or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
