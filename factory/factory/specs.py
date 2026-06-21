@@ -73,6 +73,20 @@ def min_pixels_for_dpi(length_in: float, dpi: int = DPI) -> int:
     return math.ceil(length_in * dpi)
 
 
+def print_art_px(trim_w: float = TRIM_W_IN, trim_h: float = TRIM_H_IN,
+                 dpi: int = DPI) -> int:
+    """Square side (px) a Flux page/cover image needs to print full-bleed at >=
+    `dpi` for a `trim_w` x `trim_h` book.
+
+    The art is square and gets scaled to FILL the page-plus-bleed (the cover
+    composites it full-bleed and even over-scans it), so size it to the LARGER
+    trim+bleed dimension — otherwise one axis prints under `dpi`. For an 8.5x8.5
+    book this is 8.75in -> 2625px; the old hardcoded 2560 was only ~293 DPI on
+    the full-bleed cover."""
+    w, h = interior_bleed_size_in(trim_w, trim_h)
+    return min_pixels_for_dpi(max(w, h), dpi)
+
+
 def spine_per_page(book_type: str = "journal") -> float:
     """Per-page spine caliper: colour picture/concept books print on white/colour
     stock, which is thinner per sheet than the cream stock journals/standard use."""

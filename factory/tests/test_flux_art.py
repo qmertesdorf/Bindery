@@ -1,8 +1,9 @@
-from factory.flux_art import flux_lora_workflow
+from factory.flux_art import flux_lora_workflow, _verify_art_resolution
 from factory.config import Character
 from factory.flux_art import page_plan
 from pathlib import Path
 import pytest
+from factory import specs
 from factory.config import BookConfig
 from factory.art import ComfyClient, ArtError
 from factory.flux_art import generate_flux_art
@@ -189,6 +190,44 @@ def test_generate_flux_art_threads_seed_into_graph(tmp_path):
     assert 1000 + 1 * 17 in seeds   # page 1 seed = seed + i*17
     assert 1000 + 42 in seeds       # cover seed = seed + 42
     assert all(s >= 1000 for s in seeds)
+
+def test_generate_flux_art_threads_print_resolution_upscale_into_graph(tmp_path):
+    widths = []
+    def http_post(url, json):
+        widths.append(json["prompt"]["up"]["inputs"]["width"])
+        return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+    generate_flux_art(_flux_cfg(), _flux_content(), tmp_path, comfy,
+                      seed=7, auditor=_Auditor())
+    # every submitted graph is sized for 300-DPI full-bleed print (2625 for 8.5x8.5),
+    # not the old hardcoded 2560
+    assert widths and all(w == specs.print_art_px(8.5, 8.5) for w in widths)
+    assert all(w > 2560 for w in widths)
+
+
+def test_verify_art_resolution_skips_non_image_stub(tmp_path):
+    stub = tmp_path / "stub.png"
+    stub.write_bytes(b"\x89PNG")            # the fake-runner marker, not a real image
+    _verify_art_resolution(stub, 2625)      # must not raise on a stub
+
+def test_verify_art_resolution_rejects_undersized_image(tmp_path):
+    from PIL import Image
+    p = tmp_path / "small.png"
+    Image.new("RGB", (2560, 2560)).save(p)
+    with pytest.raises(ArtError):
+        _verify_art_resolution(p, 2625)
+
+def test_verify_art_resolution_accepts_target_image(tmp_path):
+    from PIL import Image
+    p = tmp_path / "ok.png"
+    Image.new("RGB", (2625, 2625)).save(p)
+    _verify_art_resolution(p, 2625)         # exactly the target passes
+
 
 def test_generate_flux_art_routes_all_three_casts_to_correct_anchors(tmp_path):
     content = {"character_anchor": "a little girl Posy. Mango is a ginger tabby cat",

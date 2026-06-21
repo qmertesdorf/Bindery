@@ -52,11 +52,15 @@ the Flux-Fill repair still need weights/provisioning.
   Color 0.002347), `min_pixels_for_dpi` @300 DPI. `gutter_in(pages)` wired into the interior margin
   guard so >300pp books get the right gutter. Cover dims/bleed + 300-DPI cover render were already
   correct. 17 tests.
-- **WS3 upscaler** — ☐ PARTIAL. The specs helpers (`min_pixels_for_dpi`, `interior_bleed_size_in`)
-  are ready to drive a DPI-derived upscale target (8.625" trim+bleed → **2588px**, vs the hardcoded
-  2560). Remaining: thread the target through `flux_lora_workflow` + add the ≥ceil(300×(trim+bleed))
-  guard; swap lanczos `ImageScale` for an ESRGAN `UpscaleModelLoader` — **no upscale model installed
-  in ComfyUI yet** (download a commercially-licensed one, e.g. 4x-UltraSharp; verify license).
+- **WS3 upscaler** — ☐ PARTIAL. **3(a) DONE:** `specs.print_art_px(trim_w, trim_h)` derives the
+  300-DPI full-bleed target from the book's trim (8.5×8.5 → **2625px**, the *larger* trim+bleed axis;
+  the inset interior pages were already fine — it's the full-bleed *cover* compositor that upscaled
+  the old 2560 and lost DPI). Threaded through both `generate_concept_art`/`generate_flux_art` →
+  every `flux_lora_workflow` call, with a build-time `_verify_art_resolution` guard that fails any
+  rendered page/cover below target (skips non-image stubs). 244 tests pass.
+  **3(b) remaining:** swap lanczos `ImageScale` for an ESRGAN `UpscaleModelLoader` — **no upscale
+  model installed in ComfyUI yet** (download a commercially-licensed one, e.g. 4x-UltraSharp; verify
+  license). SUPIR is non-commercial — do NOT use.
 - **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6/WS7.
 
 ---

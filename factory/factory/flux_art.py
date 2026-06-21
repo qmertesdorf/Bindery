@@ -9,8 +9,27 @@ from __future__ import annotations
 from pathlib import Path
 
 from factory.art import ArtError, run_audited_render, _log
+from factory import specs
 
 BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
+
+
+def _verify_art_resolution(path, min_px: int) -> None:
+    """Build-time guard (WS3): fail if a rendered Flux page/cover is below the
+    print-resolution target, so an under-sized image can't silently ship a
+    sub-300-DPI full-bleed cover ([[catch-defects-with-guards]]). Skips a
+    non-image stub (the fake ComfyClient in tests writes a 4-byte PNG marker, not
+    a real image) so the GPU-free unit tests still pass."""
+    from PIL import Image
+    try:
+        with Image.open(path) as im:
+            w, h = im.size
+    except Exception:
+        return
+    if min(w, h) < min_px:
+        raise ArtError(
+            f"Rendered art {Path(path).name} is {w}x{h}px — below the {min_px}px "
+            f"print target (300 DPI at trim+bleed). Raise the upscale target.")
 
 # Moods that should read as somber — the child must NOT be smiling on these pages.
 GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy",
@@ -125,6 +144,9 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     out_dir.mkdir(parents=True, exist_ok=True)
     style = cfg.flux_style or content["art_style"]
     guidance = cfg.flux_guidance
+    # WS3: size the (square) art for 300-DPI full-bleed print at this book's trim,
+    # not a hardcoded 2560 (which was ~293 DPI on the full-bleed cover).
+    art_px = specs.print_art_px(cfg.trim_w, cfg.trim_h)
     pages = content["pages"]
     n = len(pages)
     # WS1b best-of-N: rank candidates by the auditor's VQAScore member (a no-op
@@ -151,8 +173,8 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
              + (f" [vs anchor {style_ref.name}]" if style_ref else " [style anchor]"))
 
         def render(p, s, op):
-            comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance),
-                         out_path=op)
+            comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
+                                            upscale=art_px), out_path=op)
 
         op = out_dir / f"page_{i:02d}.png"
         anchor = (f"a {subject} in its natural setting, in a consistent soft "
@@ -172,13 +194,14 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             _log(f"[concept] page {i}: kept best after {max_tries} tries (REVIEW)")
             flagged.append(i)
             out_pages.append(op)
+        _verify_art_resolution(out_pages[-1], art_px)
 
     _log("[concept] cover…")
     cover_prompt = f"{style}. {cfg.art_prompt}. No people, no text."
 
     def cover_render(p, s, op):
-        comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance),
-                     out_path=op)
+        comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
+                                        upscale=art_px), out_path=op)
 
     cover_path = out_dir / "art.png"
     cover_anchor = (f"a {cfg.subject} scene in a soft storybook illustration style; "
@@ -192,6 +215,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
         _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW)")
         flagged.append("cover")
         cover = cover_path
+    _verify_art_resolution(cover, art_px)
     if flagged:
         _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")
     _log(f"[concept] complete: {n} pages + cover")
@@ -208,6 +232,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
     out_dir.mkdir(parents=True, exist_ok=True)
     style = cfg.flux_style or content["art_style"]
     guidance = cfg.flux_guidance
+    art_px = specs.print_art_px(cfg.trim_w, cfg.trim_h)  # WS3 300-DPI print target
     outfit = cfg.outfit
     anchor = content["character_anchor"]
     pet = cfg.pet_name
@@ -237,8 +262,8 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
              f"{page['scene'][:60]}")
 
         def render(p, s, op, _loras=loras):
-            comfy.submit(flux_lora_workflow(p, s, loras=_loras, guidance=guidance),
-                         out_path=op)
+            comfy.submit(flux_lora_workflow(p, s, loras=_loras, guidance=guidance,
+                                            upscale=art_px), out_path=op)
 
         op = out_dir / f"page_{i:02d}.png"
         # Keep the best attempt and flag it rather than failing the whole book on one
@@ -252,6 +277,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
             _log(f"[flux] page {i}: kept best after {max_tries} tries (REVIEW)")
             flagged.append(i)
             out_pages.append(op)  # the final attempt was written before auditing
+        _verify_art_resolution(out_pages[-1], art_px)
 
     # Cover: hero + companion (if any), the configured cover scene.
     _log("[flux] cover…")
@@ -266,8 +292,8 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
                     f"and the pet is an animal; no other people.")
 
     def cover_render(p, s, op):
-        comfy.submit(flux_lora_workflow(p, s, loras=cover_loras, guidance=guidance),
-                     out_path=op)
+        comfy.submit(flux_lora_workflow(p, s, loras=cover_loras, guidance=guidance,
+                                        upscale=art_px), out_path=op)
 
     cover_path = out_dir / "art.png"
     try:
@@ -279,6 +305,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
         _log(f"[flux] cover: kept best after {max_tries} tries (REVIEW)")
         flagged.append("cover")
         cover = cover_path
+    _verify_art_resolution(cover, art_px)
     if flagged:
         _log(f"[flux] REVIEW these (audit not fully passed): {flagged}")
     _log(f"[flux] complete: {n} pages + cover")

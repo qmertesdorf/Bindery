@@ -87,6 +87,15 @@ def test_min_pixels_for_dpi_targets_trim_plus_bleed():
     assert specs.min_pixels_for_dpi(w) == 2588
     assert specs.DPI == 300
 
+def test_print_art_px_sizes_for_the_larger_trim_plus_bleed_axis():
+    # square art fills page+bleed; height (8.75 = trim + top&bottom bleed) is the
+    # binding axis on 8.5x8.5 -> 2625px, above the old hardcoded 2560 (~293 DPI)
+    assert specs.print_art_px(8.5, 8.5) == 2625
+    assert specs.print_art_px(8.5, 8.5) > 2560
+    # the larger of the two trim+bleed dims wins (here height) for any trim
+    w, h = specs.interior_bleed_size_in(6.0, 9.0)
+    assert specs.print_art_px(6.0, 9.0) == specs.min_pixels_for_dpi(max(w, h))
+
 def test_spine_per_page_for_stock_matches_kdp_table():
     assert specs.spine_per_page_for_stock("cream") == pytest.approx(0.0025)
     assert specs.spine_per_page_for_stock("white") == pytest.approx(0.002252)
