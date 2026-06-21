@@ -18,8 +18,8 @@ GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy"
 
 
 def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
-                       steps: int = 24, width: int = 1024, height: int = 1024,
-                       upscale: int = 2048) -> dict:
+                       steps: int = 28, width: int = 1152, height: int = 1152,
+                       upscale: int = 2560) -> dict:
     """Build a Flux + stacked-LoRA ComfyUI graph with prompt + seed baked in.
 
     `loras` is a list of (lora_name, strength) applied in series on the UNET

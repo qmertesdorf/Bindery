@@ -62,6 +62,8 @@ def test_concept_audit_prompt_is_character_free():
     assert "page_01.png" in prompt
     # concept books must not carry the character-identity rules
     assert "outfit" not in prompt.lower()
+    # rejects AI-slop hybrid/malformed animals (the cover deer/rabbit/fox blend)
+    assert "hybrid" in prompt.lower() and "species" in prompt.lower()
 
 
 def test_concept_audit_prompt_rejects_photorealism():
