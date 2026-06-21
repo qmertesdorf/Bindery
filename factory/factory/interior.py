@@ -61,17 +61,22 @@ def _verify_picture_page_count(pages: int) -> None:
 
 def _verify_interior_margins(pdf: Path, trim_w: float = specs.TRIM_W_IN,
                              trim_h: float = specs.TRIM_H_IN,
-                             tol_in: float = 0.06) -> None:
+                             tol_in: float = 0.06, pages: int | None = None,
+                             bleed: bool = False) -> None:
     """Fail the build if any interior text falls outside the page margins (e.g. a
     page with too many fields whose content runs off the bottom into the trim).
-    KDP rejects interiors with text in the margins. Skips a non-PDF stub."""
+    KDP rejects interiors with text in the margins. Skips a non-PDF stub.
+
+    The inside (binding) margin uses KDP's page-count gutter table when `pages` is
+    known — so a long (>300pp) book is held to a wider gutter than today's fixed
+    0.5in — and the outside margin follows the with/without-bleed rule."""
     import fitz
     try:
         doc = fitz.open(str(pdf))
     except Exception:
         return
-    x0s = specs.MARGIN_INSIDE_IN
-    x1s = trim_w - specs.MARGIN_OUTSIDE_IN
+    x0s = specs.gutter_in(pages) if pages else specs.MARGIN_INSIDE_IN
+    x1s = trim_w - specs.outside_margin_in(bleed)
     y0s = specs.MARGIN_TOPBOTTOM_IN
     y1s = trim_h - specs.MARGIN_TOPBOTTOM_IN
     bad = []
@@ -104,9 +109,10 @@ def build_interior_pdf(html_path: Path, out_dir: Path, runner=None,
     html_to_pdf(Path(html_path), pdf,
                 width_in=trim_w, height_in=trim_h,
                 margins_in=0.0, runner=runner)
-    _verify_interior_margins(pdf, trim_w, trim_h)
     pages = (pdf_page_count(pdf) if book_type in ("standard", "picture", "concept")
              else count_pages(html_path))
+    # Margin guard with the real page count so the binding gutter scales (KDP table).
+    _verify_interior_margins(pdf, trim_w, trim_h, pages=pages)
     if book_type == "standard" and pages < 1:
         # The standard page count is load-bearing: the cover spine width is derived
         # from it. A 0 here means the rendered PDF failed to open or is empty —

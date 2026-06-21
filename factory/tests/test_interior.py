@@ -213,3 +213,21 @@ def test_verify_interior_margins(tmp_path):
     # non-PDF stub is skipped
     stub = tmp_path / "s.pdf"; stub.write_bytes(b"x")
     _verify_interior_margins(stub)
+
+
+def test_verify_interior_margins_scales_gutter_by_page_count(tmp_path):
+    import fitz
+    W, H = specs.TRIM_W_IN * 72, specs.TRIM_H_IN * 72
+
+    def page_with_text(x_in):
+        p = tmp_path / f"g_{x_in}.pdf"
+        d = fitz.open(); pg = d.new_page(width=W, height=H)
+        pg.insert_text((x_in * 72, 2.0 * 72), "text", fontsize=12)
+        d.save(str(p)); d.close()
+        return p
+
+    # text 0.5in from the binding is fine for a short book (gutter 0.375)…
+    _verify_interior_margins(page_with_text(0.5), pages=40)
+    # …but a 400pp book needs a 0.625in gutter, so the same text is now too close.
+    with pytest.raises(InteriorError):
+        _verify_interior_margins(page_with_text(0.5), pages=400)

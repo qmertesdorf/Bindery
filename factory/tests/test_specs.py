@@ -54,3 +54,49 @@ def test_cover_dimensions_take_per_page():
 
 def test_colour_print_costs_more_than_bw():
     assert specs.printing_cost_usd(40, colour=True) > specs.printing_cost_usd(40)
+
+
+# --- WS4: verified KDP print geometry ---
+
+@pytest.mark.parametrize("pages,gutter", [
+    (24, 0.375), (150, 0.375),          # 24–150pp band
+    (151, 0.5), (300, 0.5),             # 151–300pp band
+    (301, 0.625), (500, 0.625),         # 301–500pp band
+    (501, 0.75), (700, 0.75),           # 501–700pp band
+    (701, 0.875), (828, 0.875),         # 701–828pp band
+])
+def test_gutter_by_page_count(pages, gutter):
+    assert specs.gutter_in(pages) == pytest.approx(gutter)
+
+def test_gutter_rejects_over_kdp_limit():
+    with pytest.raises(ValueError):
+        specs.gutter_in(829)
+
+def test_outside_margin_with_and_without_bleed():
+    assert specs.outside_margin_in(bleed=True) == pytest.approx(0.375)
+    assert specs.outside_margin_in(bleed=False) == pytest.approx(0.25)
+
+def test_interior_bleed_size():
+    # +0.125 outside (width), +0.125 top & bottom (height); inside edge no bleed
+    assert specs.interior_bleed_size_in(8.5, 8.5) == (8.625, 8.75)
+    assert specs.interior_bleed_size_in() == (6.125, 9.25)
+
+def test_min_pixels_for_dpi_targets_trim_plus_bleed():
+    # 8.5x8.5 + 0.125 bleed -> 8.625in -> ceil(8.625*300) = 2588px (>2560 current)
+    w, h = specs.interior_bleed_size_in(8.5, 8.5)
+    assert specs.min_pixels_for_dpi(w) == 2588
+    assert specs.DPI == 300
+
+def test_spine_per_page_for_stock_matches_kdp_table():
+    assert specs.spine_per_page_for_stock("cream") == pytest.approx(0.0025)
+    assert specs.spine_per_page_for_stock("white") == pytest.approx(0.002252)
+    assert specs.spine_per_page_for_stock("standard_color") == pytest.approx(0.002252)
+    assert specs.spine_per_page_for_stock("premium_color") == pytest.approx(0.002347)
+
+def test_spine_per_page_for_stock_rejects_unknown():
+    with pytest.raises(ValueError):
+        specs.spine_per_page_for_stock("glossy")
+
+def test_premium_color_spine_thicker_than_standard():
+    assert (specs.spine_per_page_for_stock("premium_color")
+            > specs.spine_per_page_for_stock("standard_color"))
