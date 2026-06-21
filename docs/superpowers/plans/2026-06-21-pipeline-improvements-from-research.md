@@ -32,8 +32,11 @@ the Flux-Fill repair still need weights/provisioning.
   subprocess daemon (factory/.venv stays torch-free). 5/5 real pages discriminate right vs wrong
   captions (right 6–15× wrong). Calibrated `qa_vqa_threshold` to a **coarse floor of 0.15** (correct
   matches score ~0.19–0.97, gross mismatches ~0.05). ☐ Re-tune vs full rhyming captions in a live run.
-- **WS1b Best-of-N** — `qa/selection.py` + `art._render_best_of_n`. DONE & wired into the concept
-  path (caption-gated). Set `qa_candidates` (3–9) per book to enable.
+- **WS1b Best-of-N** — ✅ DONE & VALIDATED LIVE. `qa/selection.py` + `art._render_best_of_n`,
+  wired into the concept path (caption-gated). Demo: 3 real ComfyUI candidates of one scene scored
+  0.531/0.478/0.257 and the selector correctly kept the top one. Set `qa_candidates` (3–9) per book.
+  VRAM note: flux (~12GB) + VQA (~6GB) contend on a 16GB card; ComfyUI's smart offload handles it,
+  but a real build should render candidates then `/free` before scoring (see `_vqa_bestof_demo.py`).
 - **WS1c HADM anatomy** — `qa/hadm.py`. Injectable `AnatomyDetector` + `Defect` boxes. ☐ TODO:
   HADM is a detectron2 project (not pip); `_load_model` raises until the HADM-L/HADM-G weights are
   provisioned and wired.
