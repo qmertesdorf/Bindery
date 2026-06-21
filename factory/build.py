@@ -9,7 +9,7 @@ from factory.content import generate_content, claude_generate
 from factory.interior import render_interior_html, build_interior_pdf, build_epub
 from factory.art import ComfyClient, generate_picture_art
 from factory.flux_art import generate_flux_art, generate_concept_art
-from factory.audit import ClaudeVisionAuditor
+from factory.qa import build_ensemble_auditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
 from factory.paste_console import make_paste_console
@@ -64,7 +64,9 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
             art = {"pages": existing_pages, "cover": cover_png, "flagged": []}
         else:
             if auditor is None:
-                auditor = ClaudeVisionAuditor()
+                # Bare ClaudeVisionAuditor unless the book enables WS1 QA stages,
+                # in which case this returns an EnsembleAuditor (drop-in).
+                auditor = build_ensemble_auditor(cfg)
             if cfg.book_type == "concept":
                 art = generate_concept_art(cfg, content, out_dir, comfy,
                                            seed=seed, auditor=auditor)

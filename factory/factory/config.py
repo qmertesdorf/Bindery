@@ -53,6 +53,14 @@ class BookConfig:
     subject: str = ""                     # concept only — the book's subject
     topics: tuple = ()                    # concept only — explicit per-spread subjects
     illustrator: str = ""                 # optional — "Illustrated by" credit (≠ author)
+    # WS1 layered-QA ensemble (all default OFF → today's Claude-only path). Enable
+    # per book once the GPU stages (VQAScore / HADM weights) are provisioned.
+    qa_vqa: bool = False                  # VQAScore caption-fidelity gate (WS1a)
+    qa_vqa_threshold: float = 0.6         # min P("does this show the caption?")
+    qa_anatomy: bool = False              # HADM anatomy-defect detector (WS1c)
+    qa_anatomy_min_score: float = 0.5     # min detector confidence to count a defect
+    qa_candidates: int = 1                # best-of-N candidates per render (WS1b; 1 = off)
+    qa_repair: bool = False               # localized inpaint repair before reroll (WS2)
 
     @property
     def makes_ebook(self) -> bool:
@@ -169,4 +177,10 @@ def load_config(path: str | Path) -> BookConfig:
         subject=str(data.get("subject", "")),
         topics=tuple(str(t) for t in (data.get("topics", []) or [])),
         illustrator=str(data.get("illustrator", "")),
+        qa_vqa=bool(data.get("qa_vqa", False)),
+        qa_vqa_threshold=float(data.get("qa_vqa_threshold", 0.6)),
+        qa_anatomy=bool(data.get("qa_anatomy", False)),
+        qa_anatomy_min_score=float(data.get("qa_anatomy_min_score", 0.5)),
+        qa_candidates=int(data.get("qa_candidates", 1)),
+        qa_repair=bool(data.get("qa_repair", False)),
     )

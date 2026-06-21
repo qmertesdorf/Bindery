@@ -29,6 +29,23 @@ def test_defaults_applied(tmp_path):
     cfg = load_config(p)
     assert cfg.prompt_count == 70      # default
     assert cfg.price_usd == 9.99       # default
+    # WS1 QA stages default OFF so behaviour is unchanged until provisioned
+    assert cfg.qa_vqa is False and cfg.qa_anatomy is False
+    assert cfg.qa_candidates == 1 and cfg.qa_repair is False
+
+
+def test_qa_flags_loaded(tmp_path):
+    p = tmp_path / "qa.json"
+    p.write_text(json.dumps({
+        "slug": "ocean", "title": "T", "subtitle": "S", "author": "A",
+        "pet_kind": "cat", "art_prompt": "watercolor ocean",
+        "qa_vqa": True, "qa_vqa_threshold": 0.7, "qa_anatomy": True,
+        "qa_anatomy_min_score": 0.4, "qa_candidates": 5, "qa_repair": True,
+    }), encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg.qa_vqa is True and cfg.qa_vqa_threshold == 0.7
+    assert cfg.qa_anatomy is True and cfg.qa_anatomy_min_score == 0.4
+    assert cfg.qa_candidates == 5 and cfg.qa_repair is True
 
 
 def test_book_type_defaults_to_journal(sample_config_file):
