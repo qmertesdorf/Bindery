@@ -129,12 +129,21 @@ size, weak for print sharpness. **Refuted/avoid (NON-COMMERCIAL — banned for p
 author confirms model *and outputs* are non-commercial; verified 2026-06-21 at the HF model card &
 discussion #4). Most popular community art upscalers are NC — do NOT assume a candidate is safe.
 
-- **VERIFIED-SAFE choice:** **Real-ESRGAN** `RealESRGAN_x4plus` (and `RealESRGAN_x4plus_anime_6B`
-  for line-heavy art) from `github.com/xinntao/Real-ESRGAN` — **BSD-3-Clause** (commercial use,
-  modification, redistribution all permitted; only keep the copyright notice). Verified at the
-  upstream LICENSE 2026-06-21. Drop the `.pth` into `ComfyUI/models/upscale_models`, set
-  `upscale_model` in the book config (code path already built, WS3b). Swap via ComfyUI
-  `UpscaleModelLoader`. A/B the general x4plus vs the anime_6B on real watercolour pages.
+- **VERIFIED-SAFE menu (all general/photo, NOT anime; licenses checked 2026-06-21):**
+  - **Real-ESRGAN `RealESRGAN_x4plus`** + lighter **`realesr-general-x4v3`** (denoise dial) —
+    `github.com/xinntao/Real-ESRGAN`, **BSD-3-Clause**.
+  - **BSRGAN** — `github.com/cszn/BSRGAN`, **Apache-2.0**. Blind SR, tends softer/painterly.
+  - **SwinIR** (real-SR x4 GAN weights) — `github.com/JingyunLiang/SwinIR`, **Apache-2.0**.
+    Transformer, sharpest/heaviest.
+  All permit commercial use/redistribution (keep the notice). For soft **watercolour** art, try
+  `realesr-general-x4v3` or BSRGAN FIRST (preserve the painterly look; x4plus/SwinIR crisp harder).
+  The `RealESRGAN_x4plus_anime_6B` variant (same BSD repo) exists for line art but is likely too
+  sharp for watercolour. **Detection note:** an upscaler leaves no provable fingerprint after
+  compositing+print; compliance is about the asymmetric KDP-takedown risk, not forensics — and free
+  BSD/Apache models match UltraSharp's quality, so there's no reason to use the NC one. (If a NC
+  model's look is ever truly wanted, Kim2091 grants commercial permission on private request.)
+  Code path already built (WS3b): drop the `.pth` into `ComfyUI/models/upscale_models`, set
+  `upscale_model` in the config, A/B on the same page.
 - **Target 300 DPI at trim+bleed.** For 8.5"×8.5" + 0.125" bleed → 8.625"² → **≥2588px**; current
   2560px ≈ 297 DPI at trim (no bleed) — slightly under once bleed is included. Set the upscale
   target from the actual trim+bleed, not a hardcoded 2560.
