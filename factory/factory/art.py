@@ -107,6 +107,19 @@ class ComfyClient:
                            sampler_node=sampler_node, prompt=prompt, seed=seed)
         return self.submit(wf, out_path=out_path)
 
+    def free(self, *, unload_models: bool = True, free_memory: bool = True) -> None:
+        """Ask ComfyUI to unload models / free VRAM (POST /free). Best-of-N scoring
+        runs the ~6GB VQA model in a SEPARATE process that ComfyUI can't offload
+        for, so on a 16GB card the resident ~12GB Flux model must be evicted first
+        or the scorer OOMs (research §WS1b VRAM note). Best-effort: freeing is an
+        optimization, not correctness, so transport errors are swallowed."""
+        try:
+            self.http_post(f"{self.base}/free",
+                           json={"unload_models": unload_models,
+                                 "free_memory": free_memory})
+        except Exception:
+            pass
+
     @staticmethod
     def _first_image(outputs: dict) -> dict:
         for node in outputs.values():

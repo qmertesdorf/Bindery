@@ -15,8 +15,12 @@ class BestOfNSelector:
     (or a single candidate) there is nothing to score, so it returns the first
     candidate unchanged — keeping caption-free pages on today's behaviour."""
 
-    def __init__(self, vqa):
+    def __init__(self, vqa, free_fn=None):
         self.vqa = vqa
+        # Optional callback invoked once before scoring a batch — used to evict the
+        # renderer's VRAM (ComfyUI /free) so the separate-process VQA model fits on
+        # a 16GB card. None = no-op (tests, or when renderer/scorer don't contend).
+        self.free_fn = free_fn
 
     def select(self, candidates, caption: str | None):
         candidates = [Path(c) for c in candidates]
@@ -24,6 +28,8 @@ class BestOfNSelector:
             raise ValueError("BestOfNSelector.select needs at least one candidate")
         if len(candidates) == 1 or not caption:
             return candidates[0]
+        if self.free_fn is not None:
+            self.free_fn()   # free the renderer's VRAM before the VQA model loads
         scored = [(self.vqa.score(c, caption), c) for c in candidates]
         # Highest score wins; ties keep the earlier (lower-seed) candidate stable.
         best = max(range(len(scored)), key=lambda i: scored[i][0])

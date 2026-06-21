@@ -170,6 +170,10 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     # when the ensemble/caption isn't enabled). cfg.qa_candidates defaults to 1.
     n_candidates = getattr(cfg, "qa_candidates", 1)
     selector = auditor.selector() if hasattr(auditor, "selector") else None
+    # Let the selector evict Flux's VRAM (ComfyUI /free) before the separate-process
+    # VQA scorer loads — flux(~12GB)+VQA(~6GB) overflow a 16GB card otherwise.
+    if selector is not None and getattr(selector, "free_fn", None) is None:
+        selector.free_fn = getattr(comfy, "free", None)
     # WS2 repair-before-reroll: only fires on a localized reject (detector boxes),
     # which only the anatomy ensemble produces — a no-op otherwise.
     repair_fn = None

@@ -140,6 +140,20 @@ def test_comfy_submit_posts_workflow_and_downloads(tmp_path):
     assert any("/view" in u for u in gets)
 
 
+def test_comfy_free_posts_unload_and_swallows_errors():
+    posts = []
+    def http_post(url, json):
+        posts.append((url, json))
+        return {}
+    ComfyClient(http_post=http_post).free()
+    assert posts[0][0].endswith("/free")
+    assert posts[0][1] == {"unload_models": True, "free_memory": True}
+    # best-effort: a transport failure must not propagate (freeing is an optimization)
+    def boom(url, json):
+        raise RuntimeError("comfy down")
+    ComfyClient(http_post=boom).free()   # does not raise
+
+
 def test_run_audited_render_retries_with_fresh_seed_and_hints(tmp_path):
     from factory.art import run_audited_render
     seeds, prompts = [], []

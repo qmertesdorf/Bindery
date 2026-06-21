@@ -76,6 +76,23 @@ def test_best_of_n_single_candidate_skips_scoring():
     sel = BestOfNSelector(VQAScorer(score_fn=lambda p, c: 1 / 0))
     assert Path(sel.select(["only.png"], caption="a fox")).name == "only.png"
 
+def test_best_of_n_frees_vram_before_scoring():
+    # the VRAM-evict hook fires once, before the (separate-process) VQA model loads
+    calls = []
+    vqa = VQAScorer(score_fn=lambda p, c: (calls.append("score"), 0.5)[1])
+    sel = BestOfNSelector(vqa, free_fn=lambda: calls.append("free"))
+    sel.select(["a.png", "b.png"], caption="a fox")
+    assert calls[0] == "free" and calls.count("free") == 1 and "score" in calls
+
+def test_best_of_n_no_free_when_nothing_to_score():
+    # single candidate / no caption short-circuits — don't pay a needless VRAM evict
+    calls = []
+    sel = BestOfNSelector(VQAScorer(score_fn=lambda p, c: 0.5),
+                          free_fn=lambda: calls.append("free"))
+    sel.select(["only.png"], caption="a fox")
+    sel.select(["a.png", "b.png"], caption=None)
+    assert calls == []
+
 
 # ---- EnsembleAuditor ----
 
