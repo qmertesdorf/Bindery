@@ -70,6 +70,26 @@ def test_flux_workflow_single_lora_chain():
     assert wf["sch"]["inputs"]["model"] == ["lora0", 0]
     assert wf["gd"]["inputs"]["model"] == ["lora0", 0]
 
+def test_flux_workflow_default_is_lanczos_only_no_esrgan_nodes():
+    wf = flux_lora_workflow("x", 1, loras=[], guidance=2.4, upscale=2625)
+    cts = [n["class_type"] for n in wf.values()]
+    assert "UpscaleModelLoader" not in cts and "ImageUpscaleWithModel" not in cts
+    assert wf["up"]["inputs"]["image"] == ["dec", 0]      # resize straight off decode
+    assert wf["up"]["inputs"]["width"] == 2625
+
+def test_flux_workflow_inserts_esrgan_upscaler_when_model_given():
+    wf = flux_lora_workflow("x", 1, loras=[], guidance=2.4, upscale=2625,
+                            upscale_model="4x-UltraSharp.pth")
+    assert wf["upm"]["class_type"] == "UpscaleModelLoader"
+    assert wf["upm"]["inputs"]["model_name"] == "4x-UltraSharp.pth"
+    assert wf["esr"]["class_type"] == "ImageUpscaleWithModel"
+    assert wf["esr"]["inputs"]["image"] == ["dec", 0]        # ESRGAN reads the decode
+    assert wf["esr"]["inputs"]["upscale_model"] == ["upm", 0]
+    # final exact-size resize now runs on the ESRGAN output, still hits the target px
+    assert wf["up"]["inputs"]["image"] == ["esr", 0]
+    assert wf["up"]["inputs"]["width"] == wf["up"]["inputs"]["height"] == 2625
+    assert wf["save"]["inputs"]["images"] == ["up", 0]
+
 def test_flux_workflow_stacks_two_loras_in_series():
     wf = flux_lora_workflow("x", 1, guidance=2.4,
                             loras=[("boy.safetensors", 0.9), ("dog.safetensors", 0.85)])
@@ -208,6 +228,26 @@ def test_generate_flux_art_threads_print_resolution_upscale_into_graph(tmp_path)
     # not the old hardcoded 2560
     assert widths and all(w == specs.print_art_px(8.5, 8.5) for w in widths)
     assert all(w > 2560 for w in widths)
+
+
+def test_generate_flux_art_threads_upscale_model_into_graph(tmp_path):
+    import dataclasses
+    posted = []
+    def http_post(url, json):
+        posted.append(json["prompt"])
+        return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+    cfg = dataclasses.replace(_flux_cfg(), upscale_model="4x-UltraSharp.pth")
+    generate_flux_art(cfg, _flux_content(), tmp_path, comfy, seed=7, auditor=_Auditor())
+    # the configured ESRGAN model reaches every submitted graph
+    assert posted and all(g["upm"]["inputs"]["model_name"] == "4x-UltraSharp.pth"
+                          for g in posted)
+    assert all(g["up"]["inputs"]["image"] == ["esr", 0] for g in posted)
 
 
 def test_verify_art_resolution_skips_non_image_stub(tmp_path):

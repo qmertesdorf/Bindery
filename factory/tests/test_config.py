@@ -201,6 +201,11 @@ def test_flux_picture_config_parses(tmp_path):
     assert hero.trigger == "b1scuitboy boy" and hero.strength == 0.9
     comp = cfg.characters[1]
     assert comp.role == "companion" and comp.appears_on == "memory"
+    assert cfg.upscale_model == ""        # WS3b: lanczos-only by default
+
+def test_flux_config_loads_upscale_model(tmp_path):
+    cfg = load_config(_write_d(tmp_path, _flux_dict(upscale_model="4x-UltraSharp.pth")))
+    assert cfg.upscale_model == "4x-UltraSharp.pth"
 
 def test_art_engine_defaults_to_sdxl(tmp_path):
     cfg = load_config(_write_d(tmp_path, {

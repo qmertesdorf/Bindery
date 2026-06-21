@@ -38,13 +38,19 @@ GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy"
 
 def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
                        steps: int = 28, width: int = 1152, height: int = 1152,
-                       upscale: int = 2560) -> dict:
+                       upscale: int = 2560, upscale_model: str = "") -> dict:
     """Build a Flux + stacked-LoRA ComfyUI graph with prompt + seed baked in.
 
     `loras` is a list of (lora_name, strength) applied in series on the UNET
     (model-only — CLIP is untouched). The seed lives on the RandomNoise node
     (Flux puts the noise seed there, NOT on a KSampler); the sampler chain reads
-    from the last LoRA in the stack."""
+    from the last LoRA in the stack.
+
+    `upscale_model` (WS3b): when set, a learned ESRGAN upscaler (UpscaleModelLoader
+    → ImageUpscaleWithModel) reconstructs detail before the final exact-size resize,
+    giving sharper print than plain lanczos; "" keeps the lanczos-only path. The
+    ESRGAN model enlarges by its own fixed factor, so we still ImageScale to the
+    exact `upscale` target px afterwards."""
     nodes = {
         "u": {"class_type": "UNETLoader",
               "inputs": {"unet_name": BASE_UNET, "weight_dtype": "fp8_e4m3fn"}},
@@ -80,12 +86,23 @@ def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
                           "latent_image": ["lat", 0]}},
         "dec": {"class_type": "VAEDecode",
                 "inputs": {"samples": ["sa", 0], "vae": ["v", 0]}},
-        "up": {"class_type": "ImageScale",
-               "inputs": {"image": ["dec", 0], "upscale_method": "lanczos",
-                          "width": upscale, "height": upscale, "crop": "disabled"}},
-        "save": {"class_type": "SaveImage",
-                 "inputs": {"filename_prefix": "flux", "images": ["up", 0]}},
     })
+    # WS3b: optional learned (ESRGAN) upscale before the final exact-size resize.
+    # Lanczos only interpolates; an ESRGAN model reconstructs high-frequency detail
+    # for sharper print. The model enlarges by its own fixed factor, so we still
+    # ImageScale to the exact target afterwards. "" -> today's lanczos-only path.
+    up_src = "dec"
+    if upscale_model:
+        nodes["upm"] = {"class_type": "UpscaleModelLoader",
+                        "inputs": {"model_name": upscale_model}}
+        nodes["esr"] = {"class_type": "ImageUpscaleWithModel",
+                        "inputs": {"upscale_model": ["upm", 0], "image": ["dec", 0]}}
+        up_src = "esr"
+    nodes["up"] = {"class_type": "ImageScale",
+                   "inputs": {"image": [up_src, 0], "upscale_method": "lanczos",
+                              "width": upscale, "height": upscale, "crop": "disabled"}}
+    nodes["save"] = {"class_type": "SaveImage",
+                     "inputs": {"filename_prefix": "flux", "images": ["up", 0]}}
     return nodes
 
 
@@ -174,7 +191,9 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
         def render(p, s, op):
             comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
-                                            upscale=art_px), out_path=op)
+                                            upscale=art_px,
+                                            upscale_model=cfg.upscale_model),
+                         out_path=op)
 
         op = out_dir / f"page_{i:02d}.png"
         anchor = (f"a {subject} in its natural setting, in a consistent soft "
@@ -201,7 +220,9 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
     def cover_render(p, s, op):
         comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
-                                        upscale=art_px), out_path=op)
+                                        upscale=art_px,
+                                            upscale_model=cfg.upscale_model),
+                         out_path=op)
 
     cover_path = out_dir / "art.png"
     cover_anchor = (f"a {cfg.subject} scene in a soft storybook illustration style; "
@@ -263,7 +284,9 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
         def render(p, s, op, _loras=loras):
             comfy.submit(flux_lora_workflow(p, s, loras=_loras, guidance=guidance,
-                                            upscale=art_px), out_path=op)
+                                            upscale=art_px,
+                                            upscale_model=cfg.upscale_model),
+                         out_path=op)
 
         op = out_dir / f"page_{i:02d}.png"
         # Keep the best attempt and flag it rather than failing the whole book on one
@@ -293,7 +316,9 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
     def cover_render(p, s, op):
         comfy.submit(flux_lora_workflow(p, s, loras=cover_loras, guidance=guidance,
-                                        upscale=art_px), out_path=op)
+                                        upscale=art_px,
+                                            upscale_model=cfg.upscale_model),
+                         out_path=op)
 
     cover_path = out_dir / "art.png"
     try:

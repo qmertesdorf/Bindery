@@ -47,6 +47,8 @@ class BookConfig:
     art_engine: str = "sdxl"              # picture only — "sdxl" (default) or "flux"
     flux_style: str = ""                  # flux only — the rich style/look prompt
     flux_guidance: float = 2.4            # flux only — FluxGuidance value
+    upscale_model: str = ""               # flux only (WS3b) — ESRGAN upscale model in
+                                          # ComfyUI/models/upscale_models; "" = lanczos
     outfit: str = ""                      # flux only — locked character wardrobe
     characters: tuple = ()                # flux only — tuple[Character, ...]
     theme: str = "grief"                  # picture only — content arc: "grief" or "comfort"
@@ -166,6 +168,7 @@ def load_config(path: str | Path) -> BookConfig:
         art_engine=art_engine,
         flux_style=str(data.get("flux_style", "")),
         flux_guidance=float(data.get("flux_guidance", 2.4)),
+        upscale_model=str(data.get("upscale_model", "")),
         outfit=str(data.get("outfit", "")),
         characters=tuple(
             Character(role=str(c.get("role", "")), lora=str(c.get("lora", "")),

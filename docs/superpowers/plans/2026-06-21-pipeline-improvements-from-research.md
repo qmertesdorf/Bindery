@@ -58,9 +58,14 @@ the Flux-Fill repair still need weights/provisioning.
   the old 2560 and lost DPI). Threaded through both `generate_concept_art`/`generate_flux_art` →
   every `flux_lora_workflow` call, with a build-time `_verify_art_resolution` guard that fails any
   rendered page/cover below target (skips non-image stubs). 244 tests pass.
-  **3(b) remaining:** swap lanczos `ImageScale` for an ESRGAN `UpscaleModelLoader` — **no upscale
-  model installed in ComfyUI yet** (download a commercially-licensed one, e.g. 4x-UltraSharp; verify
-  license). SUPIR is non-commercial — do NOT use.
+  **3(b) CODE DONE, model install remaining:** `flux_lora_workflow` takes an optional
+  `upscale_model`; when set it inserts `UpscaleModelLoader` → `ImageUpscaleWithModel` before the
+  final exact-size `ImageScale` (learned ESRGAN detail vs plain lanczos interpolation). New
+  `cfg.upscale_model` (default `""` = lanczos) threads through both generators. 248 tests pass.
+  **Only blocker:** no upscale model file installed in ComfyUI/models/upscale_models — download a
+  **commercially-licensed** one (4x-UltraSharp candidate; **verify its license** before paid use),
+  set `upscale_model` in a book config, and validate one live render. SUPIR is non-commercial — do
+  NOT use.
 - **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6/WS7.
 
 ---
