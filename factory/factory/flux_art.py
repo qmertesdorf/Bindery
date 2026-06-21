@@ -127,6 +127,10 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     guidance = cfg.flux_guidance
     pages = content["pages"]
     n = len(pages)
+    # WS1b best-of-N: rank candidates by the auditor's VQAScore member (a no-op
+    # when the ensemble/caption isn't enabled). cfg.qa_candidates defaults to 1.
+    n_candidates = getattr(cfg, "qa_candidates", 1)
+    selector = auditor.selector() if hasattr(auditor, "selector") else None
 
     # The first page that passes the (reference-free) style bar becomes the STYLE
     # ANCHOR; every later page and the cover are audited against it, so the auditor
@@ -152,7 +156,8 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 render, prompt, out_path=op, auditor=auditor, anchor=anchor,
                 scene=page["scene"], reference_path=style_ref, seed=seed + i * 17,
                 max_tries=max_tries, audit_kind="concept",
-                caption=page.get("text"))
+                caption=page.get("text"),
+                n_candidates=n_candidates, selector=selector)
             out_pages.append(done)
             if style_ref is None:
                 style_ref = done  # first cohesive page anchors the rest

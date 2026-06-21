@@ -163,3 +163,88 @@ def test_run_audited_render_raises_after_budget(tmp_path):
         run_audited_render(render, "p", out_path=tmp_path / "p.png",
                            auditor=_Auditor(fail_first=999), anchor="a",
                            scene="s", seed=0, max_tries=3)
+
+
+# ---- WS1b best-of-N selection ----
+
+def test_run_audited_render_best_of_n_keeps_highest_score(tmp_path):
+    from factory.art import run_audited_render
+    from factory.qa import VQAScorer, BestOfNSelector
+    # each candidate's bytes ARE its seed; score = that number so the highest
+    # seed wins — lets us prove the selected candidate lands at out_path
+    def render(prompt, seed, out_path):
+        Path(out_path).write_bytes(str(seed).encode())
+    vqa = VQAScorer(score_fn=lambda p, c: float(Path(p).read_bytes().decode()))
+    out = run_audited_render(
+        render, "p", out_path=tmp_path / "p.png", auditor=_Auditor(),
+        anchor="a", scene="s", seed=100, max_tries=1, caption="a fox",
+        n_candidates=3, selector=BestOfNSelector(vqa))
+    assert Path(out).read_bytes() == b"15938"   # 100 + 2*7919, the top candidate
+    assert not list(tmp_path.glob("*__cand*"))  # candidate temp files cleaned up
+
+def test_run_audited_render_best_of_n_noop_without_caption(tmp_path):
+    from factory.art import run_audited_render
+    seeds = []
+    def render(prompt, seed, out_path):
+        seeds.append(seed); Path(out_path).write_bytes(b"x")
+    run_audited_render(render, "p", out_path=tmp_path / "p.png",
+                       auditor=_Auditor(), anchor="a", scene="s", seed=5,
+                       max_tries=1, caption=None, n_candidates=3,
+                       selector="unused")
+    assert seeds == [5]   # no caption to rank on -> a single render, no waste
+
+
+# ---- WS2 repair-before-reroll ----
+
+class _DefectThenPass:
+    """Reject the first audit WITH detector boxes, then pass."""
+    def __init__(self): self.audits = 0
+    def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+              kind="character", caption=None):
+        self.audits += 1
+        if self.audits == 1:
+            return {"ok": False, "issues": ["malformed hand"],
+                    "defects": [("hand", (0, 0, 1, 1))]}
+        return {"ok": True, "issues": []}
+
+def test_repair_runs_before_reroll_on_localized_reject(tmp_path):
+    from factory.art import run_audited_render
+    class _Aud:  # rejects until the image is marked REPAIRED
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            if Path(image_path).read_bytes() == b"REPAIRED":
+                return {"ok": True, "issues": []}
+            return {"ok": False, "issues": ["bad hand"],
+                    "defects": [("hand", (0, 0, 1, 1))]}
+    renders, repaired = [], []
+    def render(prompt, seed, out_path):
+        renders.append(seed); Path(out_path).write_bytes(b"orig")
+    def repair_fn(image_path, defects, *, prompt):
+        repaired.append(defects); Path(image_path).write_bytes(b"REPAIRED")
+    out = run_audited_render(render, "p", out_path=tmp_path / "p.png",
+                             auditor=_Aud(), anchor="a", scene="s", seed=0,
+                             max_tries=4, repair_fn=repair_fn)
+    assert Path(out).read_bytes() == b"REPAIRED"
+    assert len(renders) == 1 and len(repaired) == 1  # repaired without a reroll
+
+def test_repair_failure_falls_back_to_reroll(tmp_path):
+    from factory.art import run_audited_render
+    renders = []
+    def render(prompt, seed, out_path):
+        renders.append(seed); Path(out_path).write_bytes(b"orig")
+    def repair_fn(image_path, defects, *, prompt):
+        raise RuntimeError("no fill model")
+    out = run_audited_render(render, "p", out_path=tmp_path / "p.png",
+                             auditor=_DefectThenPass(), anchor="a", scene="s",
+                             seed=0, max_tries=4, repair_fn=repair_fn)
+    assert Path(out).exists() and len(renders) == 2  # repair failed -> rerolled
+
+def test_repair_skipped_when_reject_has_no_defects(tmp_path):
+    from factory.art import run_audited_render
+    called = []
+    def render(prompt, seed, out_path): Path(out_path).write_bytes(b"x")
+    def repair_fn(image_path, defects, *, prompt): called.append(1)
+    run_audited_render(render, "p", out_path=tmp_path / "p.png",
+                       auditor=_Auditor(fail_first=1), anchor="a", scene="s",
+                       seed=0, max_tries=4, repair_fn=repair_fn)
+    assert called == []   # holistic reject with no boxes -> straight to reroll

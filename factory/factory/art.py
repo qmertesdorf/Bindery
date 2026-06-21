@@ -117,29 +117,82 @@ class ComfyClient:
         raise ArtError("no image in ComfyUI outputs")
 
 
+def _render_best_of_n(render, prompt, base_seed, out_path, *, n_candidates,
+                      selector, caption) -> Path:
+    """Render the page and leave the chosen image at out_path (research §WS1b).
+
+    With n_candidates<=1 — or with no selector / no caption to rank on — this
+    renders ONCE at base_seed, byte-for-byte today's behaviour. Otherwise it
+    draws N candidates at distinct seeds, lets `selector` pick the best (highest
+    VQAScore), copies the winner to out_path, and cleans up the rest. Best-of-N
+    is caption-gated because the selector ranks by caption fidelity; a page with
+    no caption has nothing to choose between, so we don't waste the extra draws."""
+    out_path = Path(out_path)
+    if n_candidates <= 1 or selector is None or not caption:
+        render(prompt, base_seed, out_path)
+        return out_path
+    cands = []
+    for k in range(n_candidates):
+        cp = out_path.with_name(f"{out_path.stem}__cand{k}{out_path.suffix}")
+        render(prompt, base_seed + k * 7919, cp)  # distinct prime stride per candidate
+        cands.append(cp)
+    chosen = Path(selector.select(cands, caption))
+    if chosen != out_path:
+        out_path.write_bytes(chosen.read_bytes())
+    for cp in cands:
+        if cp != out_path:
+            cp.unlink(missing_ok=True)
+    return out_path
+
+
 def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
                        reference_path=None, seed=0, max_tries=4,
-                       audit_kind="character", caption=None) -> Path:
+                       audit_kind="character", caption=None,
+                       n_candidates=1, selector=None, repair_fn=None) -> Path:
     """Render → audit → regenerate (fresh seed + corrective hints) until the
     auditor passes or the try budget runs out, then fail loudly. `render` is a
     callable (prompt, seed, out_path) -> None that writes the image. The seed is
     bumped by attempt*1009 each retry so a fresh sample is drawn, and the last
-    attempt's issues are appended to the prompt as corrective guidance."""
-    name = Path(out_path).name
+    attempt's issues are appended to the prompt as corrective guidance.
+
+    Optional QA layers (research §WS1b/§WS2; off by default → unchanged behaviour):
+    `n_candidates`+`selector` draw best-of-N per attempt; `repair_fn(image,
+    defects, prompt=...)` does a localized inpaint repair and re-audit on a
+    LOCALIZED reject (auditor verdict carries `defects`) before a fresh-seed reroll."""
+    out_path = Path(out_path)
+    name = out_path.name
     issues: list[str] = []
     for attempt in range(max_tries):
         p = prompt
         if issues:
             p = f"{prompt} Fix these problems from the last attempt: {'; '.join(issues)}"
-        render(p, seed + attempt * 1009, out_path)
+        _render_best_of_n(render, p, seed + attempt * 1009, out_path,
+                          n_candidates=n_candidates, selector=selector,
+                          caption=caption)
         verdict = auditor.audit(out_path, anchor=anchor,
                                 reference_path=reference_path, scene=scene,
                                 kind=audit_kind, caption=caption)
         if verdict.get("ok"):
             _log(f"  [audit] {name}: OK"
                  + (f" on attempt {attempt + 1}/{max_tries}" if attempt else ""))
-            return Path(out_path)
+            return out_path
         issues = verdict.get("issues", [])
+        # WS2: a LOCALIZED reject (detector boxes) gets a masked inpaint repair and
+        # a re-audit BEFORE we spend a fresh-seed reroll on the whole page.
+        if repair_fn is not None and verdict.get("defects"):
+            _log(f"  [repair] {name}: localized defect(s) — inpainting before reroll")
+            try:
+                repair_fn(out_path, verdict["defects"], prompt=p)
+            except Exception as e:  # repair is best-effort; fall back to a reroll
+                _log(f"  [repair] {name}: repair failed ({e}); rerolling")
+            else:
+                rev = auditor.audit(out_path, anchor=anchor,
+                                    reference_path=reference_path, scene=scene,
+                                    kind=audit_kind, caption=caption)
+                if rev.get("ok"):
+                    _log(f"  [repair] {name}: OK after inpaint repair")
+                    return out_path
+                issues = rev.get("issues", issues)
         _log(f"  [audit] {name}: REJECT attempt {attempt + 1}/{max_tries} — "
              f"{'; '.join(issues) or 'no reason given'}"
              + ("; regenerating" if attempt + 1 < max_tries else ""))
