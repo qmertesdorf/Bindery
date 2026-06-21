@@ -56,7 +56,7 @@ class BookConfig:
     # WS1 layered-QA ensemble (all default OFF → today's Claude-only path). Enable
     # per book once the GPU stages (VQAScore / HADM weights) are provisioned.
     qa_vqa: bool = False                  # VQAScore caption-fidelity gate (WS1a)
-    qa_vqa_threshold: float = 0.6         # min P("does this show the caption?")
+    qa_vqa_threshold: float = 0.15        # COARSE floor; catches gross subject mismatch (calibrated, see qa/VQA_SETUP.md)
     qa_anatomy: bool = False              # HADM anatomy-defect detector (WS1c)
     qa_anatomy_min_score: float = 0.5     # min detector confidence to count a defect
     qa_candidates: int = 1                # best-of-N candidates per render (WS1b; 1 = off)

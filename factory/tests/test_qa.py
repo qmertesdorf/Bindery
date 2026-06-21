@@ -24,13 +24,13 @@ def test_vqascorer_passes_reports_bool_and_score():
     ok2, _ = VQAScorer(score_fn=lambda p, c: 0.7, threshold=0.6).passes("x", "y")
     assert ok2 is True
 
-def test_vqascore_real_adapter_errors_without_dep():
-    # The default adapter must fail loudly with install guidance, never silently
-    # pass, when t2v_metrics is absent.
-    from factory.qa import vqascore
-    vqascore._MODEL = None
+def test_vqascore_real_adapter_errors_without_venv():
+    # The default adapter must fail loudly with guidance — never silently pass —
+    # when the isolated GPU venv python is missing.
+    from factory.qa.vqascore import _VQADaemon
+    d = _VQADaemon(python="/nonexistent/vqa/python.exe")
     with pytest.raises(VQAScoreError):
-        vqascore._load_model()
+        d._ensure()
 
 
 # ---- AnatomyDetector ----

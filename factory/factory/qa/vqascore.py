@@ -13,50 +13,98 @@ without a GPU. The real adapter lazily loads the open `t2v_metrics` package
 module — and running the test suite — never requires the model or a GPU.
 """
 from __future__ import annotations
+import json
+import os
+import subprocess
 from pathlib import Path
 from typing import Callable
 
-_MODEL = None  # cached t2v_metrics VQAScore model (loaded once, on first use)
+# The real model is heavy GPU (torch + a multi-GB VQA model) and must NOT live in
+# factory/.venv (the lightweight test runner). It runs in an isolated venv via a
+# persistent subprocess worker (vqa_worker.py); these point at that venv + model.
+DEFAULT_VQA_PYTHON = Path.home() / ".book-gen-vqa" / "Scripts" / "python.exe"
+DEFAULT_VQA_MODEL = "clip-flant5-xl"   # fits a 16GB card; xxl does not
+_WORKER = Path(__file__).with_name("vqa_worker.py")
+_DAEMON = None  # process-wide singleton so the model loads once per build
 
 
 class VQAScoreError(RuntimeError):
     pass
 
 
-def _load_model():
-    """Lazily import + construct the real VQAScore model. Heavy GPU dependency,
-    so it is imported on demand (never at module import) and cached."""
-    global _MODEL
-    if _MODEL is None:
-        try:
-            import t2v_metrics  # noqa: PLC0415 — heavy GPU dep, import on demand
-        except ImportError as e:  # pragma: no cover - exercised only without the dep
+class _VQADaemon:
+    """Owns the long-lived worker process in the isolated venv and exchanges
+    one JSON request/response line per score. Lazily started on first use."""
+
+    def __init__(self, python=None, model=None):
+        self.python = str(python or os.environ.get(
+            "BOOK_GEN_VQA_PYTHON", DEFAULT_VQA_PYTHON))
+        self.model = str(model or os.environ.get(
+            "BOOK_GEN_VQA_MODEL", DEFAULT_VQA_MODEL))
+        self.proc = None
+
+    def _ensure(self) -> None:
+        if self.proc is not None and self.proc.poll() is None:
+            return
+        if not Path(self.python).exists():
             raise VQAScoreError(
-                "t2v_metrics is not installed; `pip install t2v_metrics` to enable "
-                "the VQAScore caption-fidelity gate, or leave qa_vqa disabled in the "
-                "book config to keep the Claude-only path.") from e
-        _MODEL = t2v_metrics.VQAScore(model="clip-flant5-xxl")
-    return _MODEL
+                f"VQAScore venv python not found at {self.python}; create the "
+                f"isolated venv (see factory/factory/qa/VQA_SETUP.md) or set "
+                f"BOOK_GEN_VQA_PYTHON, or leave qa_vqa disabled to keep the "
+                f"Claude-only path.")
+        self.proc = subprocess.Popen(
+            [self.python, "-u", str(_WORKER), "--model", self.model],
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True,
+            encoding="utf-8", bufsize=1)
+        # Block until the worker reports the model is loaded, skipping any library
+        # noise that leaks onto stdout (download bars etc. should be on stderr).
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                raise VQAScoreError("VQAScore worker exited during startup")
+            try:
+                if json.loads(line.strip()).get("ready"):
+                    return
+            except json.JSONDecodeError:
+                continue
+
+    def score(self, image_path, caption: str) -> float:
+        self._ensure()
+        self.proc.stdin.write(
+            json.dumps({"image": str(image_path), "caption": caption}) + "\n")
+        self.proc.stdin.flush()
+        line = self.proc.stdout.readline()
+        if not line:
+            raise VQAScoreError("VQAScore worker died mid-request")
+        resp = json.loads(line.strip())
+        if "error" in resp:
+            raise VQAScoreError(f"VQAScore worker error: {resp['error']}")
+        return float(resp["score"])
 
 
-def _t2v_score(image_path: Path, caption: str) -> float:
-    """Real adapter: P("Yes" | image, "Does this figure show {caption}?") via
-    t2v_metrics' VQAScore. Returns a scalar in [0, 1]."""
-    model = _load_model()
-    score = model(images=[str(image_path)], texts=[caption])
-    # t2v_metrics returns a (1, 1) tensor; coerce to a plain float.
-    return float(score.item() if hasattr(score, "item") else score[0][0])
+def _daemon_score(image_path: Path, caption: str) -> float:
+    """Default adapter: P("Yes" | image, "Does this figure show {caption}?") via
+    the isolated-venv worker. Returns a scalar in [0, 1]."""
+    global _DAEMON
+    if _DAEMON is None:
+        _DAEMON = _VQADaemon()
+    return _DAEMON.score(image_path, caption)
 
 
 class VQAScorer:
     """Scores image<->caption faithfulness in [0, 1]. `score_fn` is injectable
-    for tests; the default lazily loads the real GPU model on first call.
+    for tests; the default talks to the real model in the isolated GPU venv.
     `threshold` is the pass bar — tune empirically in config (the research gives
     no fixed number)."""
 
     def __init__(self, score_fn: Callable[[Path, str], float] | None = None,
-                 threshold: float = 0.6):
-        self.score_fn = score_fn or _t2v_score
+                 threshold: float = 0.15):
+        # 0.15 is a COARSE floor, not a fidelity ceiling: on real rendered pages
+        # clip-flant5-xl scores correct matches anywhere from ~0.19 to ~0.97 but
+        # gross mismatches (wrong subject) at ~0.05. A low floor catches the gross
+        # case while best-of-N ranking and the holistic auditor handle fine
+        # judgment — see VQA_SETUP.md for the calibration data.
+        self.score_fn = score_fn or _daemon_score
         self.threshold = threshold
 
     def score(self, image_path, caption: str) -> float:
