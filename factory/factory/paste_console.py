@@ -9,8 +9,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from .config import BookConfig
-from .copy import book_blurb
-from .checklist import _keywords
+from .copy import listing_description, listing_keywords
 from . import specs
 
 
@@ -54,12 +53,14 @@ def build_steps(cfg: BookConfig, pages: int) -> list[dict]:
             {"type": "copy", "field": "Illustrator — First name", "value": ill_first},
             {"type": "copy", "field": "Illustrator — Last name", "value": ill_last},
         ]
+    paras = "".join(f"<p>{p}</p>" for p in listing_description(cfg).split("\n\n"))
     steps += [
-        {"type": "copy", "field": "Description", "value": f"<p>{book_blurb(cfg)}</p>",
-         "hint": "Switch the Description box to HTML view if available, then paste."},
+        {"type": "copy", "field": "Description", "value": paras,
+         "hint": "Natural-language listing copy for Amazon's Rufus assistant. "
+                 "Switch the Description box to HTML view if available, then paste."},
     ]
     steps += [{"type": "copy", "field": f"Keyword {i + 1} of 7", "value": k}
-              for i, k in enumerate(_keywords(cfg).split(", "))]
+              for i, k in enumerate(listing_keywords(cfg))]
     steps += [
         {"type": "act", "field": "Categories (choose 2)", "value": _categories(cfg),
          "hint": "Pick via KDP's category browser — not pasteable."},

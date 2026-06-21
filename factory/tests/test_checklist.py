@@ -42,8 +42,9 @@ def test_checklist_has_paste_console(tmp_path):
     # each KDP field present as a paste block
     assert "Wild Little World" in text and "Eleanor Hartley" in text
     assert "<p>Step into a wild little world.</p>" in text   # description as HTML
-    # the 7 keywords are listed one per box (numbered), not just a comma string
-    assert "1. children's animal book" in text
+    # the 7 keywords are listed one per box (numbered), not just a comma string;
+    # WS6b: natural-language intent phrases derived from the subject
+    assert "1. picture book about animals for kids" in text
     assert "7. " in text
     assert "{{" not in text   # fully rendered
 
@@ -113,8 +114,9 @@ def test_concept_checklist_is_colour_nature_and_not_grief(tmp_path):
     assert "Step into a wild little world of friendly animals." in text  # blurb wins
     assert "Death & Grief" not in text and "Death & Dying" not in text
     assert "Nature" in text
-    assert "pet loss grief journal" not in text
+    assert "grief journal for the loss" not in text
     assert "{{" not in text  # template fully rendered
     # markdown checklist must NOT be HTML-escaped (it's pasted into KDP verbatim)
     assert "&#39;" not in text and "&amp;" not in text
-    assert "children's animal book" in text
+    # WS6b: natural-language, subject-derived keywords (not grief/journal stuffing)
+    assert "picture book about animals for kids" in text

@@ -28,10 +28,10 @@
 {{ cfg.illustrator }}
 ```
 {% endif -%}
-**Description** (Description box — HTML is allowed)
+**Description** (Description box — HTML is allowed; natural-language copy for Amazon's Rufus assistant)
 ```text
-<p>{{ blurb }}</p>
-```
+{% for para in blurb.split('\n\n') %}<p>{{ para }}</p>
+{% endfor %}```
 **Keywords** — KDP has 7 separate boxes; paste one per box:
 {% for kw in keywords.split(", ") %}{{ loop.index }}. {{ kw }}
 {% endfor %}

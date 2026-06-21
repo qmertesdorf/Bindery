@@ -12,6 +12,7 @@ from factory.flux_art import generate_flux_art, generate_concept_art
 from factory.qa import build_ensemble_auditor
 from factory.cover import build_cover
 from factory.checklist import make_checklist
+from factory.copy import verify_listing_copy
 from factory.paste_console import make_paste_console
 from factory.readability import verify_readability
 from factory.provenance import write_provenance
@@ -112,7 +113,9 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
         build_epub(cfg, content, out_dir, cover_path=cover_jpg)
 
     # ⑤ checklist + interactive HTML paste console (the house standard for the
-    #    manual KDP upload — one field at a time, copy-to-clipboard)
+    #    manual KDP upload — one field at a time, copy-to-clipboard). Guard the
+    #    listing copy first (WS6b): valid KDP keywords + natural-language, un-stuffed.
+    verify_listing_copy(cfg)
     make_checklist(cfg, pages, out_dir)
     make_paste_console(cfg, pages, out_dir)
 

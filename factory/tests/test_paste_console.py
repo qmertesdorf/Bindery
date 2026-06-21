@@ -27,9 +27,12 @@ def test_build_steps_concept_fields(tmp_path):
     # concept = colour/white stock, NOT cream
     ink = next(s["value"] for s in steps if "Ink & paper" in s["field"])
     assert "Color" in ink and "White" in ink and "Cream" not in ink
-    # description is the blurb as HTML
+    # description (WS6b) leads with the back-cover hook, then expands into
+    # natural-language intent — as one or more HTML paragraphs
     desc = next(s["value"] for s in steps if s["field"] == "Description")
-    assert desc == "<p>Step into a wild little world.</p>"
+    assert desc.startswith("<p>Step into a wild little world.</p>")
+    assert "animals and nature" in desc      # subject woven into the intent body
+    assert desc.count("<p>") >= 2            # hook + intent paragraph
 
 
 def test_illustrator_contributor_steps(tmp_path):
