@@ -76,7 +76,19 @@ the Flux-Fill repair still need weights/provisioning.
   AI-disclosure hint strengthened (images count even if hand-edited; disclosure ≠ registration).
   Also fixed a latent bug: `load_config` defaulted `qa_vqa_threshold` to 0.6, overriding the
   calibrated 0.15 for configs that omit it. 260 tests pass.
-- **Not started:** WS1e (TIFA decomposition), WS5 (FLUX.2), WS6b (Rufus-era listing copy), WS7.
+- **WS1e TIFA decomposition DONE (no GPU; code + tests, default OFF):** `qa/tifa.py` —
+  `TifaDecomposer` (caption → per-fact `TifaProbe`s of category object/count/color/spatial/action;
+  default adapter shells `claude -p`, figurative phrases dropped, results cached per caption) +
+  `TifaEvaluator` that scores each probe by REUSING the §WS1a `VQAScorer` ("Does this figure show
+  {element}?") so only one VQA model loads. Gates on the MEAN probe score (`qa_tifa_threshold`,
+  default 0.4) — one stubborn fact won't sink a page — while each FAILING fact becomes a TARGETED
+  reroll hint ("unclear count: the picture does not clearly show \"eight arms\"…"), and the full
+  per-fact report rides along in the verdict + `provenance.json` `qa_policy` for interpretability.
+  Wired as an optional `EnsembleAuditor` member via `qa_tifa`/`qa_tifa_threshold` (same caption/
+  non-cover guard as the scalar gate). Also corrected `build_ensemble_auditor`'s VQA threshold
+  fallback 0.6→0.15 to match the calibrated default. 273 tests pass. ☐ Re-tune `qa_tifa_threshold`
+  in a live run against full rhyming captions (the per-element VQA values run lower than 0–1 binary).
+- **Not started:** WS5 (FLUX.2), WS6b (Rufus-era listing copy), WS7.
 
 ---
 

@@ -15,11 +15,13 @@ the unit suite never needs a GPU or downloaded weights.
 from .vqascore import VQAScorer, VQAScoreError
 from .hadm import AnatomyDetector, AnatomyError, Defect
 from .selection import BestOfNSelector
+from .tifa import TifaProbe, TifaDecomposer, TifaEvaluator, TifaError
 from .ensemble import EnsembleAuditor, build_ensemble_auditor
 
 __all__ = [
     "VQAScorer", "VQAScoreError",
     "AnatomyDetector", "AnatomyError", "Defect",
     "BestOfNSelector",
+    "TifaProbe", "TifaDecomposer", "TifaEvaluator", "TifaError",
     "EnsembleAuditor", "build_ensemble_auditor",
 ]

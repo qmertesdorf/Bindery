@@ -65,6 +65,8 @@ class BookConfig:
     qa_anatomy_min_score: float = 0.5     # min detector confidence to count a defect
     qa_candidates: int = 1                # best-of-N candidates per render (WS1b; 1 = off)
     qa_repair: bool = False               # localized inpaint repair before reroll (WS2)
+    qa_tifa: bool = False                 # TIFA per-fact caption decomposition (WS1e)
+    qa_tifa_threshold: float = 0.4        # mean probe score to pass; failing facts become targeted reroll hints
 
     @property
     def makes_ebook(self) -> bool:
@@ -191,4 +193,6 @@ def load_config(path: str | Path) -> BookConfig:
         qa_anatomy_min_score=float(data.get("qa_anatomy_min_score", 0.5)),
         qa_candidates=int(data.get("qa_candidates", 1)),
         qa_repair=bool(data.get("qa_repair", False)),
+        qa_tifa=bool(data.get("qa_tifa", False)),
+        qa_tifa_threshold=float(data.get("qa_tifa_threshold", 0.4)),
     )

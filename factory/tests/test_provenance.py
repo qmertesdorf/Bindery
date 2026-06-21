@@ -60,3 +60,5 @@ def test_write_provenance_emits_valid_json(tmp_path):
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["title"] == "Deep Blue World"
     assert data["art"]["qa_policy"]["candidates"] == 1
+    assert data["art"]["qa_policy"]["tifa"] is False
+    assert data["art"]["qa_policy"]["tifa_threshold"] == 0.4

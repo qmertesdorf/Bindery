@@ -45,7 +45,8 @@ def build_provenance(cfg: BookConfig, content: dict, *, seed: int,
     art["qa_policy"] = {
         "candidates": cfg.qa_candidates, "vqa": cfg.qa_vqa,
         "vqa_threshold": cfg.qa_vqa_threshold, "anatomy": cfg.qa_anatomy,
-        "repair": cfg.qa_repair,
+        "repair": cfg.qa_repair, "tifa": cfg.qa_tifa,
+        "tifa_threshold": cfg.qa_tifa_threshold,
     }
     return {
         "slug": cfg.slug,

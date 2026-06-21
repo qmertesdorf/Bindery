@@ -19,16 +19,19 @@ from ..audit import ClaudeVisionAuditor
 from .vqascore import VQAScorer
 from .hadm import AnatomyDetector
 from .selection import BestOfNSelector
+from .tifa import TifaDecomposer, TifaEvaluator
 
 
 class EnsembleAuditor:
-    """Holistic auditor plus optional VQAScore and anatomy-detector members."""
+    """Holistic auditor plus optional VQAScore, anatomy-detector, and TIFA members."""
 
     def __init__(self, holistic, *, vqa: VQAScorer | None = None,
-                 anatomy: AnatomyDetector | None = None):
+                 anatomy: AnatomyDetector | None = None,
+                 tifa: TifaEvaluator | None = None):
         self.holistic = holistic
         self.vqa = vqa
         self.anatomy = anatomy
+        self.tifa = tifa
 
     def selector(self) -> BestOfNSelector | None:
         """A best-of-N selector backed by the VQAScore member, or None when there
@@ -66,11 +69,23 @@ class EnsembleAuditor:
                 extras["defects"] = defects
                 issues.extend(f"anatomy defect: {d.label}" for d in defects)
 
+        # TIFA per-fact decomposition — interpretable caption fidelity. Gates on
+        # the mean probe score; on a reject it contributes TARGETED per-fact hints
+        # (which fact failed and why) to steer the reroll. Same caption/cover guard
+        # as the VQAScore gate; the full report rides along for the provenance log.
+        if self.tifa is not None and caption and kind != "cover":
+            report = self.tifa.evaluate(image_path, caption)
+            extras["tifa"] = report
+            if not report["ok"]:
+                ok = False
+                issues.extend(report["hints"])
+
         return {"ok": ok, "issues": issues, **extras}
 
 
 def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
-                           vqa_score_fn=None, anatomy_detect_fn=None):
+                           vqa_score_fn=None, anatomy_detect_fn=None,
+                           tifa_decompose_fn=None):
     """Assemble the auditor for a book from its config flags.
 
     Returns the bare holistic `ClaudeVisionAuditor` when no extra QA stage is
@@ -81,12 +96,20 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     holistic = holistic or ClaudeVisionAuditor(judge_fn=judge_fn)
     use_vqa = getattr(cfg, "qa_vqa", False)
     use_anatomy = getattr(cfg, "qa_anatomy", False)
-    if not use_vqa and not use_anatomy:
+    use_tifa = getattr(cfg, "qa_tifa", False)
+    if not use_vqa and not use_anatomy and not use_tifa:
         return holistic
     vqa = (VQAScorer(score_fn=vqa_score_fn,
-                     threshold=getattr(cfg, "qa_vqa_threshold", 0.6))
+                     threshold=getattr(cfg, "qa_vqa_threshold", 0.15))
            if use_vqa else None)
     anatomy = (AnatomyDetector(detect_fn=anatomy_detect_fn,
                                min_score=getattr(cfg, "qa_anatomy_min_score", 0.5))
                if use_anatomy else None)
-    return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy)
+    tifa = None
+    if use_tifa:
+        # Reuse the fidelity-gate scorer so only ONE VQA model loads; when the
+        # scalar gate is off, TIFA gets its own scorer (still the shared daemon).
+        scorer = vqa or VQAScorer(score_fn=vqa_score_fn)
+        tifa = TifaEvaluator(TifaDecomposer(decompose_fn=tifa_decompose_fn), scorer,
+                             threshold=getattr(cfg, "qa_tifa_threshold", 0.4))
+    return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa)
