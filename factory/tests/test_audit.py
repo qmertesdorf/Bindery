@@ -68,6 +68,9 @@ def test_concept_audit_prompt_is_character_free():
     assert "signature" in prompt.lower() and "corner" in prompt.lower()
     # rejects anatomical anomalies by counting features (the 3-eyed snail)
     assert "count" in prompt.lower() and "eyes" in prompt.lower()
+    # demands correct, realistic per-species anatomy incl. feature PLACEMENT
+    assert "anatomically correct" in prompt.lower()
+    assert "eye-stalk" in prompt.lower()  # the snail eyes-on-stalks rule
 
 
 def test_concept_audit_prompt_rejects_photorealism():
