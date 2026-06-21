@@ -85,13 +85,20 @@ children's picture book.{ref}
 
 This page should show: {anchor}.{scene_line}
 
-This is a soft, stylised storybook, so judge GENEROUSLY. Apply a two-tier bar.
+This is a soft, stylised storybook, so judge GENEROUSLY on STYLE — but look CLOSELY
+before deciding: COUNT the subject's eyes and limbs, and scan ALL FOUR CORNERS for
+stray marks. Apply a two-tier bar.
 
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the WRONG subject (a clearly different animal or thing than described above);
 - ANY people or human figures appear (this book has no people);
-- any text, letters, words, or numbers are rendered in the artwork;
-- broken anatomy (malformed faces, extra or missing limbs/eyes);
+- any text, letters, words, numbers, OR an artist's SIGNATURE, initials, or
+  watermark are rendered in the artwork — INCLUDING faint, stylised, or scribbled
+  marks tucked into a corner (the bottom corners especially);
+- ANOMALOUS ANATOMY: count the animal's features — eyes, legs, ears, antennae,
+  wings, tails — and reject any with the WRONG NUMBER for that species (e.g. a snail
+  or insect with THREE eyes, a mammal with five legs, a two-headed bird), plus
+  malformed or distorted faces and extra, missing, or duplicated body parts;
 - a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
   or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
   parts, or a creature that doesn't read clearly as ONE real animal. Every animal
