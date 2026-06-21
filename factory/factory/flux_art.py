@@ -151,7 +151,8 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             done = run_audited_render(
                 render, prompt, out_path=op, auditor=auditor, anchor=anchor,
                 scene=page["scene"], reference_path=style_ref, seed=seed + i * 17,
-                max_tries=max_tries, audit_kind="concept")
+                max_tries=max_tries, audit_kind="concept",
+                caption=page.get("text"))
             out_pages.append(done)
             if style_ref is None:
                 style_ref = done  # first cohesive page anchors the rest

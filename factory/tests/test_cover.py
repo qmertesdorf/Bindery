@@ -130,7 +130,7 @@ def test_audit_cover_composition(tmp_path):
     class Aud:
         def __init__(self, ok): self.ok = ok; self.kinds = []
         def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-                  kind="character"):
+                  kind="character", caption=None):
             self.kinds.append(kind)
             return {"ok": self.ok, "issues": [] if self.ok else ["pale text, hard to read"]}
 

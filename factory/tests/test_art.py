@@ -82,7 +82,7 @@ class _Auditor:
     """Fail the first `fail_first` audits, then pass."""
     def __init__(self, fail_first=0): self.calls = 0; self.fail_first = fail_first
     def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-              kind="character"):
+              kind="character", caption=None):
         self.calls += 1
         ok = self.calls > self.fail_first
         return {"ok": ok, "issues": [] if ok else ["dog colour off"]}

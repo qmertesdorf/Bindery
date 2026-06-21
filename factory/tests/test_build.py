@@ -100,7 +100,7 @@ def test_picture_build_paperback_only_with_pages(tmp_path, picture_config_dict, 
 
     class FakeAuditor:
         def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-                  kind="character"):
+                  kind="character", caption=None):
             return {"ok": True, "issues": []}
 
     def runner(args):
@@ -164,7 +164,7 @@ def test_picture_build_routes_to_flux_engine(tmp_path, picture_config_dict, pict
 
     class FakeAuditor:
         def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-                  kind="character"):
+                  kind="character", caption=None):
             return {"ok": True, "issues": []}
 
     def runner(args):
@@ -219,7 +219,7 @@ def test_run_build_concept_end_to_end(tmp_path):
 
     class FakeAuditor:
         def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-                  kind="character"):
+                  kind="character", caption=None):
             return {"ok": True, "issues": []}
 
     def runner(args):

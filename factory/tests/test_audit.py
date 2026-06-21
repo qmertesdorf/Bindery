@@ -100,6 +100,47 @@ def test_concept_audit_prompt_without_reference_has_no_cohesion_clause():
     assert "style reference" not in prompt
 
 
+def test_concept_audit_prompt_rejects_grain():
+    # the auditor must gate out grainy/noisy renders (the speckled jellyfish bg) so
+    # the regenerate loop self-corrects toward clean watercolour washes
+    prompt = build_concept_audit_prompt(
+        anchor="a jellyfish", scene="a jellyfish",
+        image_path=Path("/out/p.png")).lower()
+    assert "grain" in prompt and ("noisy" in prompt or "noise" in prompt)
+    assert "speckle" in prompt or "speckled" in prompt
+
+
+def test_concept_audit_prompt_includes_caption_fidelity():
+    # the caption a child reads aloud must match the picture: stated counts/actions
+    # (e.g. "eight curly arms", "wrapping its tail round the grass") are enforced
+    prompt = build_concept_audit_prompt(
+        anchor="an octopus", scene="an octopus on rocks",
+        image_path=Path("/out/p.png"),
+        caption="The octopus creeps with its eight curly arms.")
+    low = prompt.lower()
+    assert "The octopus creeps with its eight curly arms." in prompt  # caption quoted
+    assert "caption" in low and "count" in low
+    assert "caption mismatch" in low  # the reject rule is present
+
+
+def test_concept_audit_prompt_without_caption_omits_caption_clause():
+    prompt = build_concept_audit_prompt(
+        anchor="a fox", scene="a fox", image_path=Path("/out/p.png")).lower()
+    assert "caption fidelity" not in prompt
+    assert "caption mismatch" not in prompt
+
+
+def test_auditor_threads_caption_to_concept_prompt():
+    captured = {}
+    def judge(prompt):
+        captured["prompt"] = prompt
+        return '{"ok": true, "issues": []}'
+    auditor = ClaudeVisionAuditor(judge_fn=judge)
+    auditor.audit(Path("/out/page_18.png"), anchor="a seahorse", scene="a seahorse",
+                  kind="concept", caption="It wraps its tail round the grass.")
+    assert "It wraps its tail round the grass." in captured["prompt"]
+
+
 def test_auditor_kind_selects_concept_prompt():
     captured = {}
     def judge(prompt):

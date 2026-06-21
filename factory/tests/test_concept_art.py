@@ -37,10 +37,12 @@ class _OKAuditor:
     def __init__(self):
         self.kinds = []
         self.refs = []
+        self.captions = []
     def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-              kind="character"):
+              kind="character", caption=None):
         self.kinds.append(kind)
         self.refs.append(reference_path)
+        self.captions.append(caption)
         return {"ok": True, "issues": []}
 
 
@@ -76,12 +78,23 @@ def test_generate_concept_art_uses_empty_lora_stack_and_concept_audit(tmp_path):
                        for n in wf.values())
 
 
+def test_generate_concept_art_passes_page_caption_to_auditor(tmp_path):
+    # each page's read-aloud caption (content["pages"][i]["text"]) is threaded to the
+    # auditor so it can enforce caption fidelity (e.g. stated counts / actions)
+    comfy, auditor = _Comfy(), _OKAuditor()
+    generate_concept_art(_cfg(), _CONTENT, tmp_path, comfy, seed=99, auditor=auditor)
+    # the two page audits carry their captions; the cover audit (last) carries none
+    assert auditor.captions[0] == "A fox is red."
+    assert auditor.captions[1] == "A snail is slow."
+    assert auditor.captions[-1] is None  # cover has no caption
+
+
 def test_generate_concept_art_keeps_best_and_flags(tmp_path):
     comfy = _Comfy()
 
     class _NeverPasses:
         def audit(self, image_path, *, anchor, reference_path=None, scene=None,
-                  kind="character"):
+                  kind="character", caption=None):
             return {"ok": False, "issues": ["stub never passes"]}
 
     art = generate_concept_art(_cfg(page_count=1), {

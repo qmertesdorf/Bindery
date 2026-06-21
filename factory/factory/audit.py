@@ -65,8 +65,26 @@ Output the JSON and nothing else."""
 
 def build_concept_audit_prompt(*, anchor: str, scene: str | None,
                                image_path: Path,
-                               reference_path: Path | None = None) -> str:
+                               reference_path: Path | None = None,
+                               caption: str | None = None) -> str:
     scene_line = f"\nThis page is meant to depict, roughly: {scene}." if scene else ""
+    caption_line = (
+        f"\n\nCAPTION FIDELITY — a child will read this caption ALOUD beside the "
+        f"picture:\n  \"{caption}\"\nThe picture must AGREE with it. If the caption "
+        f"states a CONCRETE, depictable fact about the subject — a specific COUNT of "
+        f"body parts (e.g. \"eight arms\", \"five arms\"), a clear ACTION or POSE the "
+        f"subject is doing (e.g. \"wrapping its tail round the grass\", \"floats on "
+        f"her back\", \"puffs up like a ball\", \"peeks out\", \"huddle together\"), "
+        f"or a specific object it directly holds or touches — the image MUST actually "
+        f"show that fact. Ignore figurative or non-visual phrases (\"as proud as can "
+        f"be\", \"out of sight\", \"never to roam\", \"the largest of all\") and "
+        f"ignore incidental background scenery." if caption else "")
+    caption_reject = (
+        "\n- CAPTION MISMATCH: the picture clearly CONTRADICTS or OMITS a concrete, "
+        "depictable fact stated in the caption above — a stated COUNT of body parts, "
+        "or the specific action, pose, or object the caption describes (see CAPTION "
+        "FIDELITY). A child reading the words must see them in the picture;"
+        if caption else "")
     ref = (f"\nA STYLE REFERENCE image from this SAME book is at {reference_path}. "
            f"Read it. The new image must share the SAME illustration STYLE as the "
            f"reference — the same medium and finish (soft hand-painted storybook "
@@ -83,7 +101,7 @@ def build_concept_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a character-free
 children's picture book.{ref}
 
-This page should show: {anchor}.{scene_line}
+This page should show: {anchor}.{scene_line}{caption_line}
 
 This is a soft, stylised storybook, so judge GENEROUSLY on STYLE — but look CLOSELY
 before deciding: COUNT the subject's eyes and limbs, and scan ALL FOUR CORNERS for
@@ -112,7 +130,12 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   close-up photograph, or a glossy 3D / CGI render — instead of a hand-painted,
   soft, simplified children's storybook illustration. It MUST clearly read as a
   storybook PAINTING (visible brushwork / drawn linework, stylised, not lifelike);
-  realistic insects, fur, feathers, or water that look like a photo are a defect.{cohesion_reject}
+  realistic insects, fur, feathers, or water that look like a photo are a defect;
+- the image looks GRAINY or NOISY: covered in fine speckle, film-grain, sensor
+  noise, or a sandy/dotted texture — most visible across what should be smooth flat
+  areas like open water, deep background, or sky — instead of clean, smooth painted
+  watercolour washes. Soft brushwork and a few intentional bubbles are fine; an
+  overall gritty, noisy, speckled finish is a defect.{caption_reject}{cohesion_reject}
 
 ACCEPT (set ok=true) — do NOT reject — for natural variation:
 - different pose, camera angle, framing, or composition;
@@ -184,13 +207,15 @@ class ClaudeVisionAuditor:
         self.judge_fn = judge_fn or _claude_vision
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
-              scene: str | None = None, kind: str = "character") -> dict:
+              scene: str | None = None, kind: str = "character",
+              caption: str | None = None) -> dict:
         if kind == "cover":
             prompt = build_cover_audit_prompt(image_path=Path(image_path))
         elif kind == "concept":
             prompt = build_concept_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),
-                reference_path=Path(reference_path) if reference_path else None)
+                reference_path=Path(reference_path) if reference_path else None,
+                caption=caption)
         else:
             prompt = build_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),
