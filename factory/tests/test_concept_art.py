@@ -58,6 +58,33 @@ def test_concept_page_prompt_excludes_people_and_text():
     assert "storybook" in p.lower()
 
 
+def test_concept_page_prompt_suppresses_signatures():
+    # Flux scrawls fake artist signatures/watermarks on painterly styles — the prompt
+    # must steer them away (a real defect on a pen-name title).
+    low = concept_page_prompt({"subject": "a fox", "scene": "a fox"}, style="x").lower()
+    assert "no signature" in low and "no watermark" in low
+
+
+def test_generate_concept_art_reuses_existing_pages_and_cover(tmp_path):
+    # an already-rendered page / cover is kept; only missing art re-renders, so a
+    # targeted re-roll (delete one page) doesn't redo the whole book or the cover.
+    (tmp_path / "page_01.png").write_bytes(b"\x89PNG kept")
+    (tmp_path / "art.png").write_bytes(b"\x89PNG kept")
+    comfy, auditor = _Comfy(), _OKAuditor()
+    art = generate_concept_art(_cfg(), _CONTENT, tmp_path, comfy,
+                               seed=99, auditor=auditor)
+    assert [p.name for p in art["pages"]] == ["page_01.png", "page_02.png"]
+    assert art["cover"].name == "art.png"
+    # only the MISSING page 2 rendered + audited; page 1 and cover were reused
+    assert len(comfy.workflows) == 1
+    assert auditor.kinds == ["concept"]
+    # the reused page 1 still anchors the style for the re-rendered page 2
+    assert auditor.refs[0] is not None and auditor.refs[0].name == "page_01.png"
+    # reused art left byte-for-byte untouched
+    assert (tmp_path / "page_01.png").read_bytes() == b"\x89PNG kept"
+    assert (tmp_path / "art.png").read_bytes() == b"\x89PNG kept"
+
+
 def test_generate_concept_art_uses_empty_lora_stack_and_concept_audit(tmp_path):
     comfy, auditor = _Comfy(), _OKAuditor()
     art = generate_concept_art(_cfg(), _CONTENT, tmp_path, comfy,

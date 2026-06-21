@@ -13,6 +13,12 @@ from factory import specs
 
 BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
 
+# Flux's painterly/storybook styles like to scrawl a fake artist signature or
+# watermark in a corner (a real defect on a pen-name title, and a rights smell).
+# Append this to every generation prompt to suppress them; the holistic auditor
+# still catches any that slip through ([[catch-defects-with-guards]]).
+NO_MARKS = "no text, no signature, no watermark, no artist mark, no logo"
+
 
 def _verify_art_resolution(path, min_px: int) -> None:
     """Build-time guard (WS3): fail if a rendered Flux page/cover is below the
@@ -148,7 +154,7 @@ def concept_page_prompt(page: dict, *, style: str) -> str:
     return (f"{style}. {page['scene']} A single clear subject, painted as a soft, "
             f"hand-drawn children's storybook illustration — loose, simplified and "
             f"whimsical, NOT a photograph and NOT photorealistic. No people, no "
-            f"unrelated extra animals, no text. Illustrated edge to edge.")
+            f"unrelated extra animals, {NO_MARKS}. Illustrated edge to edge.")
 
 
 def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
@@ -190,6 +196,18 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     for i, page in enumerate(pages, 1):
         prompt = concept_page_prompt(page, style=style)
         subject = page.get("subject", "the subject")
+        op = out_dir / f"page_{i:02d}.png"
+        # Per-page reuse: keep an already-rendered (reviewed) spread; delete just its
+        # PNG to force a fresh re-render of that one page (symmetric to build.py's
+        # book-level reuse). A surviving page still anchors the style for any pages
+        # that DO re-render, so cohesion is preserved.
+        if op.exists():
+            _log(f"[concept] page {i}/{n} ({subject}): reusing existing {op.name}")
+            out_pages.append(op)
+            if style_ref is None:
+                style_ref = op
+            _verify_art_resolution(op, art_px)
+            continue
         _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}"
              + (f" [vs anchor {style_ref.name}]" if style_ref else " [style anchor]"))
 
@@ -199,7 +217,6 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                                             upscale_model=cfg.upscale_model),
                          out_path=op)
 
-        op = out_dir / f"page_{i:02d}.png"
         anchor = (f"a {subject} in its natural setting, in a consistent soft "
                   f"storybook illustration style; no people and no text")
         try:
@@ -219,8 +236,20 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             out_pages.append(op)
         _verify_art_resolution(out_pages[-1], art_px)
 
+    cover_path = out_dir / "art.png"
+    # Cover reuse (symmetric to the per-page reuse): keep an existing reviewed cover;
+    # delete art.png to force a fresh cover render. Lets a targeted page re-roll skip
+    # re-rendering a good cover.
+    if cover_path.exists():
+        _log("[concept] cover: reusing existing art.png")
+        _verify_art_resolution(cover_path, art_px)
+        if flagged:
+            _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")
+        _log(f"[concept] complete: {n} pages + cover")
+        return {"pages": out_pages, "cover": cover_path, "flagged": flagged}
+
     _log("[concept] cover…")
-    cover_prompt = f"{style}. {cfg.art_prompt}. No people, no text."
+    cover_prompt = f"{style}. {cfg.art_prompt}. No people, {NO_MARKS}."
 
     def cover_render(p, s, op):
         comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
@@ -228,7 +257,6 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                                             upscale_model=cfg.upscale_model),
                          out_path=op)
 
-    cover_path = out_dir / "art.png"
     cover_anchor = (f"a {cfg.subject} scene in a soft storybook illustration style; "
                     f"no people, no text")
     try:
