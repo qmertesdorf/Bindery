@@ -44,9 +44,13 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
         print(f"[readability] kids' text grade {rep['grade']} "
               f"(ease {rep['reading_ease']}), ceiling {cfg.max_reading_grade:g}")
 
-    # Resolve image backend up front (picture needs art before interior).
+    # Resolve image backend up front (picture needs art before interior). Give the
+    # real client a restart_fn so a native ComfyUI crash mid-build self-heals
+    # (relaunch + re-submit) instead of killing the whole render; no-op without a
+    # local ComfyUI install (tests inject their own comfy, so they're unaffected).
     if comfy is None:
-        comfy = ComfyClient()
+        from factory.comfy_runtime import make_restart_fn
+        comfy = ComfyClient(restart_fn=make_restart_fn())
 
     flux = cfg.book_type in ("picture", "concept") and cfg.art_engine == "flux"
     if not flux:

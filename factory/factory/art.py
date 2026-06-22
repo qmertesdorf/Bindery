@@ -65,18 +65,43 @@ class ComfyClient:
     def __init__(self, base: str = BASE,
                  http_post: Callable = _default_post,
                  http_get: Callable = _default_get,
-                 poll_interval: float = 1.0, max_polls: int = 600):
+                 poll_interval: float = 1.0, max_polls: int = 600,
+                 restart_fn: Callable | None = None, max_restarts: int = 3):
         self.base = base
         self.http_post = http_post
         self.http_get = http_get
         self.poll_interval = poll_interval
         self.max_polls = max_polls
+        # Optional self-heal: ComfyUI on Blackwell can die with a native SIGILL at
+        # VAE decode mid-build. restart_fn() relaunches it; submit() then re-submits
+        # the whole graph. Default None → unchanged behaviour (tests, no launcher).
+        self.restart_fn = restart_fn
+        self.max_restarts = max_restarts
 
     def submit(self, workflow: dict, *, out_path: Path) -> Path:
-        """POST an already-complete workflow graph, poll until it finishes, and
-        download the first output image. Backend-agnostic (no prompt/seed
+        """POST a workflow graph, poll, download the image — relaunching ComfyUI
+        and re-submitting if the backend dies mid-render (transport error), so one
+        native crash doesn't lose a long art build. A genuine graph error (ArtError)
+        is NOT a transport death and propagates immediately. With no restart_fn the
+        first transport error propagates unchanged."""
+        for attempt in range(self.max_restarts + 1):
+            try:
+                return self._submit_once(workflow, out_path=out_path)
+            except OSError as e:
+                # requests' ConnectionError/Timeout subclass OSError, as does the
+                # builtin ConnectionError — a dead/unreachable backend. ArtError is a
+                # RuntimeError, so a real graph error skips this and propagates.
+                if self.restart_fn is None or attempt >= self.max_restarts:
+                    raise
+                _log(f"[comfy] backend unreachable ({type(e).__name__}: {e}); "
+                     f"restarting ComfyUI and re-submitting "
+                     f"({attempt + 1}/{self.max_restarts})")
+                self.restart_fn()
+
+    def _submit_once(self, workflow: dict, *, out_path: Path) -> Path:
+        """One POST → poll → download cycle. Backend-agnostic (no prompt/seed
         injection) so Flux graphs — which bake prompt+seed into their own nodes —
-        can reuse the same submit/poll/retrieve path and the same test fakes."""
+        can reuse the same path and the same test fakes."""
         resp = self.http_post(f"{self.base}/prompt", json={"prompt": workflow})
         pid = resp.get("prompt_id")
         if not pid:

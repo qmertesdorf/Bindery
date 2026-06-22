@@ -154,6 +154,72 @@ def test_comfy_free_posts_unload_and_swallows_errors():
     ComfyClient(http_post=boom).free()   # does not raise
 
 
+def test_comfy_submit_restarts_backend_on_transport_death(tmp_path):
+    # A native ComfyUI crash (Blackwell SIGILL at VAE decode) surfaces as a
+    # connection error; submit() should relaunch via restart_fn and re-submit the
+    # whole graph (the dead process's prompt_id is gone) rather than killing the build.
+    import requests
+    state = {"alive": False, "restarts": 0}
+    def restart():
+        state["restarts"] += 1
+        state["alive"] = True
+    def http_post(url, json):
+        if not state["alive"]:
+            raise requests.exceptions.ConnectionError("refused")
+        return {"prompt_id": "z"}
+    def http_get(url):
+        if not state["alive"]:
+            raise requests.exceptions.ConnectionError("refused")
+        if "/history/" in url:
+            return {"z": {"outputs": {"9": {"images": [
+                {"filename": "img.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG\r\n"
+    client = ComfyClient(http_post=http_post, http_get=http_get,
+                         poll_interval=0, restart_fn=restart)
+    out = client.submit({"n": {"class_type": "X", "inputs": {}}},
+                        out_path=tmp_path / "f.png")
+    assert Path(out).exists()
+    assert state["restarts"] == 1  # restarted once, then the re-submit succeeded
+
+
+def test_comfy_submit_propagates_transport_error_without_restart_fn(tmp_path):
+    # Default (no restart_fn): unchanged behaviour — a transport death propagates.
+    import requests
+    def http_post(url, json):
+        raise requests.exceptions.ConnectionError("refused")
+    client = ComfyClient(http_post=http_post, poll_interval=0)
+    with pytest.raises(requests.exceptions.ConnectionError):
+        client.submit({"n": {}}, out_path=tmp_path / "f.png")
+
+
+def test_comfy_submit_gives_up_after_max_restarts(tmp_path):
+    import requests
+    calls = {"restarts": 0}
+    def restart():
+        calls["restarts"] += 1  # backend never recovers
+    def http_post(url, json):
+        raise requests.exceptions.ConnectionError("refused")
+    client = ComfyClient(http_post=http_post, poll_interval=0,
+                         restart_fn=restart, max_restarts=2)
+    with pytest.raises(requests.exceptions.ConnectionError):
+        client.submit({"n": {}}, out_path=tmp_path / "f.png")
+    assert calls["restarts"] == 2  # tried the budget, then re-raised
+
+
+def test_comfy_submit_does_not_restart_on_graph_error(tmp_path):
+    # A real ComfyUI/graph error (no prompt_id -> ArtError) is NOT a transport death;
+    # restarting would just loop, so it must propagate immediately.
+    calls = {"restarts": 0}
+    def restart():
+        calls["restarts"] += 1
+    def http_post(url, json):
+        return {}  # missing prompt_id -> ArtError
+    client = ComfyClient(http_post=http_post, poll_interval=0, restart_fn=restart)
+    with pytest.raises(ArtError):
+        client.submit({"n": {}}, out_path=tmp_path / "f.png")
+    assert calls["restarts"] == 0
+
+
 def test_run_audited_render_retries_with_fresh_seed_and_hints(tmp_path):
     from factory.art import run_audited_render
     seeds, prompts = [], []
