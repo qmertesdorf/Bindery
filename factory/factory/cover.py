@@ -357,9 +357,12 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
         # uniform soft backdrop so centred text actually reads as centred.
         if full_blur_px > 0:
             avg = blurred.crop((0, 0, full_blur_px, H)).resize((1, 1)).getpixel((0, 0))
-            # Blend hard toward the panel's average so a bright pool (e.g. sunlit
-            # water near the spine) can't make the centred blurb read as off-centre.
-            blurred = Image.blend(blurred, Image.new("RGB", (W, H), avg), 0.85)
+            # Blend hard toward a GENTLY-DIMMED panel average: an even, slightly deeper
+            # wash across the whole back panel (no bright pool, no localised dark blob)
+            # so white blurb text reads anywhere on it and the panel looks intentional
+            # rather than lopsided. An even dim reads far better than a dark ellipse.
+            dim = tuple(int(c * 0.6) for c in avg)
+            blurred = Image.blend(blurred, Image.new("RGB", (W, H), dim), 0.85)
         mask = Image.new("L", (W, H), 0)
         if full_blur_px > 0:
             mask.paste(255, (0, 0, full_blur_px, H))
@@ -380,7 +383,7 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
     back_cx = round((specs.BLEED_IN + trim_w / 2) * dpi)
     regions = [
         (front_cx, round(0.19 * H), round(3.3 * dpi), round(1.7 * dpi), 0.55),  # title
-        (back_cx, round(0.50 * H), round(3.1 * dpi), round(2.4 * dpi), 0.38),   # blurb (panel centre) — GENTLE: the even backdrop + CSS card carry contrast; a heavy ellipse here read as an off-centre dark blob
+        (back_cx, round(0.50 * H), round(3.1 * dpi), round(2.4 * dpi), 0.22),   # blurb (panel centre) — barely-there: the even DIMMED backdrop carries contrast; a heavy ellipse here read as an off-centre dark blob
     ]
     overlay = Image.new("L", (W, H), 0)
     draw = ImageDraw.Draw(overlay)
