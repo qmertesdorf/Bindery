@@ -75,7 +75,6 @@ def has_white_border(path, *, corner_frac: float = 0.03) -> bool:
     writes a tiny marker, not a real PNG) returns False so GPU-free unit tests are
     unaffected."""
     from PIL import Image
-    import statistics
     try:
         with Image.open(path) as im:
             im = im.convert("RGB")
@@ -91,7 +90,13 @@ def has_white_border(path, *, corner_frac: float = 0.03) -> bool:
         raw = im.crop(box).tobytes()  # packed RGB bytes (channel-interleaved)
         n = len(raw) // 3
         means = [sum(raw[c::3]) / n for c in range(3)]
-        std = statistics.pstdev(raw)
+        # Population stdev over the interleaved RGB bytes, computed directly:
+        # statistics.pstdev(bytes) hits a data-dependent Python 3.11 _ss TypeError
+        # on some corner patches (crashed the border check mid-build), so avoid the
+        # stdlib path entirely ([[catch-defects-with-guards]]).
+        total = len(raw)
+        mu = sum(raw) / total
+        std = (sum((b - mu) ** 2 for b in raw) / total) ** 0.5
         if all(m >= 246 for m in means) and std <= 14:
             flat += 1
         if all(m >= 253 for m in means) and std <= 2:

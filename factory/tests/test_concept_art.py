@@ -162,6 +162,23 @@ def test_has_white_border_skips_non_image_stub(tmp_path):
     assert has_white_border(stub) is False
 
 
+def test_has_white_border_handles_varied_corner_bytes(tmp_path):
+    # Regression: real renders have noisy/gradient corners (not flat fills). The
+    # population stdev over those bytes must compute without raising —
+    # statistics.pstdev(bytes) hit a data-dependent Python 3.11 _ss TypeError on
+    # some such corners and crashed the border check mid-build.
+    from PIL import Image
+    im = Image.new("RGB", (200, 200))
+    px = im.load()
+    for y in range(200):
+        for x in range(200):
+            px[x, y] = ((x * 7 + y * 3) % 200, (x * 3 + y * 11) % 200, (x + y) % 200)
+    p = tmp_path / "varied.png"
+    im.save(p)
+    # must not raise; a dark, varied corner is not a flat white paper border
+    assert has_white_border(p) is False
+
+
 def test_generate_concept_art_flags_reused_page_with_white_border(tmp_path):
     # a REUSED page that ships a white paper border is no longer blindly trusted —
     # the deterministic full-bleed guard flags it for review

@@ -28,11 +28,11 @@
     "a glowing jellyfish drifting through deep blue water",
     "a friendly sea lion resting on a smooth rock beside the calm blue sea",
     "a curious octopus among the rocks on the ocean floor",
-    "a tiny seahorse with a smooth rounded head and no ears, its curled tail wrapped around a tall blade of green seagrass",
+    "a bright striped angelfish with a tall flat body and flowing fins gliding through a sunlit coral reef",
     "a gentle round manatee grazing on green seagrass in calm shallow water",
     "a starfish resting in a sparkling tide pool"
   ],
-  "art_prompt": "a soft watercolour storybook front cover, an adorable cute baby blue whale with a big round head, large friendly sparkly eyes and rosy cheeks, and two cute playful dolphins swimming together in sparkling sunlit blue ocean water, a sweet little green sea turtle and small colourful fish nearby, exaggerated kawaii cuteness, smooth rounded whale heads with no antennae and no sprigs, gentle sun rays through the water, bright and inviting, cool ocean blues and aquas filling the whole frame, no text, no words",
+  "art_prompt": "a soft watercolour storybook front cover scene set fully underwater in deep sunlit blue ocean, an adorable cute baby blue whale with a big round smooth head, large friendly sparkly eyes and rosy cheeks, and two cute playful dolphins swimming together, a sweet little green sea turtle and small colourful fish nearby, exaggerated kawaii cuteness, smooth rounded whale and dolphin heads, no water spout, no blowhole spray, no antennae, no twigs or sprigs growing from any head, soft even gentle underwater light spread evenly across the whole scene, no strong light beams, no bright glare, no single concentrated bright spot or glowing pool, evenly and brightly lit richly painted deep-blue water, bright cheerful and inviting, cool saturated ocean blues and aquas balanced evenly left to right, no text, no words",
   "trim_w": 8.5,
   "trim_h": 8.5,
   "upscale_model": "RealESRGAN_x4plus.pth",

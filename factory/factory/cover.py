@@ -361,8 +361,12 @@ def _compose_wrap_bg(art_path: Path, out_dir: Path, width_in: float, height_in: 
             # wash across the whole back panel (no bright pool, no localised dark blob)
             # so white blurb text reads anywhere on it and the panel looks intentional
             # rather than lopsided. An even dim reads far better than a dark ellipse.
+            # The blend must be strong enough that a BRIGHT light pool in the art can't
+            # survive as a one-sided glow: residual variation ≈ (1-w)·art-range, so a
+            # ~0.94 weight keeps a worst-case sunray pool under ~8 luminance of spread —
+            # below what the vision auditor reads as a lopsided back ([[catch-defects-with-guards]]).
             dim = tuple(int(c * 0.6) for c in avg)
-            blurred = Image.blend(blurred, Image.new("RGB", (W, H), dim), 0.85)
+            blurred = Image.blend(blurred, Image.new("RGB", (W, H), dim), 0.94)
         mask = Image.new("L", (W, H), 0)
         if full_blur_px > 0:
             mask.paste(255, (0, 0, full_blur_px, H))
