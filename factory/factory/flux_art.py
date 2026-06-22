@@ -19,6 +19,19 @@ BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
 # still catches any that slip through ([[catch-defects-with-guards]]).
 NO_MARKS = "no text, no signature, no watermark, no artist mark, no logo"
 
+# Flux drops vignette-prone subjects (leaping animals, small close-ups, montages)
+# onto a blank watercolour-paper background framed by white margins — a real
+# full-bleed print defect. A weak "edge to edge" hint isn't enough (the auditor's
+# corrective hints already say it and Flux still vignettes), so steer hard at
+# generation time; has_white_border + the vision auditor still backstop
+# ([[catch-defects-with-guards]]).
+FULL_BLEED = ("The painted scene completely fills the entire square frame edge to "
+              "edge and corner to corner — a single immersive full-bleed "
+              "illustration whose background reaches and covers all four edges and "
+              "every corner, with absolutely NO white or cream paper border, NO "
+              "blank margin, NO framed vignette, and NOT an isolated cut-out or "
+              "sticker floating on a plain white background")
+
 
 def _verify_art_resolution(path, min_px: int) -> None:
     """Build-time guard (WS3): fail if a rendered Flux page/cover is below the
@@ -202,7 +215,7 @@ def concept_page_prompt(page: dict, *, style: str) -> str:
     return (f"{style}. {page['scene']} A single clear subject, painted as a soft, "
             f"hand-drawn children's storybook illustration — loose, simplified and "
             f"whimsical, NOT a photograph and NOT photorealistic. No people, no "
-            f"unrelated extra animals, {NO_MARKS}. Illustrated edge to edge.")
+            f"unrelated extra animals, {NO_MARKS}. {FULL_BLEED}.")
 
 
 def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
@@ -325,7 +338,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             pass
 
     _log("[concept] cover…")
-    cover_prompt = f"{style}. {cfg.art_prompt}. No people, {NO_MARKS}."
+    cover_prompt = f"{style}. {cfg.art_prompt}. No people, {NO_MARKS}. {FULL_BLEED}."
 
     def cover_render(p, s, op):
         comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,

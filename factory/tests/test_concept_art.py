@@ -59,6 +59,15 @@ def test_concept_page_prompt_excludes_people_and_text():
     assert "storybook" in p.lower()
 
 
+def test_concept_page_prompt_forces_full_bleed():
+    # Flux vignettes some subjects onto white paper; the generation prompt must steer
+    # hard for full-bleed, not just the post-hoc auditor ([[catch-defects-with-guards]]).
+    low = concept_page_prompt({"subject": "a fox", "scene": "a fox"}, style="x").lower()
+    assert "full-bleed" in low or "full bleed" in low
+    assert "edge to edge" in low
+    assert "no white" in low or "no blank margin" in low or "no framed vignette" in low
+
+
 def test_concept_page_prompt_suppresses_signatures():
     # Flux scrawls fake artist signatures/watermarks on painterly styles — the prompt
     # must steer them away (a real defect on a pen-name title).
