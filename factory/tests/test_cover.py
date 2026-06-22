@@ -5,7 +5,27 @@ from factory import specs
 from factory.cover import (render_cover_html, build_cover, _verify_cover_pdf,
                            _verify_cover_dimensions, _verify_cover_background,
                            _verify_cover_text_zones, _verify_cover_no_white_edge,
-                           CoverError)
+                           _verify_cover_art, CoverError)
+
+
+def test_verify_cover_art_fails_on_missing(tmp_path):
+    # a failed cover render leaves no art.png; the build must NOT silently fall back
+    # to a stale cover_bg.png — fail loudly instead.
+    with pytest.raises(CoverError):
+        _verify_cover_art(tmp_path / "art.png")
+
+
+def test_verify_cover_art_allows_test_stub(tmp_path):
+    stub = tmp_path / "art.png"
+    stub.write_bytes(b"\x89PNG stub")          # tiny non-image stub (test fake)
+    _verify_cover_art(stub)                     # must not raise
+
+
+def test_verify_cover_art_rejects_corrupt_real_file(tmp_path):
+    bad = tmp_path / "art.png"
+    bad.write_bytes(b"\x00" * 4096)            # >1KB but not a valid image
+    with pytest.raises(CoverError):
+        _verify_cover_art(bad)
 
 
 def test_verify_cover_no_white_edge(tmp_path):

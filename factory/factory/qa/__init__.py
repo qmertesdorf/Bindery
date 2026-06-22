@@ -12,14 +12,14 @@ ComfyClient): a thin class with an injectable callable whose default lazily
 loads a real GPU model only on first use, so importing this package and running
 the unit suite never needs a GPU or downloaded weights.
 """
-from .vqascore import VQAScorer, VQAScoreError
+from .vqascore import VQAScorer, VQAScoreError, shutdown_daemon
 from .hadm import AnatomyDetector, AnatomyError, Defect
 from .selection import BestOfNSelector
 from .tifa import TifaProbe, TifaDecomposer, TifaEvaluator, TifaError
 from .ensemble import EnsembleAuditor, build_ensemble_auditor
 
 __all__ = [
-    "VQAScorer", "VQAScoreError",
+    "VQAScorer", "VQAScoreError", "shutdown_daemon",
     "AnatomyDetector", "AnatomyError", "Defect",
     "BestOfNSelector",
     "TifaProbe", "TifaDecomposer", "TifaEvaluator", "TifaError",

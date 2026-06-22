@@ -503,11 +503,36 @@ def _recompress_jpg(path: Path, quality: int = 90) -> None:
     Path(path).write_bytes(data)
 
 
+def _verify_cover_art(art_path: Path) -> None:
+    """Guard: the cover art must be a real image before we composite the wrap.
+
+    `_compose_wrap_bg` silently returns if it can't open the art (so test stubs
+    pass) — but in a real build that meant a FAILED cover render left the previous
+    `cover_bg.png` in place and the build shipped a STALE cover while reporting
+    success. Fail loudly instead ([[catch-defects-with-guards]]). A genuine test
+    stub is a tiny non-image file (<1KB) and is allowed through; a missing or
+    corrupt real cover art is a hard error."""
+    p = Path(art_path)
+    if not p.exists():
+        raise CoverError(
+            f"cover art {p.name} is missing — the cover render produced no image. "
+            f"The build must NOT fall back to a stale cover_bg.png; re-render the cover.")
+    if p.stat().st_size < 1024:
+        return  # tiny stub written by the fake ComfyClient in tests
+    from PIL import Image
+    try:
+        with Image.open(p) as im:
+            im.verify()
+    except Exception as e:
+        raise CoverError(f"cover art {p.name} is not a valid image ({e}); re-render the cover.")
+
+
 def build_cover(cfg: BookConfig, pages: int, art_path: Path, out_dir: Path,
                 runner=None, make_ebook_cover: bool = True,
                 auditor=None) -> tuple[Path, Path | None]:
     out_dir = Path(out_dir)
     per_page = specs.spine_per_page(cfg.book_type)
+    _verify_cover_art(art_path)
     # wraparound paperback PDF
     wrap_html = render_cover_html(cfg, pages, art_path, out_dir, front_only=False)
     width_in, height_in = specs.cover_dimensions_in(pages, cfg.trim_w, cfg.trim_h,

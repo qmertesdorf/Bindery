@@ -82,6 +82,21 @@ class _VQADaemon:
         return float(resp["score"])
 
 
+def shutdown_daemon() -> None:
+    """Terminate the persistent VQA worker, freeing its ~6GB of VRAM. Call before a
+    subsequent Flux render that needs the whole 16GB card (e.g. the concept cover,
+    which runs after the last page's best-of-N scoring) — otherwise flux(~12GB) +
+    the still-resident VQA model OOM and the render silently produces nothing. The
+    daemon lazily restarts on the next score() if needed. Best-effort/idempotent."""
+    global _DAEMON
+    if _DAEMON is not None and _DAEMON.proc is not None:
+        try:
+            _DAEMON.proc.terminate()
+        except Exception:
+            pass
+    _DAEMON = None
+
+
 def _daemon_score(image_path: Path, caption: str) -> float:
     """Default adapter: P("Yes" | image, "Does this figure show {caption}?") via
     the isolated-venv worker. Returns a scalar in [0, 1]."""

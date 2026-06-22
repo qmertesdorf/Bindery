@@ -248,6 +248,18 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
         _log(f"[concept] complete: {n} pages + cover")
         return {"pages": out_pages, "cover": cover_path, "flagged": flagged}
 
+    # Free the VQA model (held ~6GB by the scorer daemon after the last page's
+    # best-of-N scoring) before the cover render — otherwise flux(~12GB)+VQA OOM the
+    # cover on a 16GB card and it silently renders nothing (then the build shipped a
+    # STALE cover). The cover audit uses no caption, so VQA isn't needed here.
+    if selector is not None:
+        try:
+            from factory.qa.vqascore import shutdown_daemon
+            shutdown_daemon()
+            comfy.free()   # also drop ComfyUI's cache so Flux reloads into the full card
+        except Exception:
+            pass
+
     _log("[concept] cover…")
     cover_prompt = f"{style}. {cfg.art_prompt}. No people, {NO_MARKS}."
 
@@ -264,10 +276,17 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
             anchor=cover_anchor, scene="front cover", reference_path=style_ref,
             seed=seed + 42, max_tries=max_tries, audit_kind="concept")
-    except ArtError:
-        _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW)")
+    except ArtError as e:
+        # Surface the real reason (a render/ComfyUI failure looks identical to an
+        # audit flag otherwise) and DON'T claim a usable cover if none was written —
+        # the downstream cover guard then fails loudly instead of shipping stale art.
+        _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW) — {e}")
         flagged.append("cover")
         cover = cover_path
+    if not Path(cover).exists():
+        raise ArtError(
+            f"cover render produced no image at {cover_path.name}: {cover_anchor}. "
+            f"Likely a ComfyUI/render failure — do not ship a stale cover.")
     _verify_art_resolution(cover, art_px)
     if flagged:
         _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")

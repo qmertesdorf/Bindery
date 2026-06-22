@@ -26,6 +26,13 @@ def test_vqascorer_passes_reports_bool_and_score():
     ok2, _ = VQAScorer(score_fn=lambda p, c: 0.7, threshold=0.6).passes("x", "y")
     assert ok2 is True
 
+def test_shutdown_daemon_is_safe_when_none():
+    # idempotent / safe to call before the cover render even if VQA was never used
+    from factory.qa import shutdown_daemon
+    shutdown_daemon()
+    shutdown_daemon()
+
+
 def test_vqascore_real_adapter_errors_without_venv():
     # The default adapter must fail loudly with guidance — never silently pass —
     # when the isolated GPU venv python is missing.
