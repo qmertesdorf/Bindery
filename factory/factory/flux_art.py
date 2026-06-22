@@ -37,6 +37,54 @@ def _verify_art_resolution(path, min_px: int) -> None:
             f"Rendered art {Path(path).name} is {w}x{h}px — below the {min_px}px "
             f"print target (300 DPI at trim+bleed). Raise the upscale target.")
 
+
+def has_white_border(path, *, corner_frac: float = 0.03) -> bool:
+    """Cheap deterministic full-bleed guard ([[catch-defects-with-guards]]).
+
+    A full-bleed picture-book page must reach the trim on every side, but Flux
+    sometimes paints the scene on a ragged WHITE 'watercolour-paper' vignette (or
+    leaves a blank white background panel) — a real print defect (uneven white
+    margins at the cut edge) that the vision auditor used to ACCEPT as 'framing
+    variation'. Detect it from the 4 corner patches, which separate a paper border
+    from a legitimately light edge (snow, pale sky, pale water): paper/blank white
+    is flat and channel-neutral, while sky/water/snow is colour-biased (one channel
+    lags) or painted-textured. Two tells, validated on the Deep Blue World pages:
+
+    - FLAT-white corner: every channel mean >= 246 and population stdev <= 14
+      (a soft near-white wash). >=3 of 4 such corners ⇒ a full paper vignette
+      (e.g. the seal-pup page's wash frame).
+    - PURE-paper corner: every channel mean >= 253 and stdev <= 2 (blank paper, not
+      a painted gradient). >=2 such corners ⇒ a blank white panel/border (e.g. the
+      seahorse and dolphin pages, whose top is unpainted paper) — while a genuinely
+      bright painted sky (mean ~247, stdev ~3) stays under the PURE bar and passes.
+
+    Returns True when either tell fires. A non-image stub (the test ComfyClient
+    writes a tiny marker, not a real PNG) returns False so GPU-free unit tests are
+    unaffected."""
+    from PIL import Image
+    import statistics
+    try:
+        with Image.open(path) as im:
+            im = im.convert("RGB")
+            w, h = im.size
+    except Exception:
+        return False
+    cw = max(1, int(w * corner_frac))
+    ch = max(1, int(h * corner_frac))
+    boxes = [(0, 0, cw, ch), (w - cw, 0, w, ch),
+             (0, h - ch, cw, h), (w - cw, h - ch, w, h)]
+    flat = pure = 0
+    for box in boxes:
+        raw = im.crop(box).tobytes()  # packed RGB bytes (channel-interleaved)
+        n = len(raw) // 3
+        means = [sum(raw[c::3]) / n for c in range(3)]
+        std = statistics.pstdev(raw)
+        if all(m >= 246 for m in means) and std <= 14:
+            flat += 1
+        if all(m >= 253 for m in means) and std <= 2:
+            pure += 1
+    return flat >= 3 or pure >= 2
+
 # Moods that should read as somber — the child must NOT be smiling on these pages.
 GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy",
          "aching", "empty", "quiet", "reflective", "missing", "sorrowful", "tearful"}
@@ -192,6 +240,19 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     # enforces a cohesive look across the whole book — re-rendering until each page
     # matches that one reference, not just a text description.
     out_pages, flagged = [], []
+
+    def _check_border(path, label):
+        """Flag (don't fail) a page that ships a white paper border/vignette — a
+        real full-bleed print defect the vision auditor used to wave through as
+        'framing variation', but one a soft high-key style sometimes wants on
+        purpose. Surface it for review rather than killing an otherwise-good book
+        ([[catch-defects-with-guards]]). Runs on reused pages too, so a kept page
+        is no longer blindly trusted on framing."""
+        if has_white_border(path) and label not in flagged:
+            _log(f"[concept] {label}: WHITE PAPER BORDER — art does not fill the "
+                 f"trim edge to edge (REVIEW / re-roll)")
+            flagged.append(label)
+
     style_ref = None
     for i, page in enumerate(pages, 1):
         prompt = concept_page_prompt(page, style=style)
@@ -207,6 +268,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             if style_ref is None:
                 style_ref = op
             _verify_art_resolution(op, art_px)
+            _check_border(op, i)
             continue
         _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}"
              + (f" [vs anchor {style_ref.name}]" if style_ref else " [style anchor]"))
@@ -235,6 +297,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             flagged.append(i)
             out_pages.append(op)
         _verify_art_resolution(out_pages[-1], art_px)
+        _check_border(out_pages[-1], i)
 
     cover_path = out_dir / "art.png"
     # Cover reuse (symmetric to the per-page reuse): keep an existing reviewed cover;
@@ -243,6 +306,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     if cover_path.exists():
         _log("[concept] cover: reusing existing art.png")
         _verify_art_resolution(cover_path, art_px)
+        _check_border(cover_path, "cover")
         if flagged:
             _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")
         _log(f"[concept] complete: {n} pages + cover")
@@ -288,6 +352,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             f"cover render produced no image at {cover_path.name}: {cover_anchor}. "
             f"Likely a ComfyUI/render failure — do not ship a stale cover.")
     _verify_art_resolution(cover, art_px)
+    _check_border(cover, "cover")
     if flagged:
         _log(f"[concept] REVIEW these (audit not fully passed): {flagged}")
     _log(f"[concept] complete: {n} pages + cover")

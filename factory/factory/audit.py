@@ -103,9 +103,12 @@ children's picture book.{ref}
 
 This page should show: {anchor}.{scene_line}{caption_line}
 
-This is a soft, stylised storybook, so judge GENEROUSLY on STYLE — but look CLOSELY
-before deciding: COUNT the subject's eyes and limbs, and scan ALL FOUR CORNERS for
-stray marks. Apply a two-tier bar.
+This is a soft, stylised storybook. Judge GENEROUSLY on incidental variation (pose,
+crop, palette, background, time of day), but be STRICT that every page shares ONE
+medium and finish so the book reads as a single artist's work, and that the art
+FILLS THE PAGE edge to edge. Look CLOSELY before deciding: COUNT the subject's eyes
+and limbs, scan ALL FOUR CORNERS for stray marks AND for blank white paper, and
+check that the medium and finish match the rest of the book. Apply a two-tier bar.
 
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the WRONG subject (a clearly different animal or thing than described above);
@@ -135,14 +138,22 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   noise, or a sandy/dotted texture — most visible across what should be smooth flat
   areas like open water, deep background, or sky — instead of clean, smooth painted
   watercolour washes. Soft brushwork and a few intentional bubbles are fine; an
-  overall gritty, noisy, speckled finish is a defect.{caption_reject}{cohesion_reject}
+  overall gritty, noisy, speckled finish is a defect;
+- the artwork does NOT FILL THE PAGE: a band of blank white or cream PAPER — a
+  border, margin, vignette, or empty background panel — surrounds the illustration
+  on one or more sides or corners instead of the painted scene running full-bleed to
+  all four edges. This is a print defect (uneven white margins at the trim). A soft
+  painterly fade INTO colour is fine; a corner or edge of plain unpainted paper is
+  not.{caption_reject}{cohesion_reject}
 
 ACCEPT (set ok=true) — do NOT reject — for natural variation:
-- different pose, camera angle, framing, or composition;
+- different pose, camera angle, crop, or composition (as long as the painted art
+  still fills the page edge to edge — see the blank-paper-border defect above);
 - a different or simpler background, lighting, time of day, or season;
 - extra incidental natural scenery (plants, sky, water) around the subject;
 - loose, painterly, flat, or simplified rendering — that illustrated look is GOOD;
-- stylistic differences that still read as the same soft storybook look.
+- stylistic differences that still read as the same soft storybook look (but NOT a
+  shift in medium or finish, e.g. matte watercolour vs glossy 3D — see cohesion).
 
 When the subject is right and the art is clean, set ok=true even if such details
 differ. Reserve issues for genuine defects.

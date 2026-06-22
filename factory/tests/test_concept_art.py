@@ -1,7 +1,8 @@
 from pathlib import Path
 import pytest
 from factory.config import BookConfig
-from factory.flux_art import generate_concept_art, concept_page_prompt
+from factory.flux_art import (generate_concept_art, concept_page_prompt,
+                              has_white_border)
 
 
 def _cfg(**over):
@@ -114,6 +115,56 @@ def test_generate_concept_art_passes_page_caption_to_auditor(tmp_path):
     assert auditor.captions[0] == "A fox is red."
     assert auditor.captions[1] == "A snail is slow."
     assert auditor.captions[-1] is None  # cover has no caption
+
+
+def _img(tmp_path, name, fill, *, size=200, border=0, border_fill=(255, 255, 255)):
+    """Write a `size`x`size` test PNG: solid `fill`, optionally framed by a
+    `border`-px band of `border_fill` (a stand-in for the white watercolour-paper
+    vignette). `size` defaults small for the detector unit tests; the full build
+    test uses a print-size image so the resolution guard is satisfied."""
+    from PIL import Image
+    im = Image.new("RGB", (size, size), border_fill)
+    b = border
+    Image.Image.paste(im, Image.new("RGB", (size - 2 * b, size - 2 * b), fill), (b, b))
+    p = tmp_path / name
+    im.save(p)
+    return p
+
+
+def test_has_white_border_detects_paper_vignette(tmp_path):
+    # a scene framed by a white paper border is flagged; a full-bleed page is not
+    bordered = _img(tmp_path, "bordered.png", (60, 120, 180), border=16)
+    full = _img(tmp_path, "full.png", (60, 120, 180), border=0)
+    assert has_white_border(bordered) is True
+    assert has_white_border(full) is False
+
+
+def test_has_white_border_ignores_bright_painted_sky(tmp_path):
+    # a legitimately light/tinted edge (pale sky, snow) is NOT pure flat paper white,
+    # so it must NOT be mistaken for a border (no false build flags on good pages)
+    sky = _img(tmp_path, "sky.png", (60, 120, 180), border=16,
+               border_fill=(228, 236, 245))  # tinted, below the pure-paper bar
+    assert has_white_border(sky) is False
+
+
+def test_has_white_border_skips_non_image_stub(tmp_path):
+    stub = tmp_path / "stub.png"
+    stub.write_bytes(b"\x89PNG stub")
+    assert has_white_border(stub) is False
+
+
+def test_generate_concept_art_flags_reused_page_with_white_border(tmp_path):
+    # a REUSED page that ships a white paper border is no longer blindly trusted —
+    # the deterministic full-bleed guard flags it for review
+    # print-size so the resolution guard passes; border scaled to clear the corners
+    _img(tmp_path, "page_01.png", (60, 120, 180), size=2800, border=200)
+    (tmp_path / "art.png").write_bytes(b"\x89PNG stub")        # cover reused (stub)
+    comfy, auditor = _Comfy(), _OKAuditor()
+    art = generate_concept_art(_cfg(page_count=1), {
+        "art_style": "x", "character_anchor": "", "dedication": "d",
+        "pages": [{"subject": "a fox", "text": "t", "scene": "a fox"}],
+        "closing": "c"}, tmp_path, comfy, seed=1, auditor=auditor)
+    assert 1 in art["flagged"]
 
 
 def test_generate_concept_art_keeps_best_and_flags(tmp_path):

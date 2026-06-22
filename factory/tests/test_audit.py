@@ -110,6 +110,20 @@ def test_concept_audit_prompt_rejects_grain():
     assert "speckle" in prompt or "speckled" in prompt
 
 
+def test_concept_audit_prompt_rejects_white_paper_border():
+    # the auditor must gate out pages that don't fill the trim — a ragged white
+    # 'watercolour paper' vignette / blank background panel is a full-bleed print
+    # defect (uneven white margins at the cut edge), not acceptable 'framing'
+    prompt = build_concept_audit_prompt(
+        anchor="a seahorse", scene="a seahorse",
+        image_path=Path("/out/p.png")).lower()
+    assert "fill the page" in prompt
+    assert "border" in prompt and "paper" in prompt
+    assert "full-bleed" in prompt or "edge to edge" in prompt
+    # and 'framing' variation must NOT be a blanket licence for a blank-paper edge
+    assert "still fills the page" in prompt
+
+
 def test_concept_audit_prompt_includes_caption_fidelity():
     # the caption a child reads aloud must match the picture: stated counts/actions
     # (e.g. "eight curly arms", "wrapping its tail round the grass") are enforced
