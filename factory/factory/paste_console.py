@@ -114,30 +114,31 @@ _HTML = r"""<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KDP Paste Console — __TITLE__</title>
 <style>
-  :root{--bg:#f6f4ef;--card:#fffdfa;--ink:#2e2a26;--muted:#7a726a;--line:#e6e0d6;
-    --accent:#8a6d52;--accent2:#b08968;--done:#9aa884;--chip:#efe9df;--act:#9c6b4f}
+  :root{--bg:#1b1917;--card:#262320;--ink:#ece5db;--muted:#9c9389;--line:#3a3531;
+    --accent:#c79b73;--accent2:#dbb189;--done:#8fa777;--chip:#332e29;--act:#d09a72}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,serif}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Georgia,serif;
+    color-scheme:dark}
   .wrap{max-width:760px;margin:0 auto;padding:18px 18px 70px}
   h1{font-size:20px;margin:0 0 3px}
   .sub{color:var(--muted);font-size:13px;margin:0 0 16px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;
-    box-shadow:0 2px 10px rgba(0,0,0,.04)}
+    box-shadow:0 2px 16px rgba(0,0,0,.45)}
   .meta{display:flex;justify-content:space-between;align-items:center;
     font:12.5px system-ui,sans-serif;color:var(--muted);margin-bottom:8px}
   .kdpfield{font:13px system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;
     color:var(--accent);font-weight:700}
   .kind{font:11px system-ui,sans-serif;text-transform:uppercase;letter-spacing:.04em;
     padding:3px 9px;border-radius:20px}
-  .kind.copy{background:#e7efe0;color:#5f7445}
-  .kind.act{background:#f4e7df;color:var(--act)}
+  .kind.copy{background:#283322;color:#aac28a}
+  .kind.act{background:#352a22;color:var(--act)}
   .value{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:15px;line-height:1.5;
-    background:#f3efe8;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
+    background:#15140f;border:1px solid var(--line);border-radius:10px;padding:14px 16px;
     margin:6px 0 4px;white-space:pre-wrap;word-break:break-word;user-select:all;min-height:34px}
   .hint{color:var(--muted);font-size:13px;margin:8px 0 0}
   .btns{display:flex;gap:10px;margin-top:16px;align-items:center}
   .primary{flex:1;font:16px system-ui,sans-serif;font-weight:700;border:none;border-radius:10px;
-    background:var(--accent);color:#fff;padding:14px;cursor:pointer}
+    background:var(--accent);color:#1c1712;padding:14px;cursor:pointer}
   .primary:hover{background:var(--accent2)}
   .primary.copied{background:var(--done)}
   .ghost{font:13px system-ui,sans-serif;border:1px solid var(--line);background:var(--card);
