@@ -107,7 +107,8 @@ This is a soft, stylised storybook. Judge GENEROUSLY on incidental variation (po
 crop, palette, background, time of day), but be STRICT that every page shares ONE
 medium and finish so the book reads as a single artist's work, and that the art
 FILLS THE PAGE edge to edge. Look CLOSELY before deciding: COUNT the subject's eyes
-and limbs, scan ALL FOUR CORNERS for stray marks AND for blank white paper, and
+and limbs, check that its overall BODY PLAN / SILHOUETTE is right for its real
+species, scan ALL FOUR CORNERS for stray marks AND for blank white paper, and
 check that the medium and finish match the rest of the book. Apply a two-tier bar.
 
 REJECT (set ok=false) ONLY for a real defect that would break the book:
@@ -125,6 +126,21 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   TWO upper eye-stalks, each tipped with one eye: reject a face-eye, a THIRD or extra
   eye-stalk, or any stalk ending in a blank, eyeless bulb. Also reject malformed or distorted faces and
   extra, missing, or duplicated parts. Being "cute" does NOT excuse wrong anatomy;
+- WRONG BODY PLAN / SILHOUETTE: beyond counting parts, the subject's overall body
+  SHAPE must match its real species (a stylised "cute" version is fine, but the basic
+  body plan must be right). Check the silhouette against these common tells:
+  a RAY or skate (manta / stingray) is ONE flat, wide, diamond-shaped disc whose
+  wings are PART of the body — NOT a round chubby body with separate wings stuck on,
+  and NOT leg-like dangling appendages; a SHARK has an upright VERTICAL tail fin (top
+  lobe taller) and gill slits — NOT a flat horizontal dolphin/whale fluke; a
+  STARFISH / sea star is a FLAT star with EXACTLY FIVE arms (count them — reject a
+  round dome-blob or six/seven arms); an OCTOPUS has EXACTLY EIGHT arms; a
+  MANATEE / dugong has ONE large rounded PADDLE tail — NOT a forked two-lobed fish
+  tail; whales, dolphins and narwhals have HORIZONTAL tail flukes and a smooth
+  blowhole with NO antlers, antennae, twigs or branching sprigs growing from the head
+  or blowhole; a SEAHORSE has a smooth head with NO ears and a curled prehensile
+  tail; an EEL is a long, limbless, snake-like body with NO arms or legs. Reject a
+  subject whose body plan is clearly wrong even when it is cute and cleanly painted;
 - a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
   or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
   parts, or a creature that doesn't read clearly as ONE real animal. Every animal

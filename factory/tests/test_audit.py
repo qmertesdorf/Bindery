@@ -73,6 +73,22 @@ def test_concept_audit_prompt_is_character_free():
     assert "eye-stalk" in prompt.lower()  # the snail eyes-on-stalks rule
 
 
+def test_concept_audit_prompt_checks_body_plan_silhouette():
+    # Vision review counts parts but waves through wrong BODY PLANS (round-body manta,
+    # dolphin-tailed shark, 6-arm starfish); the prompt must name the silhouette tells
+    # for the ocean animals that slipped through ([[catch-defects-with-guards]]).
+    low = build_concept_audit_prompt(
+        anchor="an ocean animal; no people, no text",
+        scene="a manta ray gliding", image_path=Path("/out/page_09.png")).lower()
+    assert "body plan" in low and "silhouette" in low
+    # the specific failure modes are named so the model has concrete tells to check
+    assert "diamond" in low                 # ray = flat disc, not round body + wings
+    assert "vertical tail" in low           # shark, not a horizontal dolphin fluke
+    assert "exactly five arms" in low       # starfish count
+    assert "exactly eight arms" in low      # octopus count
+    assert "paddle tail" in low             # manatee, not a forked fish tail
+
+
 def test_concept_audit_prompt_rejects_photorealism():
     # the auditor must gate out photo-real renders so the regenerate loop
     # self-corrects toward the storybook illustration style
