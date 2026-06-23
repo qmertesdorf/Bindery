@@ -38,6 +38,7 @@
   "upscale_model": "RealESRGAN_x4plus.pth",
   "qa_vqa": true,
   "qa_candidates": 3,
+  "qa_reaudit_reused": true,
   "price_usd": 10.99,
   "blurb": "Dive into a deep blue world! From a gentle blue whale gliding through the open sea to a tiny starfish resting in a sparkling tide pool, this gentle first ocean book takes early readers on a tour of twenty sea animals and the watery places they call home. Soft, glowing watercolours and simple, read-aloud rhymes make every page a warm discovery — a perfect first ocean adventure for curious little ones just beginning to read."
 }

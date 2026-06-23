@@ -287,6 +287,22 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 style_ref = op
             _verify_art_resolution(op, art_px)
             _check_border(op, i)
+            # Reused pages otherwise ride through with NO vision check, so an anatomy/
+            # caption defect in a kept page is never caught on a partial re-roll. With
+            # qa_reaudit_reused on, re-audit them too and FLAG (don't re-render — that
+            # would defeat reuse; delete the page to force a fresh render) failures for
+            # review ([[catch-defects-with-guards]]).
+            if getattr(cfg, "qa_reaudit_reused", False) and auditor is not None:
+                anchor = (f"a {subject} in its natural setting, in a consistent soft "
+                          f"storybook illustration style; no people and no text")
+                verdict = auditor.audit(
+                    op, anchor=anchor,
+                    reference_path=(style_ref if style_ref != op else None),
+                    scene=page.get("scene"), kind="concept", caption=page.get("text"))
+                if not verdict.get("ok") and i not in flagged:
+                    _log(f"[concept] {i}: REUSED PAGE FAILED RE-AUDIT — "
+                         f"{'; '.join(verdict.get('issues') or []) or 'no reason given'}")
+                    flagged.append(i)
             continue
         _log(f"[concept] page {i}/{n} ({subject}): {page['scene'][:60]}"
              + (f" [vs anchor {style_ref.name}]" if style_ref else " [style anchor]"))

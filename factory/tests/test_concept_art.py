@@ -193,6 +193,49 @@ def test_generate_concept_art_flags_reused_page_with_white_border(tmp_path):
     assert 1 in art["flagged"]
 
 
+class _FailAuditor:
+    """Auditor that fails every page — to prove reused pages get re-audited."""
+    def __init__(self):
+        self.calls = []
+    def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+              kind="character", caption=None):
+        self.calls.append(Path(image_path).name)
+        return {"ok": False, "issues": ["wrong body plan"]}
+
+
+def _reuse_content():
+    return {"art_style": "x", "character_anchor": "", "dedication": "d",
+            "pages": [{"subject": "a fox", "text": "t", "scene": "a fox"}],
+            "closing": "c"}
+
+
+def test_reaudit_reused_flags_failing_page_when_enabled(tmp_path):
+    # qa_reaudit_reused: a REUSED page is vision-re-audited and a failure is flagged
+    # for review — closes the gap where kept pages rode through unchecked. It is NOT
+    # re-rendered (reuse is preserved); deleting the PNG is how you force a re-roll.
+    _img(tmp_path, "page_01.png", (60, 120, 180), size=2800, border=0)
+    (tmp_path / "art.png").write_bytes(b"\x89PNG stub")        # cover reused (stub)
+    comfy, auditor = _Comfy(), _FailAuditor()
+    art = generate_concept_art(_cfg(page_count=1, qa_reaudit_reused=True),
+                               _reuse_content(), tmp_path, comfy, seed=1,
+                               auditor=auditor)
+    assert "page_01.png" in auditor.calls   # the reused page WAS re-audited
+    assert 1 in art["flagged"]              # and flagged on failure
+    assert comfy.workflows == []            # but NOT re-rendered — still reuse
+
+
+def test_reaudit_reused_skipped_by_default(tmp_path):
+    # Default (flag off): reused pages are NOT re-audited — the fast reuse path is
+    # unchanged, so existing builds keep their behaviour.
+    _img(tmp_path, "page_01.png", (60, 120, 180), size=2800, border=0)
+    (tmp_path / "art.png").write_bytes(b"\x89PNG stub")
+    comfy, auditor = _Comfy(), _FailAuditor()
+    art = generate_concept_art(_cfg(page_count=1), _reuse_content(), tmp_path,
+                               comfy, seed=1, auditor=auditor)
+    assert auditor.calls == []              # no re-audit of reused pages
+    assert 1 not in art["flagged"]
+
+
 def test_generate_concept_art_keeps_best_and_flags(tmp_path):
     comfy = _Comfy()
 
