@@ -97,6 +97,12 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                     cfg, content, out_dir, comfy, seed=seed, auditor=auditor,
                     generate_fn=generate_fn,
                     suggest_fn=suggest_fn or _default_suggest_fn(generate_fn))
+                # Re-write content.json AFTER concept art: an auto-subject-fallback
+                # swap mutates content["pages"][i] in place, and the interior PDF
+                # caption is rendered from this file. Only on a fresh render (the
+                # reuse path above changed nothing, so it leaves content.json alone).
+                content_path.write_text(json.dumps(content, indent=2),
+                                        encoding="utf-8")
             elif flux:
                 art = generate_flux_art(cfg, content, out_dir, comfy,
                                         seed=seed, auditor=auditor)
@@ -105,11 +111,6 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                                            positive_node=positive_node,
                                            sampler_node=sampler_node, seed=seed,
                                            auditor=auditor)
-        # Persist content.json AFTER concept art so an auto-subject-fallback swap
-        # (which mutates content["pages"][i] in place) reaches the interior PDF
-        # caption rendering. No-op when nothing swapped (rewrites identical JSON).
-        if cfg.book_type == "concept":
-            content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
         html = render_interior_html(cfg, content, out_dir)
         _, pages = build_interior_pdf(html, out_dir, runner=runner,
                                       book_type=cfg.book_type,
