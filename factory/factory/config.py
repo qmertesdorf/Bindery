@@ -68,6 +68,7 @@ class BookConfig:
     qa_reaudit_reused: bool = False       # vision re-audit REUSED pages too (else they ride through unchecked); flags failures for review
     qa_tifa: bool = False                 # TIFA per-fact caption decomposition (WS1e)
     qa_tifa_threshold: float = 0.4        # mean probe score to pass; failing facts become targeted reroll hints
+    qa_audit_passes: int = 1              # vision passes per audit; >1 = any-fail ensemble that recovers stochastic single-pass misses (e.g. the dolphin-tailed shark)
 
     @property
     def makes_ebook(self) -> bool:
@@ -197,4 +198,5 @@ def load_config(path: str | Path) -> BookConfig:
         qa_reaudit_reused=bool(data.get("qa_reaudit_reused", False)),
         qa_tifa=bool(data.get("qa_tifa", False)),
         qa_tifa_threshold=float(data.get("qa_tifa_threshold", 0.4)),
+        qa_audit_passes=int(data.get("qa_audit_passes", 1)),
     )

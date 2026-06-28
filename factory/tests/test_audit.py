@@ -89,6 +89,37 @@ def test_concept_audit_prompt_checks_body_plan_silhouette():
     assert "paddle tail" in low             # manatee, not a forked fish tail
 
 
+def test_focused_fidelity_check_is_general_not_per_species():
+    # The vision judge passed a dolphin-tailed shark, a bilobed-tail manatee and a
+    # 6-arm starfish because the body-plan tells were buried. The fix must be
+    # book-agnostic: force the judge to verify the concrete claims already written in
+    # THIS page's scene + caption, with no hardcoded per-species checklist that every
+    # new book would outgrow ([[catch-defects-with-guards]]).
+    low = build_concept_audit_prompt(
+        anchor="a shark in its natural setting; no people, no text",
+        scene="a grey shark with a vertical tail, top lobe taller, cruising in blue",
+        image_path=Path("/out/page_08.png"),
+        caption="The friendly grey shark gives a swish of his tail.").lower()
+    assert "focused fidelity check" in low
+    assert "ground truth" in low                       # leans on scene+caption
+    assert "count" in low and "literally" in low       # demands literal verification
+    # the focused block itself must be species-agnostic: it works off the page's own
+    # scene/caption, so the same wording appears whatever the subject is
+    other = build_concept_audit_prompt(
+        anchor="a hedgehog in a hedge", scene="a hedgehog among leaves",
+        image_path=Path("/out/p.png"), caption="The hedgehog snuffles by.").lower()
+    block = "focused fidelity check"
+    assert low[low.index(block):low.index(block) + 600] == \
+           other[other.index(block):other.index(block) + 600]
+
+
+def test_focused_fidelity_check_omitted_without_scene_or_caption():
+    # with nothing to verify against, the focused block must not appear
+    p = build_concept_audit_prompt(
+        anchor="a red fox", scene=None, image_path=Path("/out/p.png")).lower()
+    assert "focused fidelity check" not in p
+
+
 def test_concept_audit_prompt_rejects_photorealism():
     # the auditor must gate out photo-real renders so the regenerate loop
     # self-corrects toward the storybook illustration style
@@ -169,6 +200,51 @@ def test_auditor_threads_caption_to_concept_prompt():
     auditor.audit(Path("/out/page_18.png"), anchor="a seahorse", scene="a seahorse",
                   kind="concept", caption="It wraps its tail round the grass.")
     assert "It wraps its tail round the grass." in captured["prompt"]
+
+
+def test_audit_ensemble_rejects_on_any_failing_pass():
+    # A single vision pass is stochastic (it caught the dolphin-tailed shark one run,
+    # missed it the next). With passes>1 the any-fail ensemble must reject if ANY pass
+    # flags a defect, and union the issues ([[catch-defects-with-guards]]).
+    seq = iter([
+        '{"ok": true, "issues": []}',
+        '{"ok": false, "issues": ["shark tail is a symmetric fluke"]}',
+        '{"ok": true, "issues": []}',
+    ])
+    auditor = ClaudeVisionAuditor(judge_fn=lambda _p: next(seq), passes=3)
+    v = auditor.audit(Path("/out/page_08.png"), anchor="a shark", scene="a shark",
+                      kind="concept")
+    assert v["ok"] is False
+    assert v["issues"] == ["shark tail is a symmetric fluke"]
+
+
+def test_audit_ensemble_passes_when_every_pass_clean_and_dedupes():
+    calls = {"n": 0}
+    def judge(_p):
+        calls["n"] += 1
+        return '{"ok": true, "issues": []}'
+    auditor = ClaudeVisionAuditor(judge_fn=judge, passes=3)
+    v = auditor.audit(Path("/out/p.png"), anchor="a fox", scene="a fox", kind="concept")
+    assert v == {"ok": True, "issues": []}
+    assert calls["n"] == 3  # ran the configured number of passes
+
+    # repeated identical complaints across passes collapse to one issue
+    seq = iter(['{"ok": false, "issues": ["six arms"]}',
+                '{"ok": false, "issues": ["six arms"]}'])
+    a2 = ClaudeVisionAuditor(judge_fn=lambda _p: next(seq), passes=2)
+    v2 = a2.audit(Path("/out/p.png"), anchor="a starfish", scene="a starfish",
+                  kind="concept")
+    assert v2 == {"ok": False, "issues": ["six arms"]}
+
+
+def test_audit_default_is_single_pass():
+    calls = {"n": 0}
+    def judge(_p):
+        calls["n"] += 1
+        return '{"ok": true, "issues": []}'
+    ClaudeVisionAuditor(judge_fn=judge).audit(
+        Path("/out/p.png"), anchor="a fox", scene="a fox", kind="concept")
+    assert calls["n"] == 1  # default unchanged: exactly one vision call
 
 
 def test_auditor_kind_selects_concept_prompt():

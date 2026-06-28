@@ -93,7 +93,8 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     EnsembleAuditor with the configured members. The `*_fn` hooks let tests
     inject fakes for every stage without a GPU.
     """
-    holistic = holistic or ClaudeVisionAuditor(judge_fn=judge_fn)
+    holistic = holistic or ClaudeVisionAuditor(
+        judge_fn=judge_fn, passes=getattr(cfg, "qa_audit_passes", 1))
     use_vqa = getattr(cfg, "qa_vqa", False)
     use_anatomy = getattr(cfg, "qa_anatomy", False)
     use_tifa = getattr(cfg, "qa_tifa", False)

@@ -68,6 +68,29 @@ def build_concept_audit_prompt(*, anchor: str, scene: str | None,
                                reference_path: Path | None = None,
                                caption: str | None = None) -> str:
     scene_line = f"\nThis page is meant to depict, roughly: {scene}." if scene else ""
+    # General, book-agnostic anatomy guard: the per-page scene + caption already carry
+    # the ground-truth anatomy (the author writes them species-correct, e.g. "a single
+    # paddle tail, not forked", "exactly five arms — not six"), so rather than hardcode
+    # a per-species checklist that every new book would outgrow, force the judge to
+    # extract and LITERALLY verify the concrete claims already written above. Catches
+    # the dolphin-tailed shark / bilobed-tail manatee that slipped through
+    # ([[catch-defects-with-guards]]). Only meaningful when there is text to check.
+    focused = (
+        "\n\nFOCUSED FIDELITY CHECK — the scene description and caption above are the "
+        "GROUND TRUTH for this page; the author wrote them to be anatomically correct. "
+        "Before you decide, re-read them and pull out every CONCRETE, depictable claim "
+        "about the subject's body — an exact COUNT of parts (arms, legs, eyes, fins, "
+        "points, tentacles), a specific TAIL / FIN / BODY shape (e.g. 'a single paddle "
+        "tail, not forked', 'a vertical tail with the top lobe taller', 'one flat "
+        "diamond disc'), or a stated pose or action — then verify EACH one is LITERALLY "
+        "true in the image. COUNT parts one by one around the whole outline rather than "
+        "eyeballing the overall shape. Pay SPECIAL attention to any 'NOT ...' / 'not a "
+        "...' warning in the scene (e.g. 'NOT a forked tail', 'not six arms') — the "
+        "author added each one because that exact mistake is COMMON; if the image shows "
+        "the very thing the scene says it must NOT be, that is an automatic reject. If "
+        "any concrete claim in the scene or caption is contradicted or missing, set "
+        "ok=false and name it, even when the rest of the picture is lovely."
+        if (scene or caption) else "")
     caption_line = (
         f"\n\nCAPTION FIDELITY — a child will read this caption ALOUD beside the "
         f"picture:\n  \"{caption}\"\nThe picture must AGREE with it. If the caption "
@@ -101,7 +124,7 @@ def build_concept_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a character-free
 children's picture book.{ref}
 
-This page should show: {anchor}.{scene_line}{caption_line}
+This page should show: {anchor}.{scene_line}{caption_line}{focused}
 
 This is a soft, stylised storybook. Judge GENEROUSLY on incidental variation (pose,
 crop, palette, background, time of day), but be STRICT that every page shares ONE
@@ -229,9 +252,28 @@ def _claude_vision(prompt: str) -> str:
     return proc.stdout
 
 
+def _merge_verdicts(verdicts: list[dict]) -> dict:
+    """Any-fail union of repeated audit passes: ok only if EVERY pass says ok, and the
+    issues are the deduped union across passes. A single vision pass is stochastic — it
+    caught the dolphin-tailed shark one run and missed it the next — so repeating and
+    rejecting on ANY fail recovers the variance misses ([[catch-defects-with-guards]])."""
+    ok = all(v["ok"] for v in verdicts)
+    issues, seen = [], set()
+    for v in verdicts:
+        for i in v["issues"]:
+            if i not in seen:
+                seen.add(i)
+                issues.append(i)
+    return {"ok": ok, "issues": issues}
+
+
 class ClaudeVisionAuditor:
-    def __init__(self, judge_fn: Callable[[str], str] | None = None):
+    def __init__(self, judge_fn: Callable[[str], str] | None = None,
+                 passes: int = 1):
         self.judge_fn = judge_fn or _claude_vision
+        # Number of independent vision passes per audit; >1 enables the any-fail
+        # ensemble that recovers stochastic single-pass misses. Clamp to >=1.
+        self.passes = max(1, int(passes))
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
               scene: str | None = None, kind: str = "character",
@@ -247,4 +289,5 @@ class ClaudeVisionAuditor:
             prompt = build_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),
                 reference_path=Path(reference_path) if reference_path else None)
-        return parse_verdict(self.judge_fn(prompt))
+        verdicts = [parse_verdict(self.judge_fn(prompt)) for _ in range(self.passes)]
+        return _merge_verdicts(verdicts)
