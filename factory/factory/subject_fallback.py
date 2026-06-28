@@ -7,12 +7,54 @@ swapped rather than shipped flagged ([[catch-defects-with-guards]]).
 The chooser is an injected `generate_fn(prompt) -> str` (real impl shells `claude -p`,
 mirroring content generation), so this is unit-testable with no LLM."""
 from __future__ import annotations
+import re
 from typing import Callable
 
 
 class SubjectFallbackError(Exception):
     """The LLM could not offer a NEW, non-duplicate subject within the retry budget;
     the caller should flag the page and stop trying to swap it."""
+
+
+# Words that describe an animal but don't IDENTIFY a distinct species — colours,
+# sizes, shapes, textures, life-stages, habitats, articles. They're stripped before
+# comparing a candidate against the book's existing subjects, so a near-duplicate is
+# caught by its shared animal word: "a round smooth-bodied harbor seal" vs a "harbor
+# seal pup", or "a sea turtle hatchling" vs a "green sea turtle". The LLM keeps
+# proposing these despite the prompt, so we GUARD it in code ([[catch-defects-with-guards]]).
+_GENERIC = {
+    "the", "and", "with", "for", "its", "his", "her", "one", "single",
+    "baby", "juvenile", "young", "little", "tiny", "small", "big", "large", "giant",
+    "round", "smooth", "bodied", "body", "soft", "gentle", "friendly", "fluffy",
+    "plump", "cute", "adorable", "sweet", "bright", "happy", "playful", "curious",
+    "calm", "fat", "chubby", "long", "short", "tall", "old",
+    "pup", "pups", "calf", "calves", "hatchling", "chick", "fry", "juvenile",
+    "blue", "green", "grey", "gray", "red", "orange", "yellow", "white", "black",
+    "brown", "silver", "silvery", "golden", "pink", "purple", "pale", "dark",
+    "spotted", "striped", "patterned", "colourful", "colorful",
+    "sea", "ocean", "oceanic", "water", "watery", "deep", "shallow", "marine",
+    "aquatic", "harbor", "harbour", "reef", "coral", "tide", "tidal", "pool",
+    "arctic", "polar", "shore", "shallows", "sandy", "rocky", "fish",
+}
+
+
+def _singular(t: str) -> str:
+    """Crude singulariser so a plural subject and its singular match ("dolphins" vs
+    "a dolphin", "penguins" vs "a penguin"). Leaves Latin-ish -us/-is/-ss words alone
+    (walrus, octopus) and only trims a plain trailing -s."""
+    if t.endswith("ies") and len(t) > 4:
+        return t[:-3] + "y"
+    if t.endswith("s") and not t.endswith(("ss", "us", "is")) and len(t) > 3:
+        return t[:-1]
+    return t
+
+
+def _content_tokens(s: str) -> set[str]:
+    """The species-identifying words of a subject phrase (lowercased alpha tokens of
+    length >= 3, minus the generic descriptors above, singularised). Two subjects that
+    share any of these are treated as the same/related animal."""
+    return {_singular(t) for t in re.findall(r"[a-z]+", s.lower())
+            if len(t) >= 3 and t not in _GENERIC}
 
 
 def _norm(s: str) -> str:
@@ -44,9 +86,11 @@ Pick a NEW subject that is:
   sunlit daytime palette as the rest of the book. Do NOT pick an animal whose natural
   scene would force a night-time, dark, gloomy or strongly off-palette setting.
 Use your best judgment to AVOID subjects that are hard to render correctly: avoid
-flat / ray-like bodies (rays, skates, flatfish), long eel-like bodies, and animals
-with odd or easily-mangled tails or limb counts. Prefer simple, rounded, friendly
-animals.
+flat / ray-like bodies (rays, skates, flatfish), long eel-like bodies (eels), animals
+with curling or prehensile tails (seahorses, pipefish), hard-shelled crustaceans
+(crabs, lobsters, shrimp), snails and slugs, and any animal with odd or easily-mangled
+tails or limb counts. Prefer simple, plump, rounded, friendly animals (a seal, a
+penguin, a puffin, an otter and the like).
 
 Return ONLY the subject as a short noun phrase (for example: "a sea turtle"), and
 nothing else."""
@@ -54,15 +98,25 @@ nothing else."""
 
 def suggest_subject(generate_fn: Callable[[str], str], theme: str,
                     used: list[str], failed: str, *, max_retries: int = 2) -> str:
-    """Ask `generate_fn` for a replacement subject on `theme`, not in `used` and not
-    `failed`. Re-asks up to `max_retries` extra times if it returns a duplicate;
-    raises SubjectFallbackError if it never offers something new."""
+    """Ask `generate_fn` for a replacement subject on `theme`, distinct from every
+    subject in `used` and from `failed`. Re-asks up to `max_retries` extra times if it
+    returns an exact OR near duplicate (shares a species-identifying word with an
+    existing subject — the LLM keeps proposing relatives/life-stages despite the
+    prompt, so we reject them in code); raises SubjectFallbackError if it never offers
+    a genuinely new animal."""
     blocked = {_norm(u) for u in used} | {_norm(failed)}
+    # Species words already spoken for (each used subject + the failed one), so a
+    # candidate that reuses any of them is a near-duplicate and gets re-asked.
+    taken_tokens = [_content_tokens(s) for s in list(used) + [failed]]
     for _ in range(max_retries + 1):
         raw = generate_fn(build_subject_prompt(theme, used, failed))
         first = next((ln.strip() for ln in (raw or "").splitlines() if ln.strip()), "")
         cand = first.strip().strip('"').strip("'").rstrip(".").strip()
-        if cand and _norm(cand) not in blocked:
-            return cand
+        if not cand or _norm(cand) in blocked:
+            continue
+        cand_tokens = _content_tokens(cand)
+        if cand_tokens and any(cand_tokens & t for t in taken_tokens):
+            continue  # near-duplicate: shares an animal word with an existing subject
+        return cand
     raise SubjectFallbackError(
         f"no new subject offered for theme {theme!r} (failed={failed!r})")

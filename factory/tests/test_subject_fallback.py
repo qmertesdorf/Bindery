@@ -41,6 +41,44 @@ def test_suggest_subject_reasks_on_duplicate():
     assert out == "a sea otter"
 
 
+def test_suggest_subject_rejects_near_duplicate_relative():
+    # The real failures from the first live run: the chooser proposed a relative /
+    # life-stage of an existing animal (a "harbor seal" when a "harbor seal pup" is
+    # already in the book; a "sea turtle hatchling" when a "green sea turtle" is). The
+    # code guard rejects these as near-duplicates and re-asks, even though the LLM
+    # ignored the prompt's no-relatives instruction.
+    seq = iter(["a round, smooth-bodied harbor seal", "a puffin"])
+    out = suggest_subject(lambda prompt: next(seq), theme="ocean animals",
+                          used=["a harbor seal pup", "a green sea turtle"],
+                          failed="a manatee", max_retries=2)
+    assert out == "a puffin"        # the harbor-seal near-duplicate was skipped
+
+    seq2 = iter(["a sea turtle hatchling", "a sea otter"])
+    out2 = suggest_subject(lambda prompt: next(seq2), theme="ocean animals",
+                           used=["a green sea turtle"], failed="a manatee",
+                           max_retries=2)
+    assert out2 == "a sea otter"    # 'turtle' is already used → hatchling rejected
+
+
+def test_suggest_subject_rejects_singular_of_plural_subject():
+    # The book lists "dolphins"/"penguins" (plural); a singular "a dolphin" is still a
+    # duplicate. The crude singulariser catches the plural/singular mismatch.
+    seq = iter(["a dolphin", "a puffin"])
+    out = suggest_subject(lambda prompt: next(seq), theme="ocean animals",
+                          used=["dolphins", "penguins"], failed="a manatee",
+                          max_retries=2)
+    assert out == "a puffin"
+
+
+def test_suggest_subject_allows_distinct_animal_sharing_only_generic_words():
+    # A genuinely distinct animal must NOT be falsely rejected just for sharing a
+    # generic descriptor (colour/habitat) with an existing subject: "a blue tang" and
+    # "a blue lobster" share only "blue"; "a sea otter" and "a sea lion" share "sea".
+    out = suggest_subject(lambda prompt: "a sea otter", theme="ocean animals",
+                          used=["a sea lion", "a blue whale"], failed="a manatee")
+    assert out == "a sea otter"     # shares only 'sea' (generic) → allowed
+
+
 def test_suggest_subject_raises_when_only_duplicates():
     # never offers anything new → give up this fallback slot (caller flags the page)
     with pytest.raises(SubjectFallbackError):
