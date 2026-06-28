@@ -135,8 +135,8 @@ Return ONLY valid JSON:
 Output the JSON and nothing else."""
 
 
-def regenerate_concept_page(cfg: BookConfig, generate_fn, subject: str, *,
-                            max_retries: int = 1) -> dict:
+def regenerate_concept_page(cfg: BookConfig, generate_fn: Callable[[str], str],
+                            subject: str, *, max_retries: int = 1) -> dict:
     """Regenerate one concept page `{subject, text, scene}` for `subject`. Retries up
     to `max_retries` extra times if the JSON is unusable OR the couplet reads above
     cfg.max_reading_grade; returns the best clean draft (last one if readability never

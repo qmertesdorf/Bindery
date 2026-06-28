@@ -94,6 +94,26 @@ def test_regenerate_concept_page_retries_on_too_hard_readability():
     assert page["text"] == "A turtle swims,\nby the reef."
 
 
+def test_regenerate_concept_page_returns_last_draft_when_readability_never_clears():
+    # If every parseable draft reads above the grade ceiling, regenerate does NOT
+    # loop forever or raise — it returns the LAST parseable draft so the caller can
+    # flag it (rather than failing the whole build on a stubborn caption).
+    cfg = _cfg(max_reading_grade=3.0)
+    seq = iter([
+        json.dumps({"subject": "a sea turtle",
+                    "text": "The magnificent leatherback navigates extraordinary "
+                            "transoceanic currents relentlessly.",
+                    "scene": "a turtle one"}),
+        json.dumps({"subject": "a sea turtle",
+                    "text": "An astonishing reptile traverses immeasurable oceanic "
+                            "expanses persistently.",
+                    "scene": "a turtle two"}),
+    ])
+    page = regenerate_concept_page(cfg, lambda prompt: next(seq), "a sea turtle",
+                                   max_retries=1)
+    assert page["scene"] == "a turtle two"      # the LAST parseable draft is returned
+
+
 def test_regenerate_concept_page_raises_on_unusable_output():
     from factory.content import ContentError
     cfg = _cfg(max_reading_grade=0)
