@@ -15,6 +15,19 @@ def test_build_subject_prompt_includes_theme_used_failed_and_avoidance():
     assert "avoid" in low and ("flat" in low or "eel" in low)
 
 
+def test_build_subject_prompt_forbids_duplicates_relatives_and_offpalette():
+    # The chooser must avoid a duplicate/relative/life-stage of an already-used animal
+    # (the book teaches DISTINCT animals) and stay in the book's bright daytime palette
+    # — the two failures seen on the first live run (turtle hatchling dup + night beach).
+    p = build_subject_prompt("ocean animals", ["a green sea turtle"], "a manatee")
+    low = p.lower()
+    assert "different kind" in low
+    assert "relative" in low or "life-stage" in low or "life stage" in low
+    assert "distinct" in low                              # tour of distinct animals
+    # palette/setting consistency: no night/off-palette subjects
+    assert "night" in low and ("palette" in low or "setting" in low)
+
+
 def test_suggest_subject_returns_clean_first_choice():
     out = suggest_subject(lambda prompt: '  "a sea turtle"\n',
                           theme="ocean animals", used=["a whale"], failed="a manatee")
