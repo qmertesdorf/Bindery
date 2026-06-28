@@ -379,3 +379,74 @@ def test_subject_fallback_content_regen_failure_flags_not_crashes(tmp_path):
         generate_fn=junk_generate, suggest_fn=fake_suggest)
     assert 1 in art["flagged"]                          # flagged, build survived
     assert content["pages"][0]["subject"] == "a manatee"  # no usable swap applied
+
+
+def test_subject_fallback_flags_overhard_swapped_caption(tmp_path):
+    # A swapped page bypasses build.py's pre-art readability gate. If the regenerated
+    # couplet still reads above the ceiling, the page must be FLAGGED — the picture is
+    # rescued but the over-grade caption is surfaced for review (no silent defect).
+    comfy = _Comfy()
+
+    class _ManateeFails:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            ok = "manatee" not in anchor.lower()
+            return {"ok": ok, "issues": [] if ok else ["forked tail"]}
+
+    def fake_generate(prompt):
+        # parseable, but far too hard for an early reader (every retry returns hard)
+        return _json.dumps({
+            "subject": "a sea turtle",
+            "text": "The magnificent leatherback navigates extraordinary "
+                    "transoceanic currents relentlessly.",
+            "scene": "a green sea turtle in clear blue water"})
+
+    def fake_suggest(*, theme, used, failed):
+        return "a sea turtle"
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee"}], "closing": "c"}
+    art = generate_concept_art(
+        _cfg(page_count=1, subject_fallback=True, max_fallbacks=2,
+             max_reading_grade=3.0),
+        content, tmp_path, comfy, seed=1, auditor=_ManateeFails(), max_tries=1,
+        generate_fn=fake_generate, suggest_fn=fake_suggest)
+    assert content["pages"][0]["subject"] == "a sea turtle"   # swap rendered (audit ok)
+    assert 1 in art["flagged"]                                # but caption-flagged
+
+
+def test_subject_fallback_dedup_spans_all_pages(tmp_path):
+    # The replacement chooser must see EVERY page's subject in `used`, so a swap on
+    # one page can't collide with another spread's subject (shared used_subjects).
+    comfy = _Comfy()
+
+    class _ManateeFails:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            ok = "manatee" not in anchor.lower()
+            return {"ok": ok, "issues": [] if ok else ["forked tail"]}
+
+    seen = {}
+
+    def fake_suggest(*, theme, used, failed):
+        seen["used"] = list(used)
+        return "a sea turtle"
+
+    def fake_generate(prompt):
+        return _json.dumps({"subject": "a sea turtle", "text": "a\nb",
+                            "scene": "a green sea turtle in clear blue water"})
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t", "scene": "a manatee"},
+                         {"subject": "a dolphin", "text": "t2",
+                          "scene": "a dolphin leaping"}],
+               "closing": "c"}
+    generate_concept_art(
+        _cfg(page_count=2, subject_fallback=True, max_fallbacks=2,
+             max_reading_grade=0),
+        content, tmp_path, comfy, seed=1, auditor=_ManateeFails(), max_tries=1,
+        generate_fn=fake_generate, suggest_fn=fake_suggest)
+    # both the failing page's own subject AND the other spread's subject are blocked
+    assert "a manatee" in seen["used"]
+    assert "a dolphin" in seen["used"]

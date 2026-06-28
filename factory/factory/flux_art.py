@@ -13,6 +13,7 @@ from factory import specs
 from factory.subject_fallback import SubjectFallbackError
 from factory.concept_content import regenerate_concept_page
 from factory.content import ContentError
+from factory.readability import flesch_kincaid_grade
 
 BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
 
@@ -379,6 +380,17 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 page.clear()
                 page.update(new_page)
                 # loop: re-render the swapped subject (op is overwritten)
+        # A swapped page bypasses build.py's pre-art readability gate (that ran on
+        # the ORIGINAL captions). If the regenerated couplet still reads above the
+        # early-reader ceiling, flag it so the fallback never silently ships an
+        # over-grade caption — the feature's whole point is no silent defects
+        # ([[catch-defects-with-guards]]).
+        if fallbacks and cfg.max_reading_grade and cfg.max_reading_grade > 0 \
+                and i not in flagged:
+            if flesch_kincaid_grade(page.get("text", "")) > cfg.max_reading_grade:
+                _log(f"[concept] page {i}: swapped caption reads above grade "
+                     f"{cfg.max_reading_grade:g} — FLAG (REVIEW)")
+                flagged.append(i)
         _verify_art_resolution(out_pages[-1], art_px)
         _check_border(out_pages[-1], i)
 
