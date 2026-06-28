@@ -117,6 +117,15 @@ def test_build_concept_page_prompt_names_subject_and_constraints():
     assert "no people" in low
 
 
+def test_build_concept_page_prompt_requires_accurate_but_friendly_body():
+    # The single-page regenerator must carry the same friendly-face / accurate-body
+    # (no-blob) house style as the full story prompt.
+    low = build_concept_page_prompt(_cfg(), "a swordfish").lower()
+    assert "friendly" in low
+    assert "body" in low
+    assert "blob" in low or "chubby ball" in low
+
+
 def test_regenerate_concept_page_returns_clean_fields():
     cfg = _cfg(max_reading_grade=0)             # readability gate off for this test
     page = regenerate_concept_page(cfg, lambda prompt: json.dumps(

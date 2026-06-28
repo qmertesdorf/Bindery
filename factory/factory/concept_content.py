@@ -42,8 +42,15 @@ Return ONLY valid JSON:
   simple and concrete, weaving in one easy true thing about the subject. The rhyme
   must be natural, never forced or nonsensical. Vary the rhymes across pages.
 - "scene": a RICH, concrete visual of the subject in its natural setting — what it
-  looks like and where it is. CRITICAL: NO people, NO unrelated extra animals, and
-  NO words/letters/numbers in the picture. One clear subject per page.
+  looks like and where it is. ACCURATE BUT FRIENDLY: describe the subject's TRUE body
+  shape, real proportions and key identifying features for its real species (e.g.
+  long and streamlined, flat and disc-like, tall and thin; the correct fins, tail
+  shape, limb or arm count, beak or bill) so the animal is clearly recognizable. Keep
+  the FACE and expression sweet and friendly (soft gentle eyes, a gentle smile), but
+  keep the BODY true to the real animal — do NOT round every creature into the same
+  chubby ball or blob: an elongated animal stays long and sleek, a flat animal stays
+  flat. CRITICAL: NO people, NO unrelated extra animals, and NO words/letters/numbers
+  in the picture. One clear subject per page.
 - "closing": one warm closing line for the final page.
 Exactly {cfg.page_count} page objects. Output the JSON and nothing else."""
 
@@ -129,9 +136,14 @@ Return ONLY valid JSON:
 - "text": a SHORT rhyming couplet — exactly TWO lines that rhyme (AABB), separated by
   a single newline ("\\n") — an early reader can read aloud. Gentle, simple, concrete,
   weaving in one easy true thing about the subject. Natural rhyme, never forced.
-- "scene": a RICH, concrete visual of the subject in its natural setting. CRITICAL:
-  NO people, NO unrelated extra animals, NO words/letters/numbers in the picture. One
-  clear subject. Describe its correct natural body shape and key anatomy plainly.
+- "scene": a RICH, concrete visual of the subject in its natural setting. ACCURATE
+  BUT FRIENDLY: describe its TRUE body shape, real proportions and key features for
+  its real species (long/streamlined, flat, tall, correct fins/tail/limb count/bill)
+  so it is clearly recognizable; keep the FACE sweet and friendly (soft gentle eyes,
+  a gentle smile) but keep the BODY true to the animal — do NOT round it into a chubby
+  ball or blob (an elongated animal stays long and sleek, a flat animal stays flat).
+  CRITICAL: NO people, NO unrelated extra animals, NO words/letters/numbers in the
+  picture. One clear subject.
 Output the JSON and nothing else."""
 
 

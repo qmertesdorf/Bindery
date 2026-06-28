@@ -61,3 +61,13 @@ def test_concept_story_prompt_includes_explicit_topics():
 def test_concept_story_prompt_requires_rhyme():
     prompt = build_concept_story_prompt(_cfg()).lower()
     assert "rhym" in prompt  # text must be a rhyming couplet
+
+
+def test_concept_story_prompt_requires_accurate_but_friendly_body():
+    # House style: a friendly cute FACE but an ACCURATE, true-to-species BODY — never
+    # rounded into the same chubby blob (the swordfish-look direction).
+    low = build_concept_story_prompt(_cfg()).lower()
+    assert "friendly" in low                              # keep the cute face
+    assert "body" in low and ("true" in low or "accurate" in low
+                              or "proportion" in low)     # accurate body
+    assert "blob" in low or "chubby ball" in low          # explicit anti-blob guard
