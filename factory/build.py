@@ -16,13 +16,23 @@ from factory.copy import verify_listing_copy
 from factory.paste_console import make_paste_console
 from factory.readability import verify_readability
 from factory.provenance import write_provenance
+from factory.subject_fallback import suggest_subject
+
+
+def _default_suggest_fn(generate_fn):
+    """Wrap the book's LLM generate_fn as a keyword-arg subject suggester for the
+    concept auto-subject-fallback path."""
+    def _fn(*, theme, used, failed):
+        return suggest_subject(generate_fn, theme, used, failed)
+    return _fn
+
 
 DEFAULT_SEED = 12345
 
 
 def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
               comfy=None, workflow=None, positive_node="6", sampler_node="3",
-              runner=None, seed=DEFAULT_SEED, auditor=None) -> Path:
+              runner=None, seed=DEFAULT_SEED, auditor=None, suggest_fn=None) -> Path:
     cfg = load_config(config_path)
     out_dir = Path(out_root) / cfg.slug
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -83,8 +93,10 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                 # in which case this returns an EnsembleAuditor (drop-in).
                 auditor = build_ensemble_auditor(cfg)
             if cfg.book_type == "concept":
-                art = generate_concept_art(cfg, content, out_dir, comfy,
-                                           seed=seed, auditor=auditor)
+                art = generate_concept_art(
+                    cfg, content, out_dir, comfy, seed=seed, auditor=auditor,
+                    generate_fn=generate_fn,
+                    suggest_fn=suggest_fn or _default_suggest_fn(generate_fn))
             elif flux:
                 art = generate_flux_art(cfg, content, out_dir, comfy,
                                         seed=seed, auditor=auditor)
@@ -93,6 +105,11 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                                            positive_node=positive_node,
                                            sampler_node=sampler_node, seed=seed,
                                            auditor=auditor)
+        # Persist content.json AFTER concept art so an auto-subject-fallback swap
+        # (which mutates content["pages"][i] in place) reaches the interior PDF
+        # caption rendering. No-op when nothing swapped (rewrites identical JSON).
+        if cfg.book_type == "concept":
+            content_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
         html = render_interior_html(cfg, content, out_dir)
         _, pages = build_interior_pdf(html, out_dir, runner=runner,
                                       book_type=cfg.book_type,

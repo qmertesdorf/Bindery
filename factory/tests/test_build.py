@@ -299,3 +299,69 @@ def test_run_build_reuses_existing_art(tmp_path):
                         comfy=BoomComfy(), runner=runner)
     for f in ["interior.pdf", "cover-paperback.pdf", "upload-checklist.md"]:
         assert (Path(out_dir) / f).exists(), f"missing {f}"
+
+
+def test_concept_build_persists_subject_swap_to_content_json(tmp_path):
+    # When a page is swapped via auto-subject-fallback, the on-disk content.json (the
+    # source for the interior PDF caption) must reflect the NEW subject/scene/text.
+    cfg_dict = {
+        "slug": "dbw", "book_type": "concept", "art_engine": "flux",
+        "title": "Deep Blue World", "subtitle": "sub", "author": "Hannah Whitfield",
+        "subject": "ocean animals", "flux_style": "soft watercolour, no text",
+        "art_prompt": "an ocean scene, soft watercolour, no text",
+        "page_count": 20, "trim_w": 8.5, "trim_h": 8.5, "price_usd": 10.99,
+        "subject_fallback": True, "max_fallbacks": 2, "max_reading_grade": 0,
+    }
+    cfgp = tmp_path / "dbw.config.json"
+    cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
+
+    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+              "scene": f"animal {i} in the sea"} for i in range(20)]
+    pages[0] = {"subject": "a manatee", "text": "soft and slow",
+                "scene": "a manatee with a paddle tail"}
+    bible = {"art_style": "soft watercolour", "dedication": "d"}
+    story = {"pages": pages, "closing": "bye"}
+
+    def fake_llm(prompt):
+        if "STYLE BIBLE" in prompt:
+            return json.dumps(bible)
+        if "replacement subject" in prompt:          # subject suggestion
+            return "a sea turtle"
+        if "subject of THIS spread" in prompt:        # single-page regen
+            return json.dumps({"subject": "a sea turtle", "text": "A turtle swims",
+                               "scene": "a green sea turtle over a reef"})
+        return json.dumps(story)                      # the story pass
+
+    def http_post(url, json): return {"prompt_id": "p"}
+    def http_get(url):
+        if "/history/" in url:
+            return {"p": {"outputs": {"9": {"images": [
+                {"filename": "a.png", "subfolder": "", "type": "output"}]}}}}
+        return b"\x89PNG"
+    comfy = ComfyClient(http_post=http_post, http_get=http_get, poll_interval=0)
+
+    class FailManatee:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            ok = "manatee" not in anchor.lower()
+            return {"ok": ok, "issues": [] if ok else ["forked tail"]}
+
+    def runner(args):
+        if args[1] in ("pdf", "screenshot"):
+            target = Path(args[2])
+            if target.name == "interior.pdf":
+                import fitz
+                d = fitz.open()
+                for _ in range(26):
+                    d.new_page()
+                d.save(str(target)); d.close()
+            else:
+                target.write_bytes(b"x")
+        class R: returncode = 0; stdout = ""; stderr = ""
+        return R()
+
+    out_dir = run_build(cfgp, out_root=tmp_path / "out", generate_fn=fake_llm,
+                        comfy=comfy, runner=runner, auditor=FailManatee())
+    saved = json.loads((Path(out_dir) / "content.json").read_text(encoding="utf-8"))
+    assert saved["pages"][0]["subject"] == "a sea turtle"       # swap persisted
+    assert saved["pages"][0]["scene"] == "a green sea turtle over a reef"
