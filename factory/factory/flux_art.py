@@ -12,6 +12,7 @@ from factory.art import ArtError, run_audited_render, _log
 from factory import specs
 from factory.subject_fallback import SubjectFallbackError
 from factory.concept_content import regenerate_concept_page
+from factory.content import ContentError
 
 BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
 
@@ -279,7 +280,6 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
 
     style_ref = None
     for i, page in enumerate(pages, 1):
-        prompt = concept_page_prompt(page, style=style)
         subject = page.get("subject", "the subject")
         op = out_dir / f"page_{i:02d}.png"
         # Per-page reuse: keep an already-rendered (reviewed) spread; delete just its
@@ -363,7 +363,17 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                     break
                 fallbacks += 1
                 used_subjects.add(new_subject.strip().lower())
-                new_page = regenerate_concept_page(cfg, generate_fn, new_subject)
+                try:
+                    new_page = regenerate_concept_page(cfg, generate_fn, new_subject)
+                except ContentError:
+                    # The LLM never returned a usable couplet/scene for the swap —
+                    # keep best + flag rather than crashing the whole book build
+                    # (preserve the flag-don't-fail contract).
+                    _log(f"[concept] page {i}: could not regenerate content for "
+                         f"'{new_subject}' — kept best (REVIEW)")
+                    flagged.append(i)
+                    out_pages.append(op)
+                    break
                 _log(f"[concept] page {i}: subject fallback #{fallbacks}: "
                      f"'{old_subject}' -> '{new_subject}'")
                 page.clear()

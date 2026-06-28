@@ -1,3 +1,4 @@
+import json as _json
 from pathlib import Path
 import pytest
 from factory.config import BookConfig
@@ -254,9 +255,6 @@ def test_generate_concept_art_keeps_best_and_flags(tmp_path):
     assert art["pages"][0].exists()
 
 
-import json as _json
-
-
 def test_subject_fallback_swaps_stubborn_page(tmp_path):
     # A page whose subject the auditor keeps rejecting is swapped to a new subject,
     # its content regenerated, and re-rolled — rescuing the page (no flag).
@@ -352,3 +350,32 @@ def test_subject_fallback_respects_cap(tmp_path):
         generate_fn=fake_generate, suggest_fn=fake_suggest)
     assert n["suggest"] == 3            # exactly max_fallbacks swaps attempted
     assert 1 in art["flagged"]          # then gave up and flagged
+
+
+def test_subject_fallback_content_regen_failure_flags_not_crashes(tmp_path):
+    # If the swapped subject's content can't be regenerated (LLM returns junk →
+    # ContentError), the build must keep-best + FLAG, not crash — preserving the
+    # flag-don't-fail contract for the whole book.
+    comfy = _Comfy()
+
+    class _AllFail:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            return {"ok": False, "issues": ["bad"]}
+
+    def fake_suggest(*, theme, used, failed):
+        return "a sea turtle"
+
+    def junk_generate(prompt):
+        return "not json at all"        # regenerate_concept_page raises ContentError
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee"}], "closing": "c"}
+    art = generate_concept_art(
+        _cfg(page_count=1, subject_fallback=True, max_fallbacks=2,
+             max_reading_grade=0),
+        content, tmp_path, comfy, seed=1, auditor=_AllFail(), max_tries=1,
+        generate_fn=junk_generate, suggest_fn=fake_suggest)
+    assert 1 in art["flagged"]                          # flagged, build survived
+    assert content["pages"][0]["subject"] == "a manatee"  # no usable swap applied
