@@ -6,6 +6,7 @@ import json
 from typing import Callable
 from .config import BookConfig
 from .content import ContentError, _strip_fences
+from .readability import flesch_kincaid_grade
 
 
 def build_concept_bible_prompt(cfg: BookConfig) -> str:
@@ -110,3 +111,55 @@ def generate_concept_content(cfg: BookConfig,
     return {"art_style": art_style, "character_anchor": "",
             "dedication": bible["dedication"], "pages": story["pages"],
             "closing": story["closing"]}
+
+
+def build_concept_page_prompt(cfg: BookConfig, subject: str) -> str:
+    """Prompt to regenerate ONE spread's content for a NEW subject, consistent with
+    the book's voice (rhyming AABB couplet, concrete scene, no people/text). Used by
+    the auto-subject-fallback path; mirrors build_concept_story_prompt for one page."""
+    return f"""You are writing ONE spread of the character-free children's picture \
+book "{cfg.title}" about {cfg.subject}, for early readers (around age 5). Warm, simple,
+concrete, never scary.
+
+The subject of THIS spread is: {subject}.
+
+Return ONLY valid JSON:
+{{"subject": "...", "text": "...", "scene": "..."}}
+- "subject": the subject of this spread ({subject}).
+- "text": a SHORT rhyming couplet — exactly TWO lines that rhyme (AABB), separated by
+  a single newline ("\\n") — an early reader can read aloud. Gentle, simple, concrete,
+  weaving in one easy true thing about the subject. Natural rhyme, never forced.
+- "scene": a RICH, concrete visual of the subject in its natural setting. CRITICAL:
+  NO people, NO unrelated extra animals, NO words/letters/numbers in the picture. One
+  clear subject. Describe its correct natural body shape and key anatomy plainly.
+Output the JSON and nothing else."""
+
+
+def regenerate_concept_page(cfg: BookConfig, generate_fn, subject: str, *,
+                            max_retries: int = 1) -> dict:
+    """Regenerate one concept page `{subject, text, scene}` for `subject`. Retries up
+    to `max_retries` extra times if the JSON is unusable OR the couplet reads above
+    cfg.max_reading_grade; returns the best clean draft (last one if readability never
+    clears, so the caller can flag rather than loop forever). Raises ContentError if
+    nothing parseable was ever returned."""
+    last = None
+    for _ in range(max_retries + 1):
+        raw = generate_fn(build_concept_page_prompt(cfg, subject))
+        try:
+            data = json.loads(_strip_fences(raw))
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(data, dict):
+            continue
+        page = {k: str(data.get(k, "")).strip() for k in ("subject", "text", "scene")}
+        if not all(page.values()):
+            continue
+        last = page
+        grade_ok = (not cfg.max_reading_grade or cfg.max_reading_grade <= 0
+                    or flesch_kincaid_grade(page["text"]) <= cfg.max_reading_grade)
+        if grade_ok:
+            return page
+    if last is None:
+        raise ContentError(
+            f"could not regenerate a usable concept page for subject {subject!r}")
+    return last
