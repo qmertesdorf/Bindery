@@ -252,3 +252,103 @@ def test_generate_concept_art_keeps_best_and_flags(tmp_path):
     assert 1 in art["flagged"]
     assert art["pages"][0].name == "page_01.png"
     assert art["pages"][0].exists()
+
+
+import json as _json
+
+
+def test_subject_fallback_swaps_stubborn_page(tmp_path):
+    # A page whose subject the auditor keeps rejecting is swapped to a new subject,
+    # its content regenerated, and re-rolled — rescuing the page (no flag).
+    comfy = _Comfy()
+
+    class _ManateeFails:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            ok = "manatee" not in anchor.lower()
+            return {"ok": ok, "issues": [] if ok else ["forked/notched tail"]}
+
+    def fake_generate(prompt):
+        return _json.dumps({"subject": "a sea turtle",
+                            "text": "A turtle swims by,\nunder the sky.",
+                            "scene": "a green sea turtle in clear blue water"})
+
+    seen = {}
+
+    def fake_suggest(*, theme, used, failed):
+        seen["theme"] = theme
+        seen["used"] = used
+        seen["failed"] = failed
+        return "a sea turtle"
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee with a paddle tail"}],
+               "closing": "c"}
+    art = generate_concept_art(
+        _cfg(page_count=1, subject_fallback=True, max_fallbacks=2,
+             max_reading_grade=0),
+        content, tmp_path, comfy, seed=1, auditor=_ManateeFails(), max_tries=2,
+        generate_fn=fake_generate, suggest_fn=fake_suggest)
+
+    assert art["flagged"] == []                                   # swap rescued it
+    assert content["pages"][0]["subject"] == "a sea turtle"       # mutated in place
+    assert content["pages"][0]["scene"] == "a green sea turtle in clear blue water"
+    assert content["pages"][0]["text"] == "A turtle swims by,\nunder the sky."
+    assert seen["failed"] == "a manatee"
+    assert "a manatee" in seen["used"]                            # old subject blocked
+
+
+def test_subject_fallback_off_keeps_best_and_flags(tmp_path):
+    # Default (flag off): a stubborn page is kept-best + flagged, content untouched,
+    # and NO suggest/regenerate LLM calls happen.
+    comfy = _Comfy()
+
+    class _AllFail:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            return {"ok": False, "issues": ["bad"]}
+
+    def boom(*a, **k):
+        raise AssertionError("must not call the LLM when subject_fallback is off")
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee"}], "closing": "c"}
+    art = generate_concept_art(_cfg(page_count=1), content, tmp_path, comfy,
+                               seed=1, auditor=_AllFail(), max_tries=2,
+                               generate_fn=boom, suggest_fn=boom)
+    assert 1 in art["flagged"]
+    assert content["pages"][0]["subject"] == "a manatee"          # unchanged
+
+
+def test_subject_fallback_respects_cap(tmp_path):
+    # The auditor rejects every subject; the loop swaps exactly max_fallbacks times
+    # then keeps-best + flags (does not loop forever).
+    comfy = _Comfy()
+
+    class _AllFail:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            return {"ok": False, "issues": ["bad"]}
+
+    n = {"suggest": 0}
+
+    def fake_suggest(*, theme, used, failed):
+        n["suggest"] += 1
+        return f"creature {n['suggest']}"
+
+    def fake_generate(prompt):
+        return _json.dumps({"subject": "creature X", "text": "a\nb",
+                            "scene": "a creature in water"})
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee"}], "closing": "c"}
+    art = generate_concept_art(
+        _cfg(page_count=1, subject_fallback=True, max_fallbacks=3,
+             max_reading_grade=0),
+        content, tmp_path, comfy, seed=1, auditor=_AllFail(), max_tries=1,
+        generate_fn=fake_generate, suggest_fn=fake_suggest)
+    assert n["suggest"] == 3            # exactly max_fallbacks swaps attempted
+    assert 1 in art["flagged"]          # then gave up and flagged

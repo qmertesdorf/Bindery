@@ -10,6 +10,8 @@ from pathlib import Path
 
 from factory.art import ArtError, run_audited_render, _log
 from factory import specs
+from factory.subject_fallback import SubjectFallbackError
+from factory.concept_content import regenerate_concept_page
 
 BASE_UNET = "flux1-dev-fp8-e4m3fn.safetensors"
 
@@ -224,7 +226,7 @@ def concept_page_prompt(page: dict, *, style: str) -> str:
 
 
 def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
-                         max_tries: int = 4) -> dict:
+                         max_tries: int = 4, generate_fn=None, suggest_fn=None) -> dict:
     """Illustrate every spread with a locked Flux style and an EMPTY LoRA stack
     (no character identity to carry), each audited under the concept bar and
     regenerated until it passes — keeping the best and flagging a stubborn page
@@ -258,6 +260,10 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     # enforces a cohesive look across the whole book — re-rendering until each page
     # matches that one reference, not just a text description.
     out_pages, flagged = [], []
+    # Subjects already spoken for (every page's own subject + any tried as a fallback),
+    # so a swap never picks a duplicate of another spread.
+    used_subjects = {str(p.get("subject", "")).strip().lower()
+                     for p in pages if str(p.get("subject", "")).strip()}
 
     def _check_border(path, label):
         """Flag (don't fail) a page that ships a white paper border/vignette — a
@@ -313,23 +319,56 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                                             upscale_model=cfg.upscale_model),
                          out_path=op)
 
-        anchor = (f"a {subject} in its natural setting, in a consistent soft "
-                  f"storybook illustration style; no people and no text")
-        try:
-            done = run_audited_render(
-                render, prompt, out_path=op, auditor=auditor, anchor=anchor,
-                scene=page["scene"], reference_path=style_ref, seed=seed + i * 17,
-                max_tries=max_tries, audit_kind="concept",
-                caption=page.get("text"),
-                n_candidates=n_candidates, selector=selector,
-                repair_fn=repair_fn)
-            out_pages.append(done)
-            if style_ref is None:
-                style_ref = done  # first cohesive page anchors the rest
-        except ArtError:
-            _log(f"[concept] page {i}: kept best after {max_tries} tries (REVIEW)")
-            flagged.append(i)
-            out_pages.append(op)
+        # Render → audit, and (concept line, opt-in) auto-swap an un-renderable
+        # interchangeable subject for a fresh on-theme one rather than shipping a
+        # flagged defect ([[catch-defects-with-guards]]). Default off (no generate_fn
+        # /suggest_fn or subject_fallback) → identical to the old keep-best+flag path.
+        fallbacks = 0
+        while True:
+            subject = page.get("subject", "the subject")
+            anchor = (f"a {subject} in its natural setting, in a consistent soft "
+                      f"storybook illustration style; no people and no text")
+            try:
+                done = run_audited_render(
+                    render, concept_page_prompt(page, style=style), out_path=op,
+                    auditor=auditor, anchor=anchor, scene=page["scene"],
+                    reference_path=style_ref, seed=seed + i * 17 + fallbacks * 101,
+                    max_tries=max_tries, audit_kind="concept",
+                    caption=page.get("text"), n_candidates=n_candidates,
+                    selector=selector, repair_fn=repair_fn)
+                out_pages.append(done)
+                if style_ref is None:
+                    style_ref = done  # first cohesive page anchors the rest
+                break
+            except ArtError:
+                can_fallback = (getattr(cfg, "subject_fallback", False)
+                                and generate_fn is not None and suggest_fn is not None
+                                and fallbacks < getattr(cfg, "max_fallbacks", 3))
+                if not can_fallback:
+                    _log(f"[concept] page {i}: kept best after {max_tries} tries "
+                         f"(REVIEW)")
+                    flagged.append(i)
+                    out_pages.append(op)
+                    break
+                old_subject = page.get("subject", "")
+                try:
+                    new_subject = suggest_fn(theme=cfg.subject,
+                                             used=sorted(used_subjects),
+                                             failed=old_subject)
+                except SubjectFallbackError:
+                    _log(f"[concept] page {i}: no unique fallback subject — kept "
+                         f"best (REVIEW)")
+                    flagged.append(i)
+                    out_pages.append(op)
+                    break
+                fallbacks += 1
+                used_subjects.add(new_subject.strip().lower())
+                new_page = regenerate_concept_page(cfg, generate_fn, new_subject)
+                _log(f"[concept] page {i}: subject fallback #{fallbacks}: "
+                     f"'{old_subject}' -> '{new_subject}'")
+                page.clear()
+                page.update(new_page)
+                # loop: re-render the swapped subject (op is overwritten)
         _verify_art_resolution(out_pages[-1], art_px)
         _check_border(out_pages[-1], i)
 
