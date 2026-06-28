@@ -352,21 +352,14 @@ def test_illustrator_optional_and_parsed(tmp_path):
 
 
 def test_subject_fallback_flags_default_off_and_parse(tmp_path):
-    from factory.config import load_config
-    base = {
-        "slug": "s", "book_type": "concept", "art_engine": "flux",
-        "title": "T", "subtitle": "sub", "author": "A",
-        "subject": "ocean animals", "flux_style": "soft watercolour, no text",
-        "art_prompt": "a meadow, no text", "page_count": 20,
-    }
     p = tmp_path / "a.json"
-    p.write_text(json.dumps(base), encoding="utf-8")
+    p.write_text(json.dumps(_concept_data()), encoding="utf-8")
     cfg = load_config(p)
     assert cfg.subject_fallback is False          # default OFF
     assert cfg.max_fallbacks == 3                 # default cap
 
-    p.write_text(json.dumps({**base, "subject_fallback": True,
-                             "max_fallbacks": 5}), encoding="utf-8")
+    p.write_text(json.dumps(_concept_data(subject_fallback=True, max_fallbacks=5)),
+                 encoding="utf-8")
     cfg = load_config(p)
     assert cfg.subject_fallback is True
     assert cfg.max_fallbacks == 5
