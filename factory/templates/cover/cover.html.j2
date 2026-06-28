@@ -3,7 +3,11 @@
 <div class="wrap">
   {% if not front_only %}
   <div class="back">
-    <p class="blurb">{{ blurb }}</p>
+    <div class="backcard">
+      <div class="backtitle">{{ cfg.title }}</div>
+      <div class="backrule"></div>
+      <p class="blurb">{{ blurb }}</p>
+    </div>
   </div>
   {% endif %}
   <div class="front">

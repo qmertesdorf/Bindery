@@ -35,30 +35,38 @@ html, body { margin: 0; padding: 0; width: {{ width_in }}in; height: {{ height_i
 .front .author { margin: 0.55in 0.4in 0; font-variant: small-caps; font-size: 14pt; }
 .front .author .illus { font-size: 11pt; }
 
-/* Back cover (paperback wrap only): blurb centred in the left panel over a soft
-   scrim. Bottom kept clear for KDP's barcode (~2 x 1.2in, lower-right). */
+/* Back cover (paperback wrap only): a single centred CARD holding the title, a
+   divider, and the blurb. Filling the panel top-to-bottom with one deliberate block
+   reads as balanced (a small blurb floating in the large dark panel read as
+   "pushed up, lower half empty"). Bottom stays clear of KDP's barcode (~2 x 1.2in,
+   lower-right). ([[catch-defects-with-guards]]) */
 .back {
   position: absolute; top: 0; left: {{ bleed }}in; width: {{ trim_w }}in; height: 100%;
   box-sizing: border-box;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  /* Symmetric vertical padding so justify-content:center lands the blurb on the
-     panel's true vertical centre (asymmetric padding pushed it ~0.34in high). A
-     centred short blurb still clears KDP's lower-right barcode keep-out. */
-  text-align: center; padding: 0.8in 0.7in;
-  /* Strong dark halo so white blurb text stays legible even over bright art
-     (the baked scrim alone wasn't enough over the sunlit areas). */
+  /* Symmetric vertical padding so justify-content:center lands the card on the
+     panel's true vertical centre. */
+  text-align: center; padding: 0.85in 0.6in;
+  /* Strong dark halo so white text stays legible even over bright art. */
   text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 2px 12px rgba(0,0,0,0.85);
-  /* Scrim baked into cover_bg.png (soft ellipse behind the blurb). */
 }
-/* Blurb sits in a defined, centred panel so its boundaries — and its equal left/
-   right margins — are unmistakable, independent of the soft backdrop behind it.
-   Soft rounded semi-opaque card; the radius + box-shadow feather the edges so it
-   still reads gently against the watercolour back. */
+/* One unified, soft-edged card so the title + rule + blurb read as a single
+   intentional panel that fills the back's vertical space. The radius + feathered
+   box-shadow blend its edges into the watercolour backdrop. */
+.back .backcard {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  max-width: 4.7in; margin: 0;
+  background: rgba(16, 20, 16, 0.34);
+  padding: 0.7in 0.6in; border-radius: 0.34in;
+  box-shadow: 0 0 0.7in 0.7in rgba(16, 20, 16, 0.34);
+}
+.back .backtitle {
+  font-size: 25pt; line-height: 1.1; margin: 0 0 0.18in;
+}
+.back .backrule {
+  width: 1.5in; height: 2px; margin: 0 0 0.26in;
+  background: rgba(255, 255, 255, 0.55);
+}
 .back .blurb {
-  font-size: 13pt; line-height: 1.55; max-width: 4.3in; margin: 0;
-  /* Subtle card: the dimmed even backdrop carries most of the contrast, so this is
-     just a gentle, soft-edged lift behind the text rather than a hard dark panel. */
-  background: rgba(18, 22, 17, 0.30);
-  padding: 0.5in 0.55in; border-radius: 0.3in;
-  box-shadow: 0 0 0.6in 0.6in rgba(18, 22, 17, 0.30);
+  font-size: 14pt; line-height: 1.6; margin: 0;
 }
