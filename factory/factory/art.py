@@ -212,13 +212,26 @@ _COUNT_ISSUE_RE = re.compile(
     r"wrong (?P<part>[\w-]+) count: scene/caption says (?P<n>\d+)", re.IGNORECASE)
 
 
+# A stray-text/signature/watermark defect must NOT be echoed back into the reroll
+# prompt: a diffusion prompt is bag-of-words, so feeding "text 'DARINEFION'" or
+# "signature" in REINFORCES the very mark (the shark page's watermark survived all 8
+# rerolls because each hint re-fed the word "text"). Drop these from the hint and let
+# a fresh seed resample without the mark ([[catch-defects-with-guards]]).
+_TEXT_DEFECT_RE = re.compile(
+    r"\b(text|lettering|letters|words?|wording|writing|signature|watermark|"
+    r"scribbl\w*|initials|logo|caption|handwrit\w*)\b", re.IGNORECASE)
+
+
 def _shape_reroll_hint(issue: str) -> str:
     """Turn a negative defect report into a positive generation directive for the
     reroll prompt. Recognised count-guard issues become "draw exactly N <part>";
-    every other issue passes through unchanged."""
+    stray-text/signature issues are DROPPED (echoing them backfires — see
+    _TEXT_DEFECT_RE); every other issue passes through unchanged."""
     m = _COUNT_ISSUE_RE.search(issue)
     if m:
         return f"draw exactly {m.group('n')} {m.group('part')}"
+    if _TEXT_DEFECT_RE.search(issue):
+        return ""
     return issue
 
 
@@ -243,8 +256,12 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
     for attempt in range(max_tries):
         p = prompt
         if issues:
-            hints = "; ".join(_shape_reroll_hint(i) for i in issues)
-            p = f"{prompt} Fix these problems from the last attempt: {hints}"
+            # Drop empty hints (stray-text/signature defects are intentionally not
+            # echoed back — see _shape_reroll_hint). If EVERY issue was a text defect,
+            # there's no corrective hint to add: just reroll on a fresh seed.
+            hints = "; ".join(h for h in (_shape_reroll_hint(i) for i in issues) if h)
+            if hints:
+                p = f"{prompt} Fix these problems from the last attempt: {hints}"
         # The render is infrastructure: a CUDA OOM / ComfyUI crash / timeout here
         # is transient (esp. under GPU contention), NOT the subject being
         # un-renderable. Retry the render before letting it propagate — and it

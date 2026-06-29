@@ -282,6 +282,39 @@ def test_shape_reroll_hint_rewrites_count_issue_positively():
     assert _shape_reroll_hint("dog colour off") == "dog colour off"
 
 
+def test_shape_reroll_hint_drops_text_signature_defects():
+    from factory.art import _shape_reroll_hint
+    # Echoing 'text'/'signature' back into a diffusion prompt reinforces the mark, so
+    # these defects are DROPPED (return "") — a fresh seed resamples without them.
+    for issue in ["Text 'DARINEFION' rendered in white handwriting",
+                  "a cursive artist signature in the bottom-right corner",
+                  "small watermark/logo near the edge",
+                  "garbled lettering across the shark"]:
+        assert _shape_reroll_hint(issue) == "", issue
+    # a non-text defect still passes through
+    assert _shape_reroll_hint("wrong body plan: too chubby") == "wrong body plan: too chubby"
+
+
+def test_reroll_prompt_omits_text_defect_so_it_doesnt_reinforce(tmp_path):
+    from factory.art import run_audited_render
+    # The auditor rejects attempt 1 with ONLY a text defect, then passes. The reroll
+    # prompt must NOT carry the text wording back (it would re-summon the mark) — it
+    # should just be the clean base prompt on a fresh seed.
+    prompts = []
+    def render(prompt, seed, out_path):
+        prompts.append(prompt); Path(out_path).write_bytes(b"x")
+    class _TextThenOk:
+        def __init__(self): self.n = 0
+        def audit(self, image_path, **kw):
+            self.n += 1
+            return ({"ok": False, "issues": ["Text 'DARINEFION' rendered in the corner"]}
+                    if self.n == 1 else {"ok": True, "issues": []})
+    run_audited_render(render, "a friendly shark", out_path=tmp_path / "p.png",
+                       auditor=_TextThenOk(), anchor="a", scene="s", seed=1, max_tries=3)
+    assert prompts[1] == "a friendly shark"      # fresh seed, NO text wording re-fed
+    assert "DARINEFION" not in prompts[1] and "Fix these problems" not in prompts[1]
+
+
 class _CountIssueAuditor:
     """Fail once with a count-guard-style issue, then pass."""
     def __init__(self): self.calls = 0
