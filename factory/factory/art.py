@@ -287,7 +287,11 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         # auditor says OK but the post-check fires, OVERRIDE to a reject so the page
         # rerolls instead of shipping flagged ([[catch-defects-with-guards]]).
         if verdict.get("ok") and post_check is not None:
-            pc_issue = post_check(out_path)
+            try:
+                pc_issue = post_check(out_path)
+            except Exception as e:   # a best-effort post-check must never abort a build
+                _log(f"  [audit] {name}: post-check errored ({e}); skipping")
+                pc_issue = None
             if pc_issue:
                 _log(f"  [audit] {name}: post-check override — {pc_issue}")
                 verdict = {"ok": False,

@@ -89,23 +89,29 @@ def has_white_border(path, *, corner_frac: float = 0.03) -> bool:
     ch = max(1, int(h * corner_frac))
     boxes = [(0, 0, cw, ch), (w - cw, 0, w, ch),
              (0, h - ch, cw, h), (w - cw, h - ch, w, h)]
-    flat = pure = 0
-    for box in boxes:
-        raw = im.crop(box).tobytes()  # packed RGB bytes (channel-interleaved)
-        n = len(raw) // 3
-        means = [sum(raw[c::3]) / n for c in range(3)]
-        # Population stdev over the interleaved RGB bytes, computed directly:
-        # statistics.pstdev(bytes) hits a data-dependent Python 3.11 _ss TypeError
-        # on some corner patches (crashed the border check mid-build), so avoid the
-        # stdlib path entirely ([[catch-defects-with-guards]]).
-        total = len(raw)
-        mu = sum(raw) / total
-        std = (sum((b - mu) ** 2 for b in raw) / total) ** 0.5
-        if all(m >= 246 for m in means) and std <= 14:
-            flat += 1
-        if all(m >= 253 for m in means) and std <= 2:
-            pure += 1
-    return flat >= 3 or pure >= 2
+    # This is a best-effort full-bleed HEURISTIC — it must NEVER raise and abort the
+    # build (it once crashed a finished 20-page run with a data-dependent TypeError in
+    # the corner stats). Any failure here -> assume no border (False) and let the
+    # vision auditor be the backstop ([[catch-defects-with-guards]]).
+    try:
+        flat = pure = 0
+        for box in boxes:
+            raw = im.crop(box).tobytes()  # packed RGB bytes (channel-interleaved)
+            n = len(raw) // 3
+            means = [sum(raw[c::3]) / n for c in range(3)]
+            # Population stdev over the interleaved RGB bytes, computed directly:
+            # statistics.pstdev(bytes) hits a data-dependent Python 3.11 _ss TypeError
+            # on some corner patches, so avoid the stdlib path entirely.
+            total = len(raw)
+            mu = sum(raw) / total
+            std = (sum((b - mu) ** 2 for b in raw) / total) ** 0.5
+            if all(m >= 246 for m in means) and std <= 14:
+                flat += 1
+            if all(m >= 253 for m in means) and std <= 2:
+                pure += 1
+        return flat >= 3 or pure >= 2
+    except Exception:
+        return False
 
 # Moods that should read as somber — the child must NOT be smiling on these pages.
 GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy",
