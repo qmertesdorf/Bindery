@@ -218,13 +218,30 @@ def page_plan(page: dict, *, hero, companion, style: str, outfit: str):
     return prompt, loras
 
 
+def _count_directive(page: dict) -> str:
+    """Turn the page's author-stated body-part counts into a POSITIVE generation
+    directive ("Show exactly 8 arms"), so the correct number is steered at render
+    time instead of only being rejected after the fact by the count guard — which
+    wastes a reroll on a number we already knew ([[catch-defects-with-guards]]).
+
+    Reuses the count guard's own extractor so the prompt and the guard parse the
+    SAME claims and can never disagree. Empty string when no count is stated."""
+    from factory.qa.count_guard import extract_count_claims
+    claims = extract_count_claims(page.get("scene"), page.get("text"))
+    if not claims:
+        return ""
+    spec = ", ".join(f"exactly {n} {part}" for part, n in claims)
+    return f" Show {spec}."
+
+
 def concept_page_prompt(page: dict, *, style: str) -> str:
     """Prompt for one character-free spread: locked style + the page's scene, with
     hard 'no people / no text' steering. No LoRA triggers — identity is irrelevant."""
-    return (f"{style}. {page['scene']} A single clear subject, painted as a soft, "
-            f"hand-drawn children's storybook illustration — loose, simplified and "
-            f"whimsical, NOT a photograph and NOT photorealistic. No people, no "
-            f"unrelated extra animals, {NO_MARKS}. {FULL_BLEED}.")
+    return (f"{style}. {page['scene']}{_count_directive(page)} A single clear "
+            f"subject, painted as a soft, hand-drawn children's storybook "
+            f"illustration — loose, simplified and whimsical, NOT a photograph and "
+            f"NOT photorealistic. No people, no unrelated extra animals, "
+            f"{NO_MARKS}. {FULL_BLEED}.")
 
 
 def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,

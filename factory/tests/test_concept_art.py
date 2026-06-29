@@ -76,6 +76,26 @@ def test_concept_page_prompt_suppresses_signatures():
     assert "no signature" in low and "no watermark" in low
 
 
+def test_concept_page_prompt_injects_stated_counts():
+    # A stated body-part count must be steered AT GENERATION TIME (positive directive),
+    # not left for the post-hoc count guard to reject and burn a reroll on
+    # ([[catch-defects-with-guards]]). Uses the SAME extractor as the count guard so the
+    # prompt and the guard can never disagree about what the claim is.
+    p = concept_page_prompt(
+        {"subject": "an octopus",
+         "scene": "an octopus with eight curly arms among the rocks",
+         "text": "An octopus is clever and free,\nwith eight soft arms beneath the sea."},
+        style="soft watercolour")
+    assert "exactly 8 arms" in p.lower()
+
+
+def test_concept_page_prompt_no_count_when_none_stated():
+    # No numeric claim in scene/caption ⇒ no count directive appended (don't invent one).
+    p = concept_page_prompt({"subject": "a fox", "scene": "a fox in tall grass"},
+                            style="x")
+    assert "exactly" not in p.lower()
+
+
 def test_generate_concept_art_reuses_existing_pages_and_cover(tmp_path):
     # an already-rendered page / cover is kept; only missing art re-renders, so a
     # targeted re-roll (delete one page) doesn't redo the whole book or the cover.
