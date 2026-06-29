@@ -33,7 +33,7 @@ class EnsembleAuditor:
                  tifa: TifaEvaluator | None = None,
                  count_guard: CountGuard | None = None,
                  corner_guard: CornerGuard | None = None,
-                 select_mode: str = "vqa", judge_fn=None):
+                 select_mode: str = "vqa", judge_fn=None, select_floor: float = 0.10):
         self.holistic = holistic
         self.vqa = vqa
         self.anatomy = anatomy
@@ -41,6 +41,7 @@ class EnsembleAuditor:
         self.count_guard = count_guard
         self.corner_guard = corner_guard
         self.select_mode = select_mode
+        self.select_floor = select_floor
         # Vision call for the Claude taste-selector; default to the holistic auditor's
         # own judge_fn so "claude"/"hybrid" selection works with no extra wiring.
         self.judge_fn = judge_fn or getattr(holistic, "judge_fn", None)
@@ -52,7 +53,8 @@ class EnsembleAuditor:
         mode = self.select_mode
         if mode in ("claude", "hybrid") and self.judge_fn is not None:
             return ClaudeBestOfNSelector(
-                self.judge_fn, vqa=(self.vqa if mode == "hybrid" else None))
+                self.judge_fn, vqa=(self.vqa if mode == "hybrid" else None),
+                vqa_floor=self.select_floor)
         return BestOfNSelector(self.vqa) if self.vqa is not None else None
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
@@ -165,4 +167,5 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     corner_guard = CornerGuard(probe_fn=corner_probe_fn) if use_corner else None
     return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa,
                            count_guard=count_guard, corner_guard=corner_guard,
-                           select_mode=select_mode, judge_fn=judge_fn)
+                           select_mode=select_mode, judge_fn=judge_fn,
+                           select_floor=getattr(cfg, "qa_select_floor", 0.10))

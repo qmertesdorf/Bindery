@@ -220,6 +220,10 @@ def test_ensemble_selector_modes():
     assert isinstance(
         EnsembleAuditor(_holistic(), vqa=vqa, select_mode="vqa").selector(),
         BestOfNSelector)
+    # the configured VQA dud-floor reaches the hybrid selector
+    sel = EnsembleAuditor(_holistic(), vqa=vqa, select_mode="hybrid",
+                          select_floor=0.25).selector()
+    assert sel.vqa_floor == 0.25
 
 def test_factory_builds_claude_selector_without_vqa():
     # qa_select=claude WITH best-of-N must build an ensemble that exposes a Claude

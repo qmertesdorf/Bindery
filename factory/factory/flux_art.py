@@ -372,7 +372,11 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 if hasattr(selector, "subject"):
                     selector.subject = subject
                 if hasattr(selector, "anchor_path"):
-                    selector.anchor_path = style_ref
+                    # Prefer a configured KNOWN-GOOD reference (e.g. a v2 page) so the
+                    # taste-judge measures cohesion against a page we LIKE, not just the
+                    # book's own (possibly imperfect) first page.
+                    selector.anchor_path = (getattr(cfg, "qa_select_anchor", "")
+                                            or style_ref)
             try:
                 done = run_audited_render(
                     render, concept_page_prompt(page, style=style), out_path=op,
