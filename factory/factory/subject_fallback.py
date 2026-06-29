@@ -63,6 +63,26 @@ def _norm(s: str) -> str:
     return s.strip().strip('"').strip("'").rstrip(".").strip().lower()
 
 
+# A real subject is a short noun phrase ("a green sea turtle" = 4 words). The chooser
+# (claude -p) sometimes reasons out loud or adds preamble despite the prompt; cap the
+# length so a rambling sentence is never accepted as a "subject".
+_MAX_SUBJECT_WORDS = 6
+
+
+def _extract_subject(raw: str) -> str:
+    """Pull a clean short subject phrase from the LLM reply, robust to reasoning/
+    preamble: prefer the LAST line that looks like a short noun phrase (the actual
+    answer usually comes last), stripping wrapping quotes/bullets/punctuation. Falls
+    back to the last non-empty line (which the caller's word-count guard then rejects
+    if it's a paragraph)."""
+    lines = [ln.strip().strip('"').strip("'").lstrip("-*•").strip().rstrip(".").strip()
+             for ln in (raw or "").splitlines() if ln.strip()]
+    for ln in reversed(lines):
+        if ln and not ln.endswith(":") and 1 <= len(ln.split()) <= _MAX_SUBJECT_WORDS:
+            return ln
+    return lines[-1] if lines else ""
+
+
 def build_subject_prompt(theme: str, used: list[str], failed: str) -> str:
     used_str = ", ".join(used) if used else "(none yet)"
     return f"""You are choosing ONE replacement subject for a single spread of a \
@@ -92,8 +112,9 @@ with curling or prehensile tails (seahorses, pipefish), hard-shelled crustaceans
 tails or limb counts. Prefer simple, plump, rounded, friendly animals (a seal, a
 penguin, a puffin, an otter and the like).
 
-Return ONLY the subject as a short noun phrase (for example: "a sea turtle"), and
-nothing else."""
+Output ONLY the subject as a short noun phrase of 2 to 5 words on a SINGLE line — no
+explanation, no reasoning, no preamble, no extra words and no punctuation. For example:
+a sea turtle"""
 
 
 def suggest_subject(generate_fn: Callable[[str], str], theme: str,
@@ -110,9 +131,10 @@ def suggest_subject(generate_fn: Callable[[str], str], theme: str,
     taken_tokens = [_content_tokens(s) for s in list(used) + [failed]]
     for _ in range(max_retries + 1):
         raw = generate_fn(build_subject_prompt(theme, used, failed))
-        first = next((ln.strip() for ln in (raw or "").splitlines() if ln.strip()), "")
-        cand = first.strip().strip('"').strip("'").rstrip(".").strip()
-        if not cand or _norm(cand) in blocked:
+        cand = _extract_subject(raw)
+        # Reject empties, a rambling paragraph (the model reasoned instead of
+        # answering), or an exact duplicate — and re-ask.
+        if not cand or len(cand.split()) > _MAX_SUBJECT_WORDS or _norm(cand) in blocked:
             continue
         cand_tokens = _content_tokens(cand)
         if cand_tokens and any(cand_tokens & t for t in taken_tokens):

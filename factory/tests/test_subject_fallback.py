@@ -79,6 +79,31 @@ def test_suggest_subject_allows_distinct_animal_sharing_only_generic_words():
     assert out == "a sea otter"     # shares only 'sea' (generic) → allowed
 
 
+def test_suggest_subject_ignores_reasoning_preamble():
+    # Regression (v2 build): claude -p reasoned out loud despite the prompt and the
+    # old first-line heuristic returned the whole paragraph as the 'subject'. The
+    # extractor must skip the rambling and take the actual short subject (last line).
+    reply = ("A harbor porpoise is already used in this book and the brief says to "
+             "avoid cetaceans and close relatives,\n"
+             "but more importantly I should just answer with a clean distinct "
+             "on-theme subject.\n"
+             "a sea urchin")
+    out = suggest_subject(lambda p: reply, theme="ocean animals",
+                          used=["a narwhal"], failed="a narwhal")
+    assert out == "a sea urchin"
+
+
+def test_suggest_subject_rejects_paragraph_only_reply():
+    # If the model ONLY rambles (no short subject line at all), never accept the
+    # paragraph as a subject — re-ask, then raise so the caller flags the page
+    # instead of swapping in garbage.
+    ramble = ("I think the best choice here would be something that is not a cetacean "
+              "and not already used in this book, so let me consider some options")
+    with pytest.raises(SubjectFallbackError):
+        suggest_subject(lambda p: ramble, theme="ocean animals", used=[],
+                        failed="a manatee", max_retries=1)
+
+
 def test_suggest_subject_raises_when_only_duplicates():
     # never offers anything new → give up this fallback slot (caller flags the page)
     with pytest.raises(SubjectFallbackError):
