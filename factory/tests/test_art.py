@@ -236,6 +236,38 @@ def test_run_audited_render_retries_with_fresh_seed_and_hints(tmp_path):
     assert prompts[0] == "base prompt"         # first attempt is the clean prompt
 
 
+def test_post_check_override_forces_reroll_when_auditor_passes(tmp_path):
+    from factory.art import run_audited_render
+    # The vision auditor always says OK, but the deterministic post_check (e.g.
+    # has_white_border) fails the first render and passes the second. The page MUST
+    # reroll instead of shipping the first, and the post-check issue must reach the
+    # reroll hint — this is the has_white_border hard-gate that stops a bordered page
+    # the auditor missed from shipping flagged.
+    prompts, pc_calls = [], {"n": 0}
+    def render(prompt, seed, out_path):
+        prompts.append(prompt); Path(out_path).write_bytes(b"x")
+    def post_check(path):
+        pc_calls["n"] += 1
+        return "white paper border / vignette" if pc_calls["n"] == 1 else None
+    out = run_audited_render(render, "a fish", out_path=tmp_path / "p.png",
+                             auditor=_Auditor(fail_first=0), anchor="a", scene="s",
+                             seed=1, max_tries=4, post_check=post_check)
+    assert Path(out).exists()
+    assert len(prompts) == 2                              # rerolled exactly once
+    assert "white paper border" in prompts[1]            # post-check issue fed to reroll
+
+
+def test_post_check_not_run_when_auditor_already_fails(tmp_path):
+    from factory.art import run_audited_render
+    # If the auditor already rejected, the post_check is irrelevant for that attempt;
+    # the page still rerolls on the auditor's issue and passes once the auditor does.
+    def render(prompt, seed, out_path): Path(out_path).write_bytes(b"x")
+    out = run_audited_render(render, "p", out_path=tmp_path / "p.png",
+                             auditor=_Auditor(fail_first=1), anchor="a", scene="s",
+                             seed=1, max_tries=4, post_check=lambda p: None)
+    assert Path(out).exists()
+
+
 def test_shape_reroll_hint_rewrites_count_issue_positively():
     from factory.art import _shape_reroll_hint
     # the count guard's negative report becomes a positive directive (no "image shows")

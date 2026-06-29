@@ -225,7 +225,8 @@ def _shape_reroll_hint(issue: str) -> str:
 def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
                        reference_path=None, seed=0, max_tries=4,
                        audit_kind="character", caption=None,
-                       n_candidates=1, selector=None, repair_fn=None) -> Path:
+                       n_candidates=1, selector=None, repair_fn=None,
+                       post_check=None) -> Path:
     """Render → audit → regenerate (fresh seed + corrective hints) until the
     auditor passes or the try budget runs out, then fail loudly. `render` is a
     callable (prompt, seed, out_path) -> None that writes the image. The seed is
@@ -264,6 +265,16 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         verdict = auditor.audit(out_path, anchor=anchor,
                                 reference_path=reference_path, scene=scene,
                                 kind=audit_kind, caption=caption)
+        # A deterministic post-check (e.g. has_white_border) is the reliable backstop
+        # for a defect the stochastic vision auditor inconsistently catches: when the
+        # auditor says OK but the post-check fires, OVERRIDE to a reject so the page
+        # rerolls instead of shipping flagged ([[catch-defects-with-guards]]).
+        if verdict.get("ok") and post_check is not None:
+            pc_issue = post_check(out_path)
+            if pc_issue:
+                _log(f"  [audit] {name}: post-check override — {pc_issue}")
+                verdict = {"ok": False,
+                           "issues": list(verdict.get("issues", [])) + [pc_issue]}
         if verdict.get("ok"):
             _log(f"  [audit] {name}: OK"
                  + (f" on attempt {attempt + 1}/{max_tries}" if attempt else ""))

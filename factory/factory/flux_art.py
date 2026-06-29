@@ -234,6 +234,20 @@ def _count_directive(page: dict) -> str:
     return f" Show {spec}."
 
 
+def _border_post_check(path):
+    """Deterministic full-bleed backstop for the concept audit loop: a detected
+    white paper border/vignette becomes a reroll-triggering issue. The vision
+    auditor catches most vignettes but misses some (it once passed a bordered page
+    that has_white_border flagged); promoting the pixel-check from a post-hoc FLAG
+    to an in-loop REJECT means a border page rerolls instead of shipping
+    ([[catch-defects-with-guards]], [[concept-scenes-underwater-fullbleed]])."""
+    if has_white_border(path):
+        return ("white paper border / vignette: the painting does not fill the page "
+                "edge to edge — repaint the scene all the way to every edge and into "
+                "all four corners, with no blank white or cream paper margin")
+    return None
+
+
 def concept_page_prompt(page: dict, *, style: str) -> str:
     """Prompt for one character-free spread: locked style + the page's scene, with
     hard 'no people / no text' steering. No LoRA triggers — identity is irrelevant."""
@@ -353,7 +367,8 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                     reference_path=style_ref, seed=seed + i * 17 + fallbacks * 101,
                     max_tries=max_tries, audit_kind="concept",
                     caption=page.get("text"), n_candidates=n_candidates,
-                    selector=selector, repair_fn=repair_fn)
+                    selector=selector, repair_fn=repair_fn,
+                    post_check=_border_post_check)
                 out_pages.append(done)
                 if style_ref is None:
                     style_ref = done  # first cohesive page anchors the rest
