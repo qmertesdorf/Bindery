@@ -164,6 +164,16 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   or blowhole; a SEAHORSE has a smooth head with NO ears and a curled prehensile
   tail; an EEL is a long, limbless, snake-like body with NO arms or legs. Reject a
   subject whose body plan is clearly wrong even when it is cute and cleanly painted;
+- NOT RECOGNIZABLE AS ITS SPECIES: the animal must be clearly identifiable as the
+  EXACT species named above, showing the SIGNATURE features that distinguish that
+  species — not merely a generic member of that broad kind of animal. Using what you
+  know about the REAL animal, REJECT if a defining feature is MISSING, smoothed away,
+  or so downplayed that the subject reads as a plain, generic, or different creature —
+  e.g. a PUFFERFISH drawn with a smooth body and NO spines/prickles (a real puffer is
+  covered in spines when puffed), a SWORDFISH with no long sword bill, a NARWHAL with
+  no tusk, a HAMMERHEAD with an ordinary head. Friendly, simplified stylisation is
+  fine, but the species' signature features must be clearly present so a child could
+  name the animal from the picture alone;
 - a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
   or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
   parts, or a creature that doesn't read clearly as ONE real animal. Every animal

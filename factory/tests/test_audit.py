@@ -24,6 +24,18 @@ def test_cover_audit_prompt_checks_front_art_defects():
     # malformed/duplicated anatomy
     assert "malformed" in p or "duplicated" in p or "fused" in p
 
+def test_concept_audit_prompt_requires_species_recognizability():
+    # The concept auditor must reject an animal that's missing its species' SIGNATURE
+    # feature so it reads generic (the gap that passed a spineless 'pufferfish'),
+    # using knowledge of the real animal — not only the scene's stated claims.
+    p = build_concept_audit_prompt(
+        anchor="a pufferfish in its natural setting", scene="a round pufferfish",
+        image_path=Path("/o/p.png")).lower()
+    assert "recogniz" in p and "signature" in p
+    assert "generic" in p
+    assert "pufferfish" in p and ("spine" in p or "prickle" in p)  # illustrative example
+
+
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
                            image_path=Path("/out/page_01.png"),

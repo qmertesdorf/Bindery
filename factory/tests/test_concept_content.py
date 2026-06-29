@@ -71,3 +71,6 @@ def test_concept_story_prompt_requires_accurate_but_friendly_body():
     assert "body" in low and ("true" in low or "accurate" in low
                               or "proportion" in low)     # accurate body
     assert "blob" in low or "chubby ball" in low          # explicit anti-blob guard
+    # signature/defining features so the animal is recognizable (the spineless-puffer gap)
+    assert "signature" in low and "recogniz" in low
+    assert "spine" in low or "tusk" in low or "bill" in low
