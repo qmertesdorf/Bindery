@@ -272,6 +272,52 @@ def test_audit_ensemble_passes_when_every_pass_clean_and_dedupes():
     assert v2 == {"ok": False, "issues": ["six arms"]}
 
 
+def test_merge_verdicts_majority_passes_on_minority_fail():
+    # Majority vote trades the any-fail recall for precision: a lone dissenting pass
+    # no longer sinks the page, but its issue is still surfaced for provenance.
+    from factory.audit import _merge_verdicts
+    v = _merge_verdicts([
+        {"ok": True, "issues": []},
+        {"ok": False, "issues": ["six arms"]},
+        {"ok": True, "issues": []},
+    ], mode="majority")
+    assert v["ok"] is True
+    assert v["issues"] == ["six arms"]
+
+
+def test_merge_verdicts_majority_rejects_on_majority_fail_and_ties():
+    from factory.audit import _merge_verdicts
+    assert _merge_verdicts([
+        {"ok": False, "issues": ["a"]},
+        {"ok": False, "issues": ["b"]},
+        {"ok": True, "issues": []},
+    ], mode="majority")["ok"] is False
+    # an even split errs safe → reject (this is a defect auditor)
+    assert _merge_verdicts([
+        {"ok": True, "issues": []},
+        {"ok": False, "issues": ["a"]},
+    ], mode="majority")["ok"] is False
+
+
+def test_auditor_majority_aggregate_end_to_end():
+    seq = iter(['{"ok": true, "issues": []}',
+                '{"ok": false, "issues": ["x"]}',
+                '{"ok": true, "issues": []}'])
+    a = ClaudeVisionAuditor(judge_fn=lambda _p: next(seq), passes=3,
+                            aggregate="majority")
+    v = a.audit(Path("/o/p.png"), anchor="a fox", scene="a fox", kind="concept")
+    assert v["ok"] is True  # any-fail would reject; majority passes (2 of 3 clean)
+
+
+def test_auditor_default_aggregate_is_any_fail():
+    seq = iter(['{"ok": true, "issues": []}',
+                '{"ok": false, "issues": ["x"]}',
+                '{"ok": true, "issues": []}'])
+    a = ClaudeVisionAuditor(judge_fn=lambda _p: next(seq), passes=3)
+    assert a.audit(Path("/o/p.png"), anchor="a fox", scene="a fox",
+                   kind="concept")["ok"] is False  # default unchanged
+
+
 def test_audit_default_is_single_pass():
     calls = {"n": 0}
     def judge(_p):

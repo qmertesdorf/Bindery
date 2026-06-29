@@ -326,12 +326,23 @@ def _claude_vision(prompt: str) -> str:
     return proc.stdout
 
 
-def _merge_verdicts(verdicts: list[dict]) -> dict:
-    """Any-fail union of repeated audit passes: ok only if EVERY pass says ok, and the
-    issues are the deduped union across passes. A single vision pass is stochastic — it
-    caught the dolphin-tailed shark one run and missed it the next — so repeating and
-    rejecting on ANY fail recovers the variance misses ([[catch-defects-with-guards]])."""
-    ok = all(v["ok"] for v in verdicts)
+def _merge_verdicts(verdicts: list[dict], *, mode: str = "any_fail") -> dict:
+    """Combine repeated audit passes; the issues are always the deduped union across
+    passes (so a reroll sees every hint, even on a pass).
+
+    mode="any_fail" (default): ok only if EVERY pass says ok. A single vision pass is
+    stochastic — it caught the dolphin-tailed shark one run and missed it the next — so
+    rejecting on ANY fail recovers the variance misses, at the cost of more false
+    rejects ([[catch-defects-with-guards]]).
+
+    mode="majority": ok only if a STRICT majority of passes say ok (an even split errs
+    safe → reject, since this is a defect auditor). Trades some recall for precision so
+    a lone over-zealous pass doesn't sink a clean page into endless rerolls."""
+    n_ok = sum(1 for v in verdicts if v["ok"])
+    if mode == "majority":
+        ok = n_ok * 2 > len(verdicts)  # strict majority; tie → reject
+    else:
+        ok = n_ok == len(verdicts)     # any_fail
     issues, seen = [], set()
     for v in verdicts:
         for i in v["issues"]:
@@ -343,11 +354,14 @@ def _merge_verdicts(verdicts: list[dict]) -> dict:
 
 class ClaudeVisionAuditor:
     def __init__(self, judge_fn: Callable[[str], str] | None = None,
-                 passes: int = 1):
+                 passes: int = 1, aggregate: str = "any_fail"):
         self.judge_fn = judge_fn or _claude_vision
-        # Number of independent vision passes per audit; >1 enables the any-fail
+        # Number of independent vision passes per audit; >1 enables the multi-pass
         # ensemble that recovers stochastic single-pass misses. Clamp to >=1.
         self.passes = max(1, int(passes))
+        # How to combine the passes: "any_fail" (max recall, default) or "majority"
+        # (more precision; a lone dissent no longer triggers a reroll).
+        self.aggregate = aggregate
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
               scene: str | None = None, kind: str = "character",
@@ -364,4 +378,4 @@ class ClaudeVisionAuditor:
                 anchor=anchor, scene=scene, image_path=Path(image_path),
                 reference_path=Path(reference_path) if reference_path else None)
         verdicts = [parse_verdict(self.judge_fn(prompt)) for _ in range(self.passes)]
-        return _merge_verdicts(verdicts)
+        return _merge_verdicts(verdicts, mode=self.aggregate)

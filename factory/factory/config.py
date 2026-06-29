@@ -68,7 +68,8 @@ class BookConfig:
     qa_reaudit_reused: bool = False       # vision re-audit REUSED pages too (else they ride through unchecked); flags failures for review
     qa_tifa: bool = False                 # TIFA per-fact caption decomposition (WS1e)
     qa_tifa_threshold: float = 0.4        # mean probe score to pass; failing facts become targeted reroll hints
-    qa_audit_passes: int = 1              # vision passes per audit; >1 = any-fail ensemble that recovers stochastic single-pass misses (e.g. the dolphin-tailed shark)
+    qa_audit_passes: int = 1              # vision passes per audit; >1 = multi-pass ensemble that recovers stochastic single-pass misses (e.g. the dolphin-tailed shark)
+    qa_audit_aggregate: str = "any_fail"  # how to combine passes: "any_fail" (max recall, default) or "majority" (more precision; a lone dissent won't trigger a reroll)
     # Auto-subject-fallback (concept line): on a page that exhausts its render→audit
     # budget, swap to a fresh on-theme LLM-chosen subject and re-roll instead of
     # shipping a flagged defect. Default OFF → existing builds unchanged.
@@ -204,6 +205,7 @@ def load_config(path: str | Path) -> BookConfig:
         qa_tifa=bool(data.get("qa_tifa", False)),
         qa_tifa_threshold=float(data.get("qa_tifa_threshold", 0.4)),
         qa_audit_passes=int(data.get("qa_audit_passes", 1)),
+        qa_audit_aggregate=str(data.get("qa_audit_aggregate", "any_fail")),
         subject_fallback=bool(data.get("subject_fallback", False)),
         max_fallbacks=int(data.get("max_fallbacks", 3)),
     )

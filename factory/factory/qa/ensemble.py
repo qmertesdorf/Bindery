@@ -94,7 +94,8 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     inject fakes for every stage without a GPU.
     """
     holistic = holistic or ClaudeVisionAuditor(
-        judge_fn=judge_fn, passes=getattr(cfg, "qa_audit_passes", 1))
+        judge_fn=judge_fn, passes=getattr(cfg, "qa_audit_passes", 1),
+        aggregate=getattr(cfg, "qa_audit_aggregate", "any_fail"))
     use_vqa = getattr(cfg, "qa_vqa", False)
     use_anatomy = getattr(cfg, "qa_anatomy", False)
     use_tifa = getattr(cfg, "qa_tifa", False)
