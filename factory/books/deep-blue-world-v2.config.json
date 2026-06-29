@@ -41,6 +41,7 @@
   "qa_reaudit_reused": false,
   "qa_audit_passes": 3,
   "qa_audit_aggregate": "majority",
+  "qa_describe_first": true,
   "qa_count_guard": true,
   "subject_fallback": true,
   "price_usd": 10.99,
