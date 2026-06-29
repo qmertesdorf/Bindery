@@ -66,17 +66,26 @@ depict: "{caption}".
 OPEN AND LOOK AT each candidate image:
 {lines}{anchor}
 
-Choose the ONE best PICTURE-BOOK ILLUSTRATION, judged in this priority:
-1. CORRECT SUBJECT — clearly a {subj} with its TRUE-species body shape and proportions
-   (NOT a generic chubby round ball/blob) and a sweet, friendly, gently-smiling face.
-2. HOUSE STYLE — soft hand-painted watercolour with GENTLE FUZZY / FEATHERED edges and
-   visible loose brushwork, cohesive with the anchor. STRONGLY prefer this over any
-   glossy, hard-outlined, high-contrast, over-saturated, airbrushed, or CGI/3D-looking
-   candidate.
-3. CLEAN — no text/letters/signature/watermark; no obvious anatomy errors; no stray
-   extra creatures the scene didn't ask for.
-4. APPEAL — warm, charming, well-composed; the one a parent would pick off the shelf.
-When candidates are close, TIE-BREAK toward the SOFTER, gentler, more painterly one.
+STEP 1 — DISQUALIFY FOR PRINT (this is a hard gate, apply it FIRST). A full-bleed page
+must run its painting off ALL FOUR edges. RULE OUT any candidate whose painting fades to
+a white/cream unpainted-paper border, a feathered or soft vignette, or sits on a blank
+margin — these print as ugly white slivers at the trim cut. Soft BRUSHWORK inside the
+picture is good; a soft unpainted EDGE that fades to paper is a DISQUALIFIER. Be strict:
+if you can see paper/white at any edge or corner, it is disqualified.
+
+STEP 2 — Among ONLY the candidates that survive Step 1, pick the single best picture-book
+illustration, in this priority:
+  a. CORRECT SUBJECT — clearly a {subj} with its TRUE-species body shape and proportions
+     (NOT a generic chubby round ball/blob) and a sweet, friendly, gently-smiling face.
+  b. HOUSE STYLE — soft, loose, hand-painted watercolour with gentle visible brushwork,
+     cohesive with the anchor. STRONGLY prefer this over any glossy, hard-outlined,
+     high-contrast, over-saturated, airbrushed, or CGI/3D-looking candidate.
+  c. CLEAN — no text/letters/signature/watermark; no anatomy errors; no stray creatures.
+  d. APPEAL — warm, charming, well-composed; the one a parent would pick off the shelf.
+  Tie-break toward the SOFTER, gentler, more painterly one.
+
+If (and only if) EVERY candidate is disqualified in Step 1, pick the one with the
+SMALLEST, least-noticeable paper border.
 
 Reply with ONLY one line, no other text: BEST: <number>"""
 

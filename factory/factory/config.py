@@ -64,7 +64,7 @@ class BookConfig:
     qa_anatomy: bool = False              # HADM anatomy-defect detector (WS1c)
     qa_anatomy_min_score: float = 0.5     # min detector confidence to count a defect
     qa_candidates: int = 1                # best-of-N candidates per render (WS1b; 1 = off)
-    qa_select: str = "vqa"                # best-of-N chooser: "vqa" (highest VQAScore = caption FIDELITY; over-rewards bold/glossy), "claude" (Claude-vision TASTE pick on the soft-watercolour rubric — the literal best), or "hybrid" (VQA floor drops wrong-subject duds, then Claude picks the best of the survivors)
+    qa_select: str = "claude"             # best-of-N chooser. DEFAULT "claude": a Claude-vision TASTE pick on the soft-watercolour + FULL-BLEED rubric (the literal best, print-safe) — beats the old VQAScore default which over-rewarded bold/glossy/literal renders. Other modes: "vqa" (highest VQAScore = caption fidelity only), "hybrid" (VQA floor drops wrong-subject duds, then Claude picks the best survivor). Only fires when qa_candidates>1; single-candidate books are unaffected.
     qa_repair: bool = False               # localized inpaint repair before reroll (WS2)
     qa_reaudit_reused: bool = False       # vision re-audit REUSED pages too (else they ride through unchecked); flags failures for review
     qa_tifa: bool = False                 # TIFA per-fact caption decomposition (WS1e)
@@ -206,7 +206,7 @@ def load_config(path: str | Path) -> BookConfig:
         qa_anatomy=bool(data.get("qa_anatomy", False)),
         qa_anatomy_min_score=float(data.get("qa_anatomy_min_score", 0.5)),
         qa_candidates=int(data.get("qa_candidates", 1)),
-        qa_select=str(data.get("qa_select", "vqa")),
+        qa_select=str(data.get("qa_select", "claude")),
         qa_repair=bool(data.get("qa_repair", False)),
         qa_reaudit_reused=bool(data.get("qa_reaudit_reused", False)),
         qa_tifa=bool(data.get("qa_tifa", False)),

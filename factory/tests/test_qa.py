@@ -120,7 +120,9 @@ def test_claude_selector_picks_judge_choice_and_sees_all_candidates():
     assert Path(chosen).name == "c.png"               # the judged winner
     assert "a.png" in seen["prompt"] and "c.png" in seen["prompt"]  # all candidates named
     assert "anchor.png" in seen["prompt"]             # anchor passed to the rubric
-    assert "watercolour" in seen["prompt"].lower()    # soft-style rubric present
+    p = seen["prompt"].lower()
+    assert "watercolour" in p                          # soft-style rubric present
+    assert "full-bleed" in p and "trim" in p           # print-safe full-bleed requirement
 
 def test_claude_selector_single_or_no_caption_skips_judge():
     def boom(prompt):
@@ -220,13 +222,21 @@ def test_ensemble_selector_modes():
         BestOfNSelector)
 
 def test_factory_builds_claude_selector_without_vqa():
-    # qa_select=claude must build an ensemble that exposes a Claude taste selector
-    # even when every other QA stage (incl. VQA) is off.
+    # qa_select=claude WITH best-of-N must build an ensemble that exposes a Claude
+    # taste selector even when every other QA stage (incl. VQA) is off.
     cfg = _Cfg(qa_vqa=False, qa_anatomy=False, qa_tifa=False, qa_count_guard=False,
-               qa_corner_crops=False, qa_select="claude")
+               qa_corner_crops=False, qa_select="claude", qa_candidates=3)
     aud = build_ensemble_auditor(cfg, judge_fn=lambda p: '{"ok": true}')
     assert isinstance(aud, EnsembleAuditor)
     assert isinstance(aud.selector(), ClaudeBestOfNSelector)
+
+def test_factory_stays_bare_holistic_for_single_candidate_claude_default():
+    # The default flip to qa_select="claude" must NOT pull single-candidate books off
+    # the bare-holistic path — the selector only matters when qa_candidates>1.
+    cfg = _Cfg(qa_vqa=False, qa_anatomy=False, qa_tifa=False, qa_count_guard=False,
+               qa_corner_crops=False, qa_select="claude", qa_candidates=1)
+    aud = build_ensemble_auditor(cfg, judge_fn=lambda p: '{"ok": true}')
+    assert isinstance(aud, ClaudeVisionAuditor)
 
 
 # ---- build_ensemble_auditor factory ----

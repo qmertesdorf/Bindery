@@ -138,10 +138,13 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     use_tifa = getattr(cfg, "qa_tifa", False)
     use_count = getattr(cfg, "qa_count_guard", False)
     use_corner = getattr(cfg, "qa_corner_crops", False)
-    select_mode = getattr(cfg, "qa_select", "vqa")
+    select_mode = getattr(cfg, "qa_select", "claude")
     # A Claude TASTE selector needs no VQA model, so it must still build the ensemble
-    # (which exposes .selector()) even when every other stage is off.
-    claude_select = select_mode in ("claude", "hybrid")
+    # (which exposes .selector()) even when every other stage is off — but ONLY when
+    # best-of-N is actually on (qa_candidates>1), so single-candidate books stay on the
+    # bare-holistic path and are completely unaffected by the default flip to "claude".
+    claude_select = (select_mode in ("claude", "hybrid")
+                     and getattr(cfg, "qa_candidates", 1) > 1)
     if not (use_vqa or use_anatomy or use_tifa or use_count or use_corner
             or claude_select):
         return holistic
