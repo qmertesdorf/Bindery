@@ -282,6 +282,51 @@ def test_audit_default_is_single_pass():
     assert calls["n"] == 1  # default unchanged: exactly one vision call
 
 
+def _all_three_prompts():
+    return (
+        build_concept_audit_prompt(anchor="a fox", scene="a fox",
+                                   image_path=Path("/o/p.png")).lower(),
+        build_audit_prompt(anchor="a boy + dog", scene="x",
+                           image_path=Path("/o/p.png"), reference_path=None).lower(),
+        build_cover_audit_prompt(image_path=Path("/o/c.png")).lower(),
+    )
+
+
+def test_prompts_force_pixels_first_describe_then_judge():
+    # The dominant VLM-judge failure is trusting the text spec over the pixels; every
+    # prompt must tell the judge to look at the image FIRST and let the pixels win.
+    for low in _all_three_prompts():
+        assert "actually see" in low
+        assert "only from the pixels" in low
+
+
+def test_prompts_bias_defect_list_toward_strict():
+    # Leniency bias: judges over-accept. The defect list (only) must push "prove it's
+    # clean" — no waving a borderline defect through — while staying generous on
+    # incidental variation.
+    for low in _all_three_prompts():
+        assert "borderline" in low
+
+
+def test_prompts_require_evidence_location_per_issue():
+    # Evidence-grounding: each issue must localize itself (corner / edge / body part),
+    # which both steadies the judge and makes the reroll/repair targeted.
+    for low in _all_three_prompts():
+        assert "name where" in low
+
+
+def test_concept_and_cover_check_physics_consistency():
+    # Groh taxonomy: inconsistent light/shadow/reflection/perspective is a common AI
+    # render tell the prompts didn't previously cover.
+    for low in (
+        build_concept_audit_prompt(anchor="a fox", scene="a fox",
+                                   image_path=Path("/o/p.png")).lower(),
+        build_cover_audit_prompt(image_path=Path("/o/c.png")).lower(),
+    ):
+        assert "shadow" in low
+        assert "reflection" in low or "perspective" in low
+
+
 def test_auditor_kind_selects_concept_prompt():
     captured = {}
     def judge(prompt):

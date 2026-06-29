@@ -16,6 +16,46 @@ class AuditError(RuntimeError):
     pass
 
 
+# --- Shared judge-hardening clauses ----------------------------------------
+# These encode documented LLM/VLM-as-judge defences so every prompt variant
+# gets them (see docs/research): describe-then-judge to beat the text-prior
+# bias, a strictness nudge to beat leniency bias, evidence-grounding so each
+# call is checkable, and the Groh physics-tell category.
+
+# Pixels-first: a VLM judge over-trusts the text spec and "sees" what the words
+# say rather than the pixels — the single most-documented failure mode — and a
+# polite "focus on the image" barely helps. So force a literal look BEFORE the
+# spec below is weighed, and tell it the pixels win ties.
+_PIXELS_FIRST = (
+    "FIRST look at the picture ITSELF and note what you ACTUALLY see — the "
+    "subject and its parts, plus anything in the corners and background. Do NOT "
+    "assume the description or caption below is true of the image: judge only "
+    "from the pixels, and let what you actually see OVERRIDE what the words say "
+    "should be there.\n\n")
+
+# Leniency bias: judges over-accept and wave borderline defects through. Bias the
+# DEFECT LIST ONLY toward "prove it's clean" while staying generous elsewhere.
+_STRICT_RULE = (
+    " For the defect list below ONLY, default to REJECT when a listed defect is "
+    "plausibly present — do NOT wave a borderline case through as 'probably "
+    "fine', which is exactly how defects ship. (Stay generous on incidental "
+    "style, pose, crop, lighting, and background variation.)")
+
+# Evidence-grounding: require each issue to localize itself — steadies the judge
+# and makes the reroll/repair targeted.
+_EVIDENCE_RULE = (
+    " For EACH issue you list, name WHERE you see it (which corner, edge, or body "
+    "part) so it can be checked.")
+
+# Physics tells (Groh et al. AI-artifact taxonomy): inconsistent light/shadow,
+# impossible reflections, or broken perspective are common machine-render tells.
+_PHYSICS_REJECT = (
+    "\n- INCONSISTENT PHYSICS: light and shadow that disagree (shadows falling in "
+    "different directions, or a shadow with no light source), impossible "
+    "reflections, or broken perspective / scale — tells that the picture was "
+    "machine-assembled rather than painted as one coherent scene;")
+
+
 def build_audit_prompt(*, anchor: str, scene: str | None,
                        image_path: Path, reference_path: Path | None) -> str:
     ref = (f"\nA reference image of the recurring character(s) is at {reference_path}. "
@@ -27,9 +67,10 @@ def build_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a children's
 picture book.{ref}
 
-The recurring character(s) should look like: {anchor}.{scene_line}
+{_PIXELS_FIRST}The recurring character(s) should look like: {anchor}.{scene_line}
 
-This is a soft, stylised storybook, so judge GENEROUSLY. Apply a two-tier bar.
+This is a soft, stylised storybook, so judge GENEROUSLY on incidental variation.
+Apply a two-tier bar.{_STRICT_RULE}
 
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the character is the WRONG character, or characters are CONFLATED (e.g. a
@@ -57,7 +98,7 @@ character recognisable:
 - missing or rearranged minor scene props; the scene only needs to be roughly right.
 
 When the character is recognisable and the art is clean, set ok=true even if such
-details differ. Reserve issues for genuine defects.
+details differ. Reserve issues for genuine defects.{_EVIDENCE_RULE}
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""
@@ -124,7 +165,7 @@ def build_concept_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a character-free
 children's picture book.{ref}
 
-This page should show: {anchor}.{scene_line}{caption_line}{focused}
+{_PIXELS_FIRST}This page should show: {anchor}.{scene_line}{caption_line}{focused}
 
 This is a soft, stylised storybook. Judge GENEROUSLY on incidental variation (pose,
 crop, palette, background, time of day), but be STRICT that every page shares ONE
@@ -132,7 +173,8 @@ medium and finish so the book reads as a single artist's work, and that the art
 FILLS THE PAGE edge to edge. Look CLOSELY before deciding: COUNT the subject's eyes
 and limbs, check that its overall BODY PLAN / SILHOUETTE is right for its real
 species, scan ALL FOUR CORNERS for stray marks AND for blank white paper, and
-check that the medium and finish match the rest of the book. Apply a two-tier bar.
+check that the medium and finish match the rest of the book. Apply a two-tier
+bar.{_STRICT_RULE}
 
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the WRONG subject (a clearly different animal or thing than described above);
@@ -201,7 +243,7 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   on one or more sides or corners instead of the painted scene running full-bleed to
   all four edges. This is a print defect (uneven white margins at the trim). A soft
   painterly fade INTO colour is fine; a corner or edge of plain unpainted paper is
-  not.{caption_reject}{cohesion_reject}
+  not;{_PHYSICS_REJECT}{caption_reject}{cohesion_reject}
 
 ACCEPT (set ok=true) — do NOT reject — for natural variation:
 - different pose, camera angle, crop, or composition (as long as the painted art
@@ -213,7 +255,7 @@ ACCEPT (set ok=true) — do NOT reject — for natural variation:
   shift in medium or finish, e.g. matte watercolour vs glossy 3D — see cohesion).
 
 When the subject is right and the art is clean, set ok=true even if such details
-differ. Reserve issues for genuine defects.
+differ. Reserve issues for genuine defects.{_EVIDENCE_RULE}
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""
@@ -224,8 +266,8 @@ def build_cover_audit_prompt(*, image_path: Path) -> str:
 picture-book cover laid flat: the BACK cover is the LEFT half, a thin SPINE runs
 down the middle, and the FRONT cover is the RIGHT half.
 
-Judge it for defects a publisher would fix. REJECT (set ok=false) for any real
-problem:
+{_PIXELS_FIRST}Judge it for defects a publisher would fix. REJECT (set ok=false) for
+any real problem:{_STRICT_RULE}
 - TEXT LEGIBILITY: any text hard to read — low contrast against the art behind it
   (e.g. pale or white text over a bright, light, or busy area), washed out, or too
   faint. The back-cover blurb must be clearly readable from its first line to its
@@ -246,10 +288,14 @@ problem:
   growing out of its head); malformed, garbled, fused or duplicated anatomy (a wrong
   number of fins, flippers, limbs, eyes or tails; extra or merged body parts); or stray
   floating shapes that read as a rendering mistake rather than intentional scenery.
+- INCONSISTENT PHYSICS on the front art: light and shadow that disagree (shadows
+  falling in different directions, or a shadow with no light source), impossible
+  reflections, or broken perspective / scale — machine-render tells a publisher
+  would catch.
 
 ACCEPT (set ok=true) if the front title/author and the entire back blurb are clearly
 legible, the layout is clean, AND the front-cover animals are free of growths/
-malformations/stray-object defects — natural art-style variation is fine.
+malformations/stray-object defects — natural art-style variation is fine.{_EVIDENCE_RULE}
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short issue", ...]}}
 Output the JSON and nothing else."""
