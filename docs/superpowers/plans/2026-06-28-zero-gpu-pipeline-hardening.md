@@ -54,12 +54,13 @@ audit first stated and is confined to the SDXL path we don't ship.
   marks" text out of positive) **changes the render graph and cannot be validated
   without a GPU A/B** — so it stays queued with the live re-render, not unit-faked.
 
-### NEXT (this batch) — Deterministic couplet contract guard
-- `couplet_issues(text)`: exactly 2 non-empty lines + lines must not end on the
-  identical word (a fake rhyme). Conservative — no phonetic matching, so zero
-  false rejects on real couplets. Wire into `validate_concept_story` (hard, with
-  the existing retry) and `regenerate_concept_page` (keep-best like readability).
-  Requires updating the existing tests that use single-line prose stand-ins.
+### ✅ DONE — Deterministic couplet contract guard
+- `concept_content.couplet_issues(text)`: exactly 2 non-empty lines + lines must
+  not end on the identical word (a fake rhyme). Conservative — no phonetic
+  matching, so zero false rejects on real couplets. Wired into
+  `validate_concept_story` (hard, with the existing retry) and
+  `regenerate_concept_page` (keep-best, exactly like the readability gate).
+  Updated the content/build test fixtures that used single-line prose stand-ins.
 
 ### FOLLOW-UP — Reconcile / soften the guards
 - Corner guard has no leniency (`any-corner-fail`, one probe each) — a re-probe-on-

@@ -3,7 +3,8 @@ import pytest
 from factory.config import BookConfig
 from factory.content import ContentError
 from factory.concept_content import (
-    generate_concept_content, validate_concept_story, build_concept_story_prompt)
+    generate_concept_content, validate_concept_story, build_concept_story_prompt,
+    couplet_issues)
 
 
 def _cfg(**over):
@@ -27,17 +28,21 @@ def _fake_llm(bible, story):
 def test_generate_concept_content_shape():
     bible = json.dumps({"art_style": "soft watercolour", "dedication": "For the curious."})
     story = json.dumps({"pages": [
-        {"subject": "a fox", "text": "A fox is red.", "scene": "a fox in tall grass"},
-        {"subject": "a snail", "text": "A snail is slow.", "scene": "a snail on a leaf"},
-        {"subject": "an owl", "text": "An owl hoots.", "scene": "an owl in an oak at dusk"},
-        {"subject": "a frog", "text": "A frog hops.", "scene": "a frog on a lily pad"},
+        {"subject": "a fox", "text": "A fox is red,\ncurled in its bed.",
+         "scene": "a fox in tall grass"},
+        {"subject": "a snail", "text": "A snail is slow,\nwith far to go.",
+         "scene": "a snail on a leaf"},
+        {"subject": "an owl", "text": "An owl can fly,\nhigh in the sky.",
+         "scene": "an owl in an oak at dusk"},
+        {"subject": "a frog", "text": "A frog can hop,\nand never stop.",
+         "scene": "a frog on a lily pad"},
     ], "closing": "So many tiny friends!"})
     content = generate_concept_content(_cfg(), _fake_llm(bible, story))
     assert content["dedication"] == "For the curious."
     assert content["closing"] == "So many tiny friends!"
     assert len(content["pages"]) == 4
     assert content["pages"][0]["subject"] == "a fox"
-    assert content["pages"][0]["text"] == "A fox is red."
+    assert content["pages"][0]["text"] == "A fox is red,\ncurled in its bed."
     # no character anchor for a character-free book
     assert content["character_anchor"] == ""
 
@@ -50,6 +55,30 @@ def test_concept_story_validates_page_count():
 def test_concept_story_requires_scene():
     bad = {"pages": [{"subject": "a fox", "text": "hi", "scene": ""}], "closing": "x"}
     with pytest.raises(ContentError, match="scene"):
+        validate_concept_story(bad, 1)
+
+
+def test_couplet_issues_accepts_a_real_two_line_rhyme():
+    assert couplet_issues("A turtle swims by,\nunder the sky.") == []
+    # punctuation/case differences don't break a legit rhyme
+    assert couplet_issues("Deep in the SEA,\nan octopus swims free!") == []
+
+
+def test_couplet_issues_flags_wrong_line_count():
+    assert couplet_issues("A fox is red.")                      # one line
+    assert couplet_issues("one\ntwo\nthree")                    # three lines
+
+
+def test_couplet_issues_flags_identical_end_word_fake_rhyme():
+    # both lines ending on the SAME word is not an AABB rhyme
+    assert couplet_issues("A whale is blue,\nthe sea is blue.")
+
+
+def test_concept_story_validates_couplet_contract():
+    # a single-line 'couplet' in a read-aloud learning book is a real defect
+    bad = {"pages": [{"subject": "a fox", "text": "A fox is red.",
+                      "scene": "a fox in grass"}], "closing": "x"}
+    with pytest.raises(ContentError, match="couplet"):
         validate_concept_story(bad, 1)
 
 

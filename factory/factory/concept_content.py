@@ -3,10 +3,37 @@
 held together only by a locked art style."""
 from __future__ import annotations
 import json
+import re
 from typing import Callable
 from .config import BookConfig
 from .content import ContentError, _strip_fences
 from .readability import flesch_kincaid_grade
+
+_WORD_RE = re.compile(r"[a-z0-9']+", re.IGNORECASE)
+
+
+def _last_word(line: str) -> str:
+    words = _WORD_RE.findall(line)
+    return words[-1].lower() if words else ""
+
+
+def couplet_issues(text: str) -> list[str]:
+    """Deterministic couplet-contract guard ([[catch-defects-with-guards]]).
+
+    The story prompt demands a TWO-line AABB couplet, but the validator only
+    checked the field was non-empty — so a one-line 'couplet' or a fake rhyme
+    (both lines ending on the SAME word) could ship in a read-aloud learning book.
+    This guard catches the two UNAMBIGUOUS violations only — wrong line count and
+    an identical end-word — so a legitimate near-rhyme is never falsely rejected
+    (no phonetic matching, which would be noisy). Returns a list of issues (empty
+    when the couplet is well-formed)."""
+    lines = [ln.strip() for ln in str(text).split("\n") if ln.strip()]
+    if len(lines) != 2:
+        return [f"couplet must be exactly two lines, got {len(lines)}"]
+    w1, w2 = _last_word(lines[0]), _last_word(lines[1])
+    if w1 and w1 == w2:
+        return [f"couplet lines both end on '{w1}' — an identical word is not a rhyme"]
+    return []
 
 
 def build_concept_bible_prompt(cfg: BookConfig) -> str:
@@ -79,6 +106,9 @@ def validate_concept_story(data: dict, expected_pages: int) -> None:
         for k in ("subject", "text", "scene"):
             if not str(pg.get(k, "")).strip():
                 raise ContentError(f"concept page {i} missing '{k}'")
+        ci = couplet_issues(pg["text"])
+        if ci:
+            raise ContentError(f"concept page {i} couplet: {ci[0]}")
     if not str(data.get("closing", "")).strip():
         raise ContentError("concept story missing 'closing'")
 
@@ -173,7 +203,8 @@ def regenerate_concept_page(cfg: BookConfig, generate_fn: Callable[[str], str],
         last = page
         grade_ok = (not cfg.max_reading_grade or cfg.max_reading_grade <= 0
                     or flesch_kincaid_grade(page["text"]) <= cfg.max_reading_grade)
-        if grade_ok:
+        couplet_ok = not couplet_issues(page["text"])
+        if grade_ok and couplet_ok:
             return page
     if last is None:
         raise ContentError(

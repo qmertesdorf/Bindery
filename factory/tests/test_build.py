@@ -202,7 +202,7 @@ def test_run_build_concept_end_to_end(tmp_path):
     cfgp = tmp_path / "tiny.config.json"
     cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
 
-    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+    pages = [{"subject": f"animal {i}", "text": f"line {i} in the sun,\nhaving so much fun.",
               "scene": f"animal {i} in a meadow"} for i in range(20)]
     bible = {"art_style": "soft watercolour", "dedication": "d"}
     story = {"pages": pages, "closing": "bye"}
@@ -263,7 +263,7 @@ def test_run_build_reuses_existing_art(tmp_path):
     # Pre-seed reviewed content + art so the build should reuse, not render.
     out = tmp_path / "out" / "tiny"
     out.mkdir(parents=True)
-    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+    pages = [{"subject": f"animal {i}", "text": f"line {i} in the sun,\nhaving so much fun.",
               "scene": f"animal {i} in a meadow"} for i in range(20)]
     (out / "content.json").write_text(json.dumps({
         "art_style": "x", "character_anchor": "", "dedication": "d",
@@ -315,9 +315,9 @@ def test_concept_build_persists_subject_swap_to_content_json(tmp_path):
     cfgp = tmp_path / "dbw.config.json"
     cfgp.write_text(json.dumps(cfg_dict), encoding="utf-8")
 
-    pages = [{"subject": f"animal {i}", "text": f"line {i}",
+    pages = [{"subject": f"animal {i}", "text": f"line {i} in the sun,\nhaving so much fun.",
               "scene": f"animal {i} in the sea"} for i in range(20)]
-    pages[0] = {"subject": "a manatee", "text": "soft and slow",
+    pages[0] = {"subject": "a manatee", "text": "soft and slow,\nwatch it go.",
                 "scene": "a manatee with a paddle tail"}
     bible = {"art_style": "soft watercolour", "dedication": "d"}
     story = {"pages": pages, "closing": "bye"}
@@ -328,7 +328,7 @@ def test_concept_build_persists_subject_swap_to_content_json(tmp_path):
         if "replacement subject" in prompt:          # subject suggestion
             return "a sea turtle"
         if "subject of THIS spread" in prompt:        # single-page regen
-            return json.dumps({"subject": "a sea turtle", "text": "A turtle swims",
+            return json.dumps({"subject": "a sea turtle", "text": "A turtle swims by,\nunder the sky.",
                                "scene": "a green sea turtle over a reef"})
         return json.dumps(story)                      # the story pass
 
