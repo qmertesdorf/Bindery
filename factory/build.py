@@ -95,6 +95,7 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
             if cfg.book_type == "concept":
                 art = generate_concept_art(
                     cfg, content, out_dir, comfy, seed=seed, auditor=auditor,
+                    max_tries=cfg.qa_max_tries,
                     generate_fn=generate_fn,
                     suggest_fn=suggest_fn or _default_suggest_fn(generate_fn))
                 # Re-write content.json AFTER concept art: an auto-subject-fallback
@@ -105,7 +106,8 @@ def run_build(config_path, out_root="out", *, generate_fn=claude_generate,
                                         encoding="utf-8")
             elif flux:
                 art = generate_flux_art(cfg, content, out_dir, comfy,
-                                        seed=seed, auditor=auditor)
+                                        seed=seed, auditor=auditor,
+                                        max_tries=cfg.qa_max_tries)
             else:
                 art = generate_picture_art(cfg, content, out_dir, comfy, workflow,
                                            positive_node=positive_node,

@@ -73,6 +73,7 @@ class BookConfig:
     qa_describe_first: bool = False        # describe-then-judge: one spec-free observation pass feeds every judge pass (beats VLM text-prior bias); +1 vision call/audit
     qa_count_guard: bool = False           # deterministic exact-count gate: isolated per-part count probe + code integer-compare vs the scene/caption's stated counts (the VLM can't count the 6-arm starfish)
     qa_corner_crops: bool = False          # full-res four-corner probe for stray text/signatures/watermarks + blank trim-margin paper invisible on the downscaled page; +4 vision calls/audit
+    qa_max_tries: int = 4                  # render→audit attempts per page before keep-best (or subject_fallback). Raise for styles that draw stubborn corner signatures so reroll converges instead of shipping/swapping
     # Auto-subject-fallback (concept line): on a page that exhausts its render→audit
     # budget, swap to a fresh on-theme LLM-chosen subject and re-roll instead of
     # shipping a flagged defect. Default OFF → existing builds unchanged.
@@ -212,6 +213,7 @@ def load_config(path: str | Path) -> BookConfig:
         qa_describe_first=bool(data.get("qa_describe_first", False)),
         qa_count_guard=bool(data.get("qa_count_guard", False)),
         qa_corner_crops=bool(data.get("qa_corner_crops", False)),
+        qa_max_tries=int(data.get("qa_max_tries", 4)),
         subject_fallback=bool(data.get("subject_fallback", False)),
         max_fallbacks=int(data.get("max_fallbacks", 3)),
     )

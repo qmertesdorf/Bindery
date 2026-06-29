@@ -33,6 +33,7 @@ def test_defaults_applied(tmp_path):
     assert cfg.qa_vqa is False and cfg.qa_anatomy is False
     assert cfg.qa_candidates == 1 and cfg.qa_repair is False
     assert cfg.qa_tifa is False and cfg.qa_tifa_threshold == 0.4
+    assert cfg.qa_max_tries == 4       # default render→audit attempts per page
     # the load_config default must match the calibrated dataclass default (0.15),
     # not the old stray 0.6, so an omitting config gets the calibrated floor
     assert cfg.qa_vqa_threshold == 0.15
@@ -46,13 +47,14 @@ def test_qa_flags_loaded(tmp_path):
         "pet_kind": "cat", "art_prompt": "watercolor ocean",
         "qa_vqa": True, "qa_vqa_threshold": 0.7, "qa_anatomy": True,
         "qa_anatomy_min_score": 0.4, "qa_candidates": 5, "qa_repair": True,
-        "qa_tifa": True, "qa_tifa_threshold": 0.6,
+        "qa_tifa": True, "qa_tifa_threshold": 0.6, "qa_max_tries": 8,
     }), encoding="utf-8")
     cfg = load_config(p)
     assert cfg.qa_vqa is True and cfg.qa_vqa_threshold == 0.7
     assert cfg.qa_anatomy is True and cfg.qa_anatomy_min_score == 0.4
     assert cfg.qa_candidates == 5 and cfg.qa_repair is True
     assert cfg.qa_tifa is True and cfg.qa_tifa_threshold == 0.6
+    assert cfg.qa_max_tries == 8
 
 
 def test_book_type_defaults_to_journal(sample_config_file):
