@@ -374,7 +374,11 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                     max_tries=max_tries, audit_kind="concept",
                     caption=page.get("text"), n_candidates=n_candidates,
                     selector=selector, repair_fn=repair_fn,
-                    post_check=_border_post_check)
+                    # OPT-IN only: forcing a reroll on any light/soft corner flattens the
+                    # fuzzy-watercolour aesthetic, so default keeps the non-fatal review
+                    # flag (_check_border below) — v2-era behaviour ([[concept-scenes-underwater-fullbleed]]).
+                    post_check=(_border_post_check
+                                if getattr(cfg, "qa_border_gate", False) else None))
                 out_pages.append(done)
                 if style_ref is None:
                     style_ref = done  # first cohesive page anchors the rest

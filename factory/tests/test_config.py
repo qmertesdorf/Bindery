@@ -34,6 +34,7 @@ def test_defaults_applied(tmp_path):
     assert cfg.qa_candidates == 1 and cfg.qa_repair is False
     assert cfg.qa_tifa is False and cfg.qa_tifa_threshold == 0.4
     assert cfg.qa_max_tries == 4       # default render→audit attempts per page
+    assert cfg.qa_border_gate is False  # hard full-bleed gate OFF by default (keeps soft watercolour edges)
     # the load_config default must match the calibrated dataclass default (0.15),
     # not the old stray 0.6, so an omitting config gets the calibrated floor
     assert cfg.qa_vqa_threshold == 0.15

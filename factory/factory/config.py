@@ -74,6 +74,7 @@ class BookConfig:
     qa_count_guard: bool = False           # deterministic exact-count gate: isolated per-part count probe + code integer-compare vs the scene/caption's stated counts (the VLM can't count the 6-arm starfish)
     qa_corner_crops: bool = False          # full-res four-corner probe for stray text/signatures/watermarks + blank trim-margin paper invisible on the downscaled page; +4 vision calls/audit
     qa_max_tries: int = 4                  # render→audit attempts per page before keep-best (or subject_fallback). Raise for styles that draw stubborn corner signatures so reroll converges instead of shipping/swapping
+    qa_border_gate: bool = False           # OPT-IN hard full-bleed gate: a detected white-paper border FORCES a reroll. DEFAULT OFF on purpose — a soft watercolour aesthetic WANTS fuzzy/feathered light edges, and forcing hard edge-to-edge fill flattens that look (it pushed deep-blue-world-v3 glossier/harder than the softer v2). With it off, has_white_border still logs a NON-FATAL review flag (the v2-era behaviour); only turn it on for a book that truly needs strict edge-to-edge print bleed.
     # Auto-subject-fallback (concept line): on a page that exhausts its render→audit
     # budget, swap to a fresh on-theme LLM-chosen subject and re-roll instead of
     # shipping a flagged defect. Default OFF → existing builds unchanged.
@@ -214,6 +215,7 @@ def load_config(path: str | Path) -> BookConfig:
         qa_count_guard=bool(data.get("qa_count_guard", False)),
         qa_corner_crops=bool(data.get("qa_corner_crops", False)),
         qa_max_tries=int(data.get("qa_max_tries", 4)),
+        qa_border_gate=bool(data.get("qa_border_gate", False)),
         subject_fallback=bool(data.get("subject_fallback", False)),
         max_fallbacks=int(data.get("max_fallbacks", 3)),
     )
