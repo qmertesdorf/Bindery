@@ -4,6 +4,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from typing import Callable
 from .config import BookConfig
 
@@ -118,6 +119,37 @@ def generate_content(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict
     return data
 
 
+def run_claude_cli(shell_cmd: str, prompt: str, *, timeout: int = 300,
+                   attempts: int = 3, backoff: float = 3.0) -> str:
+    """Run the Claude Code CLI in print mode, RETRYING transient failures.
+
+    A single non-zero exit (or an empty reply) from the CLI is almost always a
+    transient hiccup — a momentary network blip or 5xx. Without a retry, one such
+    blip on ANY of the hundreds of content/vision calls a build makes would abort
+    the whole multi-hour run (an AuditError propagating out of run_audited_render).
+    Retry with linear backoff and only raise after the last attempt, so the build
+    survives transient CLI errors but still fails loudly on a real outage
+    ([[catch-defects-with-guards]]).
+
+    `shell_cmd` is a CONSTANT string at every call site (no interpolated user
+    data), preserving the existing no-injection-surface property.
+    """
+    last = ""
+    rc = -1
+    for i in range(attempts):
+        proc = subprocess.run(
+            shell_cmd, input=prompt, capture_output=True, text=True,
+            timeout=timeout, shell=True, encoding="utf-8", errors="replace")
+        if proc.returncode == 0 and proc.stdout.strip():
+            return proc.stdout
+        rc = proc.returncode
+        last = (proc.stderr or proc.stdout or "").strip()[:500]
+        if i < attempts - 1:
+            time.sleep(backoff * (i + 1))
+    raise ContentError(
+        f"claude CLI failed after {attempts} attempts (exit {rc}): {last}")
+
+
 def claude_generate(prompt: str) -> str:
     """Real adapter: shell out to the installed Claude Code CLI in print mode.
 
@@ -130,13 +162,4 @@ def claude_generate(prompt: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9._-]+", CONTENT_MODEL):
         raise ContentError(
             f"BOOKGEN_CONTENT_MODEL {CONTENT_MODEL!r} is not a safe model token")
-    proc = subprocess.run(
-        f"claude -p --model {CONTENT_MODEL}",
-        input=prompt,
-        capture_output=True, text=True, timeout=300,
-        shell=True,
-        encoding="utf-8", errors="replace",
-    )
-    if proc.returncode != 0:
-        raise ContentError(f"claude CLI failed (exit {proc.returncode}): {proc.stderr[:500]}")
-    return proc.stdout
+    return run_claude_cli(f"claude -p --model {CONTENT_MODEL}", prompt)

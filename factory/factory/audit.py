@@ -6,10 +6,9 @@ files in print mode and return a JSON verdict.
 """
 from __future__ import annotations
 import json
-import subprocess
 from pathlib import Path
 from typing import Callable
-from .content import _strip_fences
+from .content import _strip_fences, run_claude_cli, ContentError
 
 
 class AuditError(RuntimeError):
@@ -345,14 +344,14 @@ def parse_verdict(raw: str) -> dict:
 
 def _claude_vision(prompt: str) -> str:
     """Real adapter: shell to the Claude CLI in print mode (it can Read the image
-    path in the prompt). Constant shell string 'claude -p' — no injection surface."""
-    proc = subprocess.run(
-        "claude -p", input=prompt, capture_output=True, text=True, timeout=300,
-        shell=True, encoding="utf-8", errors="replace")
-    if proc.returncode != 0:
-        raise AuditError(f"claude vision failed (exit {proc.returncode}): "
-                         f"{proc.stderr[:500]}")
-    return proc.stdout
+    path in the prompt). Constant shell string 'claude -p' — no injection surface.
+
+    Retries transient CLI failures (see run_claude_cli): a lone exit-1 blip on any
+    of a build's hundreds of vision calls must not abort the whole run."""
+    try:
+        return run_claude_cli("claude -p", prompt)
+    except ContentError as e:
+        raise AuditError(str(e).replace("claude CLI", "claude vision")) from e
 
 
 def _merge_verdicts(verdicts: list[dict], *, mode: str = "any_fail") -> dict:

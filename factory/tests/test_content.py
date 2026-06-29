@@ -2,7 +2,46 @@ import json
 import pytest
 from factory.config import BookConfig
 from factory.content import (build_prompt, generate_content, ContentError,
-                             validate_content, generate_json)
+                             validate_content, generate_json, run_claude_cli)
+
+
+class _FakeProc:
+    def __init__(self, returncode, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def test_run_claude_cli_retries_transient_failure(monkeypatch):
+    # A lone exit-1 blip must NOT abort: the helper retries and returns the later
+    # success, so one transient CLI hiccup can't kill a multi-hour build.
+    calls = []
+    seq = iter([_FakeProc(1, stderr="boom"), _FakeProc(0, stdout="OK\n")])
+
+    def fake_run(cmd, **kw):
+        calls.append(cmd)
+        return next(seq)
+
+    monkeypatch.setattr("factory.content.subprocess.run", fake_run)
+    monkeypatch.setattr("factory.content.time.sleep", lambda *_: None)
+    assert run_claude_cli("claude -p", "hi") == "OK\n"
+    assert len(calls) == 2
+
+
+def test_run_claude_cli_raises_after_exhausting_attempts(monkeypatch):
+    monkeypatch.setattr("factory.content.subprocess.run",
+                        lambda cmd, **kw: _FakeProc(1, stderr="still down"))
+    monkeypatch.setattr("factory.content.time.sleep", lambda *_: None)
+    with pytest.raises(ContentError, match="after 3 attempts"):
+        run_claude_cli("claude -p", "hi", attempts=3)
+
+
+def test_run_claude_cli_empty_output_counts_as_failure(monkeypatch):
+    # exit 0 but blank stdout is also transient (the build needs a real reply)
+    seq = iter([_FakeProc(0, stdout="   \n"), _FakeProc(0, stdout="real\n")])
+    monkeypatch.setattr("factory.content.subprocess.run", lambda cmd, **kw: next(seq))
+    monkeypatch.setattr("factory.content.time.sleep", lambda *_: None)
+    assert run_claude_cli("claude -p", "hi") == "real\n"
 
 
 def test_generate_json_feeds_error_back_then_succeeds():
