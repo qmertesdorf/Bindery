@@ -20,18 +20,21 @@ from .vqascore import VQAScorer
 from .hadm import AnatomyDetector
 from .selection import BestOfNSelector
 from .tifa import TifaDecomposer, TifaEvaluator
+from .count_guard import CountGuard
 
 
 class EnsembleAuditor:
-    """Holistic auditor plus optional VQAScore, anatomy-detector, and TIFA members."""
+    """Holistic auditor plus optional VQAScore, anatomy, TIFA, and count members."""
 
     def __init__(self, holistic, *, vqa: VQAScorer | None = None,
                  anatomy: AnatomyDetector | None = None,
-                 tifa: TifaEvaluator | None = None):
+                 tifa: TifaEvaluator | None = None,
+                 count_guard: CountGuard | None = None):
         self.holistic = holistic
         self.vqa = vqa
         self.anatomy = anatomy
         self.tifa = tifa
+        self.count_guard = count_guard
 
     def selector(self) -> BestOfNSelector | None:
         """A best-of-N selector backed by the VQAScore member, or None when there
@@ -61,6 +64,15 @@ class EnsembleAuditor:
                     f"{self.vqa.threshold:.2f}): the picture does not clearly "
                     f"show \"{caption}\"")
 
+        # Deterministic exact-count gate: for every <count, part> claim the author
+        # wrote in the scene/caption, an isolated probe counts that part and code
+        # compares integers — the holistic VLM's canonical-count bias never decides.
+        if self.count_guard is not None and (scene or caption) and kind != "cover":
+            cissues = self.count_guard.check(image_path, scene=scene, caption=caption)
+            if cissues:
+                ok = False
+                issues.extend(cissues)
+
         # HADM anatomy-defect gate; its boxes drive the WS2 repair pass.
         if self.anatomy is not None and kind != "cover":
             defects = self.anatomy.detect(image_path)
@@ -85,7 +97,7 @@ class EnsembleAuditor:
 
 def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
                            vqa_score_fn=None, anatomy_detect_fn=None,
-                           tifa_decompose_fn=None):
+                           tifa_decompose_fn=None, count_fn=None):
     """Assemble the auditor for a book from its config flags.
 
     Returns the bare holistic `ClaudeVisionAuditor` when no extra QA stage is
@@ -100,7 +112,8 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     use_vqa = getattr(cfg, "qa_vqa", False)
     use_anatomy = getattr(cfg, "qa_anatomy", False)
     use_tifa = getattr(cfg, "qa_tifa", False)
-    if not use_vqa and not use_anatomy and not use_tifa:
+    use_count = getattr(cfg, "qa_count_guard", False)
+    if not use_vqa and not use_anatomy and not use_tifa and not use_count:
         return holistic
     vqa = (VQAScorer(score_fn=vqa_score_fn,
                      threshold=getattr(cfg, "qa_vqa_threshold", 0.15))
@@ -115,4 +128,6 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
         scorer = vqa or VQAScorer(score_fn=vqa_score_fn)
         tifa = TifaEvaluator(TifaDecomposer(decompose_fn=tifa_decompose_fn), scorer,
                              threshold=getattr(cfg, "qa_tifa_threshold", 0.4))
-    return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa)
+    count_guard = CountGuard(count_fn=count_fn) if use_count else None
+    return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa,
+                           count_guard=count_guard)

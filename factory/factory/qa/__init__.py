@@ -16,6 +16,7 @@ from .vqascore import VQAScorer, VQAScoreError, shutdown_daemon
 from .hadm import AnatomyDetector, AnatomyError, Defect
 from .selection import BestOfNSelector
 from .tifa import TifaProbe, TifaDecomposer, TifaEvaluator, TifaError
+from .count_guard import CountGuard, extract_count_claims
 from .ensemble import EnsembleAuditor, build_ensemble_auditor
 
 __all__ = [
@@ -23,5 +24,6 @@ __all__ = [
     "AnatomyDetector", "AnatomyError", "Defect",
     "BestOfNSelector",
     "TifaProbe", "TifaDecomposer", "TifaEvaluator", "TifaError",
+    "CountGuard", "extract_count_claims",
     "EnsembleAuditor", "build_ensemble_auditor",
 ]
