@@ -14,7 +14,8 @@ the unit suite never needs a GPU or downloaded weights.
 """
 from .vqascore import VQAScorer, VQAScoreError, shutdown_daemon
 from .hadm import AnatomyDetector, AnatomyError, Defect
-from .selection import BestOfNSelector
+from .selection import (BestOfNSelector, ClaudeBestOfNSelector,
+                        build_select_prompt, parse_best)
 from .tifa import TifaProbe, TifaDecomposer, TifaEvaluator, TifaError
 from .count_guard import CountGuard, extract_count_claims
 from .corner_guard import CornerGuard
@@ -23,7 +24,7 @@ from .ensemble import EnsembleAuditor, build_ensemble_auditor
 __all__ = [
     "VQAScorer", "VQAScoreError", "shutdown_daemon",
     "AnatomyDetector", "AnatomyError", "Defect",
-    "BestOfNSelector",
+    "BestOfNSelector", "ClaudeBestOfNSelector", "build_select_prompt", "parse_best",
     "TifaProbe", "TifaDecomposer", "TifaEvaluator", "TifaError",
     "CountGuard", "extract_count_claims",
     "CornerGuard",

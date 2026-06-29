@@ -6,6 +6,7 @@ from pathlib import Path
 
 from factory.audit import ClaudeVisionAuditor
 from factory.qa import (VQAScorer, AnatomyDetector, Defect, BestOfNSelector,
+                        ClaudeBestOfNSelector, build_select_prompt, parse_best,
                         EnsembleAuditor, build_ensemble_auditor,
                         TifaProbe, TifaDecomposer, TifaEvaluator)
 from factory.qa.vqascore import VQAScoreError
@@ -101,6 +102,54 @@ def test_best_of_n_no_free_when_nothing_to_score():
     assert calls == []
 
 
+# ---- ClaudeBestOfNSelector (taste pick) ----
+
+def test_parse_best_reads_1based_index_else_zero():
+    assert parse_best("BEST: 2", 3) == 1
+    assert parse_best("blah\nBEST:  3  \nok", 3) == 2
+    assert parse_best("no answer", 3) == 0       # unparseable -> first
+    assert parse_best("BEST: 9", 3) == 0         # out of range -> first
+
+def test_claude_selector_picks_judge_choice_and_sees_all_candidates():
+    seen = {}
+    def judge(prompt):
+        seen["prompt"] = prompt
+        return "BEST: 3"
+    sel = ClaudeBestOfNSelector(judge, subject="a penguin", anchor_path="anchor.png")
+    chosen = sel.select(["a.png", "b.png", "c.png"], caption="penguins swim")
+    assert Path(chosen).name == "c.png"               # the judged winner
+    assert "a.png" in seen["prompt"] and "c.png" in seen["prompt"]  # all candidates named
+    assert "anchor.png" in seen["prompt"]             # anchor passed to the rubric
+    assert "watercolour" in seen["prompt"].lower()    # soft-style rubric present
+
+def test_claude_selector_single_or_no_caption_skips_judge():
+    def boom(prompt):
+        raise AssertionError("judge called when there was nothing to choose")
+    sel = ClaudeBestOfNSelector(boom)
+    assert Path(sel.select(["only.png"], caption="x")).name == "only.png"
+    assert Path(sel.select(["a.png", "b.png"], caption=None)).name == "a.png"
+
+def test_hybrid_drops_wrong_subject_duds_then_judge_picks():
+    # VQA floor removes the dud (0.02), Claude then picks among the survivors
+    scores = {"dud.png": 0.02, "good1.png": 0.6, "good2.png": 0.8}
+    vqa = VQAScorer(score_fn=lambda p, c: scores[Path(p).name])
+    judged = {}
+    def judge(prompt):
+        judged["prompt"] = prompt
+        return "BEST: 2"            # 2nd of the survivors
+    sel = ClaudeBestOfNSelector(judge, vqa=vqa, vqa_floor=0.10)
+    chosen = sel.select(["dud.png", "good1.png", "good2.png"], caption="a penguin")
+    assert Path(chosen).name == "good2.png"           # survivor #2
+    assert "dud.png" not in judged["prompt"]          # dud never reached the judge
+
+def test_hybrid_keeps_best_when_all_below_floor():
+    # everything is a dud -> never empty: fall back to the single highest VQA
+    scores = {"a.png": 0.02, "b.png": 0.05}
+    vqa = VQAScorer(score_fn=lambda p, c: scores[Path(p).name])
+    sel = ClaudeBestOfNSelector(lambda prompt: "BEST: 1", vqa=vqa, vqa_floor=0.10)
+    assert Path(sel.select(["a.png", "b.png"], caption="a penguin")).name == "b.png"
+
+
 # ---- EnsembleAuditor ----
 
 def _holistic(ok=True, issues=None):
@@ -156,6 +205,28 @@ def test_ensemble_selector_from_vqa_member():
     ens = EnsembleAuditor(_holistic(), vqa=VQAScorer(score_fn=lambda p, c: 0.5))
     assert isinstance(ens.selector(), BestOfNSelector)
     assert EnsembleAuditor(_holistic()).selector() is None
+
+def test_ensemble_selector_modes():
+    vqa = VQAScorer(score_fn=lambda p, c: 0.5)
+    # "claude": a taste selector with NO vqa member needed (uses the holistic judge_fn)
+    claude_sel = EnsembleAuditor(_holistic(), select_mode="claude").selector()
+    assert isinstance(claude_sel, ClaudeBestOfNSelector) and claude_sel.vqa is None
+    # "hybrid": taste selector pre-filtered by the VQA member
+    hybrid_sel = EnsembleAuditor(_holistic(), vqa=vqa, select_mode="hybrid").selector()
+    assert isinstance(hybrid_sel, ClaudeBestOfNSelector) and hybrid_sel.vqa is vqa
+    # "vqa" (default) stays the fidelity selector
+    assert isinstance(
+        EnsembleAuditor(_holistic(), vqa=vqa, select_mode="vqa").selector(),
+        BestOfNSelector)
+
+def test_factory_builds_claude_selector_without_vqa():
+    # qa_select=claude must build an ensemble that exposes a Claude taste selector
+    # even when every other QA stage (incl. VQA) is off.
+    cfg = _Cfg(qa_vqa=False, qa_anatomy=False, qa_tifa=False, qa_count_guard=False,
+               qa_corner_crops=False, qa_select="claude")
+    aud = build_ensemble_auditor(cfg, judge_fn=lambda p: '{"ok": true}')
+    assert isinstance(aud, EnsembleAuditor)
+    assert isinstance(aud.selector(), ClaudeBestOfNSelector)
 
 
 # ---- build_ensemble_auditor factory ----

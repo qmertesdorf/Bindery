@@ -18,7 +18,7 @@ from __future__ import annotations
 from ..audit import ClaudeVisionAuditor
 from .vqascore import VQAScorer
 from .hadm import AnatomyDetector
-from .selection import BestOfNSelector
+from .selection import BestOfNSelector, ClaudeBestOfNSelector
 from .tifa import TifaDecomposer, TifaEvaluator
 from .count_guard import CountGuard
 from .corner_guard import CornerGuard
@@ -32,17 +32,27 @@ class EnsembleAuditor:
                  anatomy: AnatomyDetector | None = None,
                  tifa: TifaEvaluator | None = None,
                  count_guard: CountGuard | None = None,
-                 corner_guard: CornerGuard | None = None):
+                 corner_guard: CornerGuard | None = None,
+                 select_mode: str = "vqa", judge_fn=None):
         self.holistic = holistic
         self.vqa = vqa
         self.anatomy = anatomy
         self.tifa = tifa
         self.count_guard = count_guard
         self.corner_guard = corner_guard
+        self.select_mode = select_mode
+        # Vision call for the Claude taste-selector; default to the holistic auditor's
+        # own judge_fn so "claude"/"hybrid" selection works with no extra wiring.
+        self.judge_fn = judge_fn or getattr(holistic, "judge_fn", None)
 
-    def selector(self) -> BestOfNSelector | None:
-        """A best-of-N selector backed by the VQAScore member, or None when there
-        is no scorer to rank candidates with."""
+    def selector(self):
+        """The best-of-N chooser for this book's qa_select mode: a Claude-vision TASTE
+        pick ("claude"/"hybrid", literal best on the soft-watercolour rubric) or the
+        VQAScore FIDELITY pick ("vqa"). None when nothing can rank candidates."""
+        mode = self.select_mode
+        if mode in ("claude", "hybrid") and self.judge_fn is not None:
+            return ClaudeBestOfNSelector(
+                self.judge_fn, vqa=(self.vqa if mode == "hybrid" else None))
         return BestOfNSelector(self.vqa) if self.vqa is not None else None
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
@@ -128,7 +138,12 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     use_tifa = getattr(cfg, "qa_tifa", False)
     use_count = getattr(cfg, "qa_count_guard", False)
     use_corner = getattr(cfg, "qa_corner_crops", False)
-    if not (use_vqa or use_anatomy or use_tifa or use_count or use_corner):
+    select_mode = getattr(cfg, "qa_select", "vqa")
+    # A Claude TASTE selector needs no VQA model, so it must still build the ensemble
+    # (which exposes .selector()) even when every other stage is off.
+    claude_select = select_mode in ("claude", "hybrid")
+    if not (use_vqa or use_anatomy or use_tifa or use_count or use_corner
+            or claude_select):
         return holistic
     vqa = (VQAScorer(score_fn=vqa_score_fn,
                      threshold=getattr(cfg, "qa_vqa_threshold", 0.15))
@@ -146,4 +161,5 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     count_guard = CountGuard(count_fn=count_fn) if use_count else None
     corner_guard = CornerGuard(probe_fn=corner_probe_fn) if use_corner else None
     return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa,
-                           count_guard=count_guard, corner_guard=corner_guard)
+                           count_guard=count_guard, corner_guard=corner_guard,
+                           select_mode=select_mode, judge_fn=judge_fn)

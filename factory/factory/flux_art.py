@@ -366,6 +366,13 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             subject = page.get("subject", "the subject")
             anchor = (f"a {subject} in its natural setting, in a consistent soft "
                       f"storybook illustration style; no people and no text")
+            # Sharpen the Claude taste-selector's rubric with this page's subject and
+            # the style anchor (a previously-approved page); harmless for the VQA selector.
+            if selector is not None:
+                if hasattr(selector, "subject"):
+                    selector.subject = subject
+                if hasattr(selector, "anchor_path"):
+                    selector.anchor_path = style_ref
             try:
                 done = run_audited_render(
                     render, concept_page_prompt(page, style=style), out_path=op,
