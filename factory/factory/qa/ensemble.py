@@ -95,7 +95,8 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     """
     holistic = holistic or ClaudeVisionAuditor(
         judge_fn=judge_fn, passes=getattr(cfg, "qa_audit_passes", 1),
-        aggregate=getattr(cfg, "qa_audit_aggregate", "any_fail"))
+        aggregate=getattr(cfg, "qa_audit_aggregate", "any_fail"),
+        describe_first=getattr(cfg, "qa_describe_first", False))
     use_vqa = getattr(cfg, "qa_vqa", False)
     use_anatomy = getattr(cfg, "qa_anatomy", False)
     use_tifa = getattr(cfg, "qa_tifa", False)

@@ -272,6 +272,44 @@ def test_audit_ensemble_passes_when_every_pass_clean_and_dedupes():
     assert v2 == {"ok": False, "issues": ["six arms"]}
 
 
+def test_describe_prompt_is_spec_free_and_objective():
+    from factory.audit import build_describe_prompt
+    p = build_describe_prompt(Path("/o/p.png"))
+    low = p.lower()
+    assert "p.png" in p
+    assert "describe" in low and "count" in low
+    # it must NOT smuggle in the verdict task or the spec
+    assert "reject" not in low and "ok=" not in low
+
+
+def test_describe_first_injects_independent_observation():
+    calls = []
+    def judge(prompt):
+        calls.append(prompt)
+        if len(calls) == 1:  # the describe pass comes first
+            return "A round orange fish with two eyes, no text, fills the frame."
+        return '{"ok": true, "issues": []}'
+    a = ClaudeVisionAuditor(judge_fn=judge, passes=2, describe_first=True)
+    v = a.audit(Path("/o/p.png"), anchor="a fox", scene="a fox", kind="concept")
+    assert v["ok"] is True
+    assert len(calls) == 3  # 1 describe + 2 judge passes
+    # both judge passes carry the independent observation
+    assert "round orange fish" in calls[1].lower()
+    assert "round orange fish" in calls[2].lower()
+    # and the judge prompt tells it to trust the pixels over the observation
+    assert "trust the pixels" in calls[1].lower() or "trust your own" in calls[1].lower()
+
+
+def test_describe_first_off_by_default_no_extra_call():
+    calls = {"n": 0}
+    def judge(_p):
+        calls["n"] += 1
+        return '{"ok": true, "issues": []}'
+    ClaudeVisionAuditor(judge_fn=judge, passes=2).audit(
+        Path("/o/p.png"), anchor="a fox", scene="a fox", kind="concept")
+    assert calls["n"] == 2  # no describe call
+
+
 def test_merge_verdicts_majority_passes_on_minority_fail():
     # Majority vote trades the any-fail recall for precision: a lone dissenting pass
     # no longer sinks the page, but its issue is still surfaced for provenance.

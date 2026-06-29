@@ -261,6 +261,35 @@ Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
 Output the JSON and nothing else."""
 
 
+def build_describe_prompt(image_path: Path) -> str:
+    """Spec-free observation pass: ask the model to report what it LITERALLY sees,
+    with no idea what the picture is supposed to be. Feeding this independent
+    description into the judge pass is the structural defence against the dominant
+    VLM-judge failure of 'seeing' what the spec says instead of the pixels — far more
+    effective than merely telling the judge to 'focus on the image'."""
+    return f"""Read the image file at {image_path} and DESCRIBE exactly what you
+literally see. You have NOT been told what it is supposed to be, so do not guess the
+intent and do not judge quality. Report concretely:
+- the main subject(s) and, COUNTING them one by one, their visible parts (eyes,
+  legs, arms, fins, tails, wings, antennae, eye-stalks);
+- the overall body shape / silhouette of each subject;
+- what is in each of the four CORNERS and in the background;
+- the medium and finish (painted, photographic, 3D, etc.) and whether the art runs
+  to all four edges or leaves any blank/unpainted paper;
+- any text, letters, numbers, signatures, or stray marks, and where they sit.
+
+Just report what is in the pixels. Do NOT output a verdict or any JSON."""
+
+
+# Prepended to the judge prompt when describe-then-judge is on: gives the judge an
+# independent grounding to compare against the spec, while keeping the pixels final.
+_OBSERVED_PREFIX = (
+    "An INDEPENDENT observer, who was NOT told what this picture is meant to be, "
+    "described it as follows:\n\n<observation>\n{observed}\n</observation>\n\nUse "
+    "that observation to ground your check against the spec below, but rely on your "
+    "OWN direct look at the image — where they differ, trust the pixels.\n\n")
+
+
 def build_cover_audit_prompt(*, image_path: Path) -> str:
     return f"""Read the image file at {image_path}. It is a wraparound children's
 picture-book cover laid flat: the BACK cover is the LEFT half, a thin SPINE runs
@@ -354,7 +383,8 @@ def _merge_verdicts(verdicts: list[dict], *, mode: str = "any_fail") -> dict:
 
 class ClaudeVisionAuditor:
     def __init__(self, judge_fn: Callable[[str], str] | None = None,
-                 passes: int = 1, aggregate: str = "any_fail"):
+                 passes: int = 1, aggregate: str = "any_fail",
+                 describe_first: bool = False):
         self.judge_fn = judge_fn or _claude_vision
         # Number of independent vision passes per audit; >1 enables the multi-pass
         # ensemble that recovers stochastic single-pass misses. Clamp to >=1.
@@ -362,6 +392,10 @@ class ClaudeVisionAuditor:
         # How to combine the passes: "any_fail" (max recall, default) or "majority"
         # (more precision; a lone dissent no longer triggers a reroll).
         self.aggregate = aggregate
+        # Describe-then-judge: when on, one extra spec-free observation pass runs
+        # first and is fed into every judge pass — the structural defence against
+        # the VLM text-prior bias. Costs one extra call per audit. Default off.
+        self.describe_first = describe_first
 
     def audit(self, image_path, *, anchor: str, reference_path=None,
               scene: str | None = None, kind: str = "character",
@@ -377,5 +411,8 @@ class ClaudeVisionAuditor:
             prompt = build_audit_prompt(
                 anchor=anchor, scene=scene, image_path=Path(image_path),
                 reference_path=Path(reference_path) if reference_path else None)
+        if self.describe_first:
+            observed = self.judge_fn(build_describe_prompt(Path(image_path)))
+            prompt = _OBSERVED_PREFIX.format(observed=observed.strip()) + prompt
         verdicts = [parse_verdict(self.judge_fn(prompt)) for _ in range(self.passes)]
         return _merge_verdicts(verdicts, mode=self.aggregate)
