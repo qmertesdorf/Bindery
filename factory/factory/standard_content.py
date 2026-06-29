@@ -1,9 +1,8 @@
 """Standard (read-through) book content: two-pass outline + per-chapter prose."""
 from __future__ import annotations
-import json
 from typing import Callable
 from .config import BookConfig
-from .content import ContentError, _strip_fences
+from .content import ContentError, generate_json
 
 MIN_CHAPTER_WORDS = 20    # hard floor that catches an empty / refused generation
 LENGTH_FLOOR_RATIO = 0.8  # below this fraction of the target, retry once for length
@@ -115,44 +114,40 @@ def _chapter_words(body: dict) -> int:
 def _generate_one_chapter(cfg: BookConfig, ch: dict, n: int, titles: list[str],
                           generate_fn: Callable[[str], str],
                           expand: bool = False) -> dict:
-    raw_c = generate_fn(build_chapter_prompt(cfg, ch, n, titles, expand=expand))
-    try:
-        body = json.loads(_strip_fences(raw_c))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"chapter {n} is not valid JSON: {e}") from e
-    validate_chapter(body, chapter_n=n)
-    return body
+    def _pv(data):
+        validate_chapter(data, chapter_n=n)
+        return data
+    return generate_json(
+        generate_fn, lambda: build_chapter_prompt(cfg, ch, n, titles, expand=expand),
+        _pv, label=f"chapter {n}")
 
 
 def _generate_matter(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict:
-    raw_m = generate_fn(build_matter_prompt(cfg))
-    try:
-        matter = json.loads(_strip_fences(raw_m))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"matter is not valid JSON: {e}") from e
-    validate_matter(matter)
-    return matter
+    def _pv(data):
+        validate_matter(data)
+        return data
+    return generate_json(generate_fn, lambda: build_matter_prompt(cfg), _pv,
+                         label="matter")
 
 
 def generate_standard_content(cfg: BookConfig,
                               generate_fn: Callable[[str], str]) -> dict:
-    raw = generate_fn(build_outline_prompt(cfg))
-    try:
-        outline = json.loads(_strip_fences(raw))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"outline is not valid JSON: {e}") from e
-    validate_outline(outline, cfg.chapter_count)
+    # Each artifact retries with the rejection reason fed back (generate_json), so a
+    # transient blip OR a systematic contract miss self-corrects instead of failing
+    # identically. The outline gains a retry it previously lacked.
+    def _pv_outline(data):
+        validate_outline(data, cfg.chapter_count)
+        return data
+    outline = generate_json(generate_fn, lambda: build_outline_prompt(cfg),
+                            _pv_outline, label="outline")
 
     target = cfg.words_per_chapter
     chapters, titles = [], []
     for i, ch in enumerate(outline["chapters"], 1):
-        # A chapter can hard-fail (refusal, truncation, sub-floor length, bad JSON)
-        # — a transient LLM blip that should not nuke a whole multi-chapter build.
-        # Give it ONE fresh retry; if that also fails, let the guard fail the build.
-        try:
-            body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
-        except ContentError:
-            body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
+        # A chapter that hard-fails (refusal, truncation, sub-floor length, bad JSON)
+        # is retried with feedback inside _generate_one_chapter; if it still fails,
+        # the guard fails the build.
+        body = _generate_one_chapter(cfg, ch, i, titles, generate_fn)
         # LLMs routinely under-deliver on length. If a chapter lands well under
         # the target, retry ONCE with an explicit expand instruction and keep the
         # longer draft — bounded so a stubbornly-short model can't loop forever.
@@ -167,12 +162,9 @@ def generate_standard_content(cfg: BookConfig,
         chapters.append({"title": ch["title"], "paragraphs": body["paragraphs"]})
         titles.append(ch["title"])
 
-    # Matter is one small call after all chapters — but a transient failure here
-    # would still nuke a fully-generated book, so give it the same one retry.
-    try:
-        matter = _generate_matter(cfg, generate_fn)
-    except ContentError:
-        matter = _generate_matter(cfg, generate_fn)
+    # Matter is one small call after all chapters; _generate_matter retries with
+    # feedback so a transient failure here can't nuke a fully-generated book.
+    matter = _generate_matter(cfg, generate_fn)
 
     return {"preface": outline["preface"], "chapters": chapters,
             "epigraph": matter["epigraph"], "readings": matter["readings"],

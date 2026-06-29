@@ -90,13 +90,15 @@ audit first stated and is confined to the SDXL path we don't ship.
   prompt, so the wrong number isn't reinjected into a bag-of-words prompt.
   Unrecognised issues pass through. Tests in `test_art.py`.
 
-### ✅ DONE — Error-feedback retry for content generation
+### ✅ DONE — Error-feedback retry for content generation (all paths)
 - `content.generate_json(generate_fn, build_prompt, parse_validate)`: on a
   parse/validation failure it retries while FEEDING the rejection reason back into
   the prompt (the old retries re-rolled the identical prompt blind, so a systematic
-  contract miss failed twice). Concept bible + story now route through it; the
-  paused standard/picture paths still use the old blind retry (easy follow-up — the
-  helper is generic). Tests in `test_content.py` + `test_concept_content.py`.
+  contract miss failed twice). **Concept** bible+story, **picture** bible+story, and
+  **standard** outline/chapter/matter all route through it now — the standard
+  *outline* also gained a feedback-retry it previously lacked, and the chapter
+  length-expand retry is preserved on top. Tests in `test_content.py`,
+  `test_concept_content.py`, `test_picture_content.py`, `test_standard_content.py`.
 
 ### ✅ DONE — Pin the content-generation model
 - `content.CONTENT_MODEL` (env-overridable `BOOKGEN_CONTENT_MODEL`, default

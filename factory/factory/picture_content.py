@@ -1,9 +1,8 @@
 """Picture-book content: a frozen story bible + per-page story text & scenes."""
 from __future__ import annotations
-import json
 from typing import Callable
 from .config import BookConfig
-from .content import ContentError, _strip_fences
+from .content import ContentError, generate_json
 
 
 def build_bible_prompt(cfg: BookConfig) -> str:
@@ -147,42 +146,33 @@ def validate_story(data: dict, expected_pages: int) -> None:
 
 
 def _generate_bible(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict:
-    raw = generate_fn(build_bible_prompt(cfg))
-    try:
-        data = json.loads(_strip_fences(raw))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"story bible is not valid JSON: {e}") from e
-    validate_bible(data)
-    return data
+    def _pv(data):
+        validate_bible(data)
+        return data
+    return generate_json(generate_fn, lambda: build_bible_prompt(cfg), _pv,
+                         label="story bible")
 
 
 def _generate_story(cfg: BookConfig, anchor: str,
                     generate_fn: Callable[[str], str]) -> dict:
-    raw = generate_fn(build_story_prompt(cfg, anchor))
-    try:
-        data = json.loads(_strip_fences(raw))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"story is not valid JSON: {e}") from e
-    validate_story(data, cfg.page_count)
-    return data
+    def _pv(data):
+        validate_story(data, cfg.page_count)
+        return data
+    return generate_json(generate_fn, lambda: build_story_prompt(cfg, anchor), _pv,
+                         label="story")
 
 
 def generate_picture_content(cfg: BookConfig,
                              generate_fn: Callable[[str], str]) -> dict:
-    # One retry each: a transient LLM blip should not nuke the whole build
-    # (same pattern as the standard strategy).
-    try:
-        bible = _generate_bible(cfg, generate_fn)
-    except ContentError:
-        bible = _generate_bible(cfg, generate_fn)
+    # Each artifact retries with the rejection reason fed back (generate_json), so a
+    # transient blip OR a systematic contract miss self-corrects instead of failing
+    # identically twice.
+    bible = _generate_bible(cfg, generate_fn)
     # Config-locked art_style / character_anchor always win so the look never
     # drifts run to run (and let us pin SDXL-friendly, renderable character traits).
     art_style = cfg.art_style or bible["art_style"]
     anchor = cfg.character_anchor or bible["character_anchor"]
-    try:
-        story = _generate_story(cfg, anchor, generate_fn)
-    except ContentError:
-        story = _generate_story(cfg, anchor, generate_fn)
+    story = _generate_story(cfg, anchor, generate_fn)
     return {"character_anchor": anchor, "art_style": art_style,
             "dedication": bible["dedication"], "pages": story["pages"],
             "closing": story["closing"]}

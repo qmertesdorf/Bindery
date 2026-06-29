@@ -19,6 +19,28 @@ def test_bible_prompt_mentions_pet_name_and_audience():
     p = build_bible_prompt(_cfg())
     assert "Sunny" in p and "dog" in p
 
+
+def test_picture_generation_feeds_rejection_reason_into_retry():
+    # the standard/picture paths now route through content.generate_json, so a first
+    # bad story is retried with the rejection reason fed back into the prompt
+    bible = json.dumps({"character_anchor": "a child and a dog",
+                        "art_style": "soft watercolour", "dedication": "For Sunny."})
+    good_pages = [_page(i) for i in range(1, 5)]
+    bad_story = json.dumps({"pages": good_pages[:2], "closing": "x"})   # wrong count
+    good_story = json.dumps({"pages": good_pages, "closing": "Goodnight."})
+    seen = []
+    calls = {"n": 0}
+    def fn(prompt):
+        seen.append(prompt); calls["n"] += 1
+        if calls["n"] == 1:
+            return bible
+        if calls["n"] == 2:
+            return bad_story
+        return good_story
+    out = generate_picture_content(_cfg(page_count=4), fn)
+    assert len(out["pages"]) == 4
+    assert "REJECTED" in seen[2] and "exactly 4" in seen[2]
+
 def test_story_prompt_requests_exact_page_count():
     p = build_story_prompt(_cfg(page_count=4), anchor="a child and a dog")
     assert "4" in p and "a child and a dog" in p
