@@ -21,6 +21,25 @@ class ArtError(RuntimeError):
     pass
 
 
+class AuditExhaustedError(ArtError):
+    """Every render attempt was REJECTED BY THE AUDITOR — the subject couldn't be
+    drawn acceptably. Deliberately distinct from a plain ArtError (a render-infra
+    failure: CUDA OOM, ComfyUI crash, timeout, no image) so callers can keep-best
+    or subject-swap on a genuine audit miss WITHOUT doing so on a transient render
+    failure — which a swap can never fix and which silently corrupted the book
+    (an OOM once swapped the cover-hero whale for a giant clam). Infra ArtError now
+    propagates and aborts loudly instead ([[catch-defects-with-guards]])."""
+    pass
+
+
+# A render (ComfyUI submit / best-of-N) can fail transiently — most often a CUDA
+# OOM while another GPU job contends for VRAM. Retry the render itself a few times
+# before letting the failure propagate, so a brief blip self-heals instead of
+# aborting (or, worse, masquerading as an un-renderable subject).
+_RENDER_RETRIES = 3
+_RENDER_BACKOFF = 6.0
+
+
 def inject_prompt(workflow: dict, *, positive_node: str, sampler_node: str,
                   prompt: str, seed: int) -> dict:
     wf = copy.deepcopy(workflow)
@@ -225,9 +244,23 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         if issues:
             hints = "; ".join(_shape_reroll_hint(i) for i in issues)
             p = f"{prompt} Fix these problems from the last attempt: {hints}"
-        _render_best_of_n(render, p, seed + attempt * 1009, out_path,
-                          n_candidates=n_candidates, selector=selector,
-                          caption=caption)
+        # The render is infrastructure: a CUDA OOM / ComfyUI crash / timeout here
+        # is transient (esp. under GPU contention), NOT the subject being
+        # un-renderable. Retry the render before letting it propagate — and it
+        # propagates as a plain ArtError (never AuditExhaustedError), so it aborts
+        # loudly rather than triggering a keep-best or a misguided subject swap.
+        for r in range(_RENDER_RETRIES):
+            try:
+                _render_best_of_n(render, p, seed + attempt * 1009, out_path,
+                                  n_candidates=n_candidates, selector=selector,
+                                  caption=caption)
+                break
+            except ArtError as e:
+                if r + 1 >= _RENDER_RETRIES:
+                    raise
+                _log(f"  [render] {name}: render failed ({e}); "
+                     f"retry {r + 1}/{_RENDER_RETRIES - 1} after backoff")
+                time.sleep(_RENDER_BACKOFF * (r + 1))
         verdict = auditor.audit(out_path, anchor=anchor,
                                 reference_path=reference_path, scene=scene,
                                 kind=audit_kind, caption=caption)
@@ -255,7 +288,7 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         _log(f"  [audit] {name}: REJECT attempt {attempt + 1}/{max_tries} — "
              f"{'; '.join(issues) or 'no reason given'}"
              + ("; regenerating" if attempt + 1 < max_tries else ""))
-    raise ArtError(
+    raise AuditExhaustedError(
         f"could not produce a consistent illustration for {name} "
         f"after {max_tries} tries; last issues: {issues}")
 

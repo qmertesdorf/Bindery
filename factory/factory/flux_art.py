@@ -8,7 +8,7 @@ in the config already exist in ComfyUI/models/loras."""
 from __future__ import annotations
 from pathlib import Path
 
-from factory.art import ArtError, run_audited_render, _log
+from factory.art import ArtError, AuditExhaustedError, run_audited_render, _log
 from factory import specs
 from factory.subject_fallback import SubjectFallbackError
 from factory.concept_content import regenerate_concept_page
@@ -358,7 +358,7 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 if style_ref is None:
                     style_ref = done  # first cohesive page anchors the rest
                 break
-            except ArtError:
+            except AuditExhaustedError:
                 can_fallback = (getattr(cfg, "subject_fallback", False)
                                 and generate_fn is not None and suggest_fn is not None
                                 and fallbacks < getattr(cfg, "max_fallbacks", 3))
@@ -452,10 +452,11 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
             cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
             anchor=cover_anchor, scene="front cover", reference_path=style_ref,
             seed=seed + 42, max_tries=max_tries, audit_kind="concept")
-    except ArtError as e:
-        # Surface the real reason (a render/ComfyUI failure looks identical to an
-        # audit flag otherwise) and DON'T claim a usable cover if none was written —
-        # the downstream cover guard then fails loudly instead of shipping stale art.
+    except AuditExhaustedError as e:
+        # Audit never passed the cover after every try — keep best + flag for review
+        # (an infra ArtError: OOM/crash now propagates and aborts loudly instead, so
+        # a render failure can't masquerade as a soft audit flag). DON'T claim a
+        # usable cover if none was written — the cover guard backstops either way.
         _log(f"[concept] cover: kept best after {max_tries} tries (REVIEW) — {e}")
         flagged.append("cover")
         cover = cover_path
@@ -524,7 +525,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
                 render, prompt, out_path=op, auditor=auditor, anchor=audit_anchor,
                 scene=page["scene"], reference_path=None, seed=seed + i * 17,
                 max_tries=max_tries))
-        except ArtError:
+        except AuditExhaustedError:
             _log(f"[flux] page {i}: kept best after {max_tries} tries (REVIEW)")
             flagged.append(i)
             out_pages.append(op)  # the final attempt was written before auditing
@@ -554,7 +555,7 @@ def generate_flux_art(cfg, content, out_dir, comfy, *, seed, auditor,
             cover_render, cover_prompt, out_path=cover_path, auditor=auditor,
             anchor=anchor, scene="front cover", reference_path=None, seed=seed + 42,
             max_tries=max_tries)
-    except ArtError:
+    except AuditExhaustedError:
         _log(f"[flux] cover: kept best after {max_tries} tries (REVIEW)")
         flagged.append("cover")
         cover = cover_path

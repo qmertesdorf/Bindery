@@ -275,6 +275,41 @@ def test_generate_concept_art_keeps_best_and_flags(tmp_path):
     assert art["pages"][0].exists()
 
 
+def test_render_oom_propagates_and_does_not_swap_subject(tmp_path, monkeypatch):
+    # A render-infra failure (a CUDA OOM surfaces as ArtError from ComfyUI) must NOT
+    # be mistaken for an un-renderable subject: it propagates as a plain ArtError
+    # (aborting loudly) rather than triggering a keep-best or — the bug this guards —
+    # a subject swap that silently corrupts the book (an OOM once swapped the
+    # cover-hero whale for a giant clam). subject_fallback is ON to prove the swap
+    # path is NOT taken on infra failure.
+    import factory.art as art_mod
+    monkeypatch.setattr(art_mod.time, "sleep", lambda *_: None)  # skip retry backoff
+
+    class _OOMComfy:
+        def submit(self, workflow, *, out_path):
+            raise art_mod.ArtError("ComfyUI error: CUDA out of memory")
+
+    def fake_generate(prompt):
+        raise AssertionError("must not regenerate content on a render OOM")
+
+    def fake_suggest(*, theme, used, failed):
+        raise AssertionError("must not swap subject on a render OOM")
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a blue whale", "text": "t",
+                          "scene": "a blue whale in deep water"}],
+               "closing": "c"}
+    with pytest.raises(art_mod.ArtError) as ei:
+        generate_concept_art(
+            _cfg(page_count=1, subject_fallback=True, max_fallbacks=2,
+                 max_reading_grade=0),
+            content, tmp_path, _OOMComfy(), seed=1, auditor=_OKAuditor(),
+            max_tries=2, generate_fn=fake_generate, suggest_fn=fake_suggest)
+    assert not isinstance(ei.value, art_mod.AuditExhaustedError)  # infra, not audit
+    assert "out of memory" in str(ei.value).lower()
+    assert content["pages"][0]["subject"] == "a blue whale"       # subject untouched
+
+
 def test_subject_fallback_swaps_stubborn_page(tmp_path):
     # A page whose subject the auditor keeps rejecting is swapped to a new subject,
     # its content regenerated, and re-rolled — rescuing the page (no flag).
