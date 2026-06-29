@@ -12,6 +12,18 @@ def test_cover_audit_prompt_checks_legibility():
     assert "blurb" in p
     assert "centred" in p or "centered" in p or "balance" in p  # checks centering too
 
+
+def test_cover_audit_prompt_checks_front_art_defects():
+    # The cover composition audit must also scrutinise the FRONT-COVER ART for defects
+    # (the gap that let a whale ship with a coral sprig growing from its blowhole) —
+    # not only text/layout.
+    p = build_cover_audit_prompt(image_path=Path("/o/c.png")).lower()
+    assert "front" in p and "art" in p
+    # growths / sprigs / antennae from an animal's head/body
+    assert "sprig" in p or "growth" in p or "antennae" in p or "blowhole" in p
+    # malformed/duplicated anatomy
+    assert "malformed" in p or "duplicated" in p or "fused" in p
+
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
                            image_path=Path("/out/page_01.png"),

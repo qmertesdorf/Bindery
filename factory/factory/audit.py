@@ -219,9 +219,19 @@ problem:
   when the background behind it is lopsided (e.g. a bright pool on one side, darker
   on the other) so the text appears pushed to one side even if technically centred.
 - broken or garbled text, or obvious layout breakage.
+- FRONT-COVER ART DEFECTS: look CLOSELY at every illustrated animal and subject on
+  the FRONT cover (the right half) — the cover art is the first thing a buyer sees,
+  so be STRICT. REJECT if any subject has an obvious illustration defect, such as:
+  unnatural growths, twigs, sprigs, branching coral, leaves, antennae, horns, antlers
+  or stray objects sprouting from an animal's head, blowhole, back or body where they
+  do not belong (e.g. a whale's blowhole must be a smooth spout, NOT a plant or branch
+  growing out of its head); malformed, garbled, fused or duplicated anatomy (a wrong
+  number of fins, flippers, limbs, eyes or tails; extra or merged body parts); or stray
+  floating shapes that read as a rendering mistake rather than intentional scenery.
 
-ACCEPT (set ok=true) if the front title/author and the entire back blurb are
-clearly legible and the layout is clean — natural art-style variation is fine.
+ACCEPT (set ok=true) if the front title/author and the entire back blurb are clearly
+legible, the layout is clean, AND the front-cover animals are free of growths/
+malformations/stray-object defects — natural art-style variation is fine.
 
 Return ONLY JSON: {{"ok": true|false, "issues": ["short issue", ...]}}
 Output the JSON and nothing else."""
