@@ -174,6 +174,14 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   no tusk, a HAMMERHEAD with an ordinary head. Friendly, simplified stylisation is
   fine, but the species' signature features must be clearly present so a child could
   name the animal from the picture alone;
+- EXTRA UNREQUESTED ANIMALS in the scene: this page shows the subject(s) described
+  above and nothing more. REJECT if the picture adds ANIMALS or CREATURES the scene
+  did NOT call for — e.g. small stray fish, birds, ducks, crabs, or other little
+  creatures scattered, swimming, or floating in the BACKGROUND of a single-subject
+  page. (Judge against the scene: if it describes several of one animal — "a pod of
+  dolphins", "a family of penguins" — that group is fine. Incidental NON-animal
+  scenery — plants, seaweed, coral, rocks, shells, bubbles, sky, water — is also fine;
+  ONLY unrequested extra CREATURES are the defect.);
 - a MALFORMED or HYBRID animal: anatomy that blends two species (e.g. a fox's body
   or colouring with a deer's or rabbit's tall ears/legs), mismatched or wrong body
   parts, or a creature that doesn't read clearly as ONE real animal. Every animal

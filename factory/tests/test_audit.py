@@ -36,6 +36,17 @@ def test_concept_audit_prompt_requires_species_recognizability():
     assert "pufferfish" in p and ("spine" in p or "prickle" in p)  # illustrative example
 
 
+def test_concept_audit_prompt_rejects_unrequested_extra_animals():
+    # Stray background creatures the scene didn't ask for (the 'ducks' behind the
+    # pufferfish) must be rejected — but legitimate multi-animal scenes still pass.
+    p = build_concept_audit_prompt(
+        anchor="a pufferfish in its natural setting", scene="a round pufferfish",
+        image_path=Path("/o/p.png")).lower()
+    assert "extra" in p and ("background" in p or "stray" in p)
+    assert "pod of dolphins" in p or "family of penguins" in p  # allowed groups
+    assert "scenery" in p  # non-animal scenery still fine
+
+
 def test_build_audit_prompt_includes_image_anchor_scene():
     p = build_audit_prompt(anchor="a girl + golden dog", scene="by the window",
                            image_path=Path("/out/page_01.png"),
