@@ -1,6 +1,7 @@
 """Stage 3: generate cover art via the local ComfyUI HTTP API."""
 from __future__ import annotations
 import copy
+import re
 import sys
 import time
 import urllib.parse
@@ -183,6 +184,25 @@ def _render_best_of_n(render, prompt, base_seed, out_path, *, n_candidates,
     return out_path
 
 
+# The count guard reports a wrong count as "wrong <part> count: scene/caption says
+# <n>, image shows <m>" (qa/count_guard.py). Re-shape that into a POSITIVE directive
+# before it is fed back into the diffusion prompt — a diffusion prompt is bag-of-words,
+# so appending "image shows 6 arms" can REINFORCE the wrong number instead of fixing it
+# ([[catch-defects-with-guards]]).
+_COUNT_ISSUE_RE = re.compile(
+    r"wrong (?P<part>[\w-]+) count: scene/caption says (?P<n>\d+)", re.IGNORECASE)
+
+
+def _shape_reroll_hint(issue: str) -> str:
+    """Turn a negative defect report into a positive generation directive for the
+    reroll prompt. Recognised count-guard issues become "draw exactly N <part>";
+    every other issue passes through unchanged."""
+    m = _COUNT_ISSUE_RE.search(issue)
+    if m:
+        return f"draw exactly {m.group('n')} {m.group('part')}"
+    return issue
+
+
 def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
                        reference_path=None, seed=0, max_tries=4,
                        audit_kind="character", caption=None,
@@ -203,7 +223,8 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
     for attempt in range(max_tries):
         p = prompt
         if issues:
-            p = f"{prompt} Fix these problems from the last attempt: {'; '.join(issues)}"
+            hints = "; ".join(_shape_reroll_hint(i) for i in issues)
+            p = f"{prompt} Fix these problems from the last attempt: {hints}"
         _render_best_of_n(render, p, seed + attempt * 1009, out_path,
                           n_candidates=n_candidates, selector=selector,
                           caption=caption)

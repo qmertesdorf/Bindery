@@ -1,7 +1,31 @@
 import json
 import pytest
 from factory.config import BookConfig
-from factory.content import build_prompt, generate_content, ContentError, validate_content
+from factory.content import (build_prompt, generate_content, ContentError,
+                             validate_content, generate_json)
+
+
+def test_generate_json_feeds_error_back_then_succeeds():
+    # first response fails validation; the retry prompt must carry the rejection reason
+    seen = []
+    seq = iter(['{"n": 1}', '{"n": 2}'])
+    def fn(prompt):
+        seen.append(prompt)
+        return next(seq)
+    def pv(data):
+        if data["n"] != 2:
+            raise ContentError("n must be 2")
+        return data
+    out = generate_json(fn, lambda: "BASE", pv, label="thing")
+    assert out == {"n": 2}
+    assert seen[0] == "BASE"
+    assert "REJECTED" in seen[1] and "n must be 2" in seen[1]
+
+
+def test_generate_json_raises_after_attempts_exhausted():
+    with pytest.raises(ContentError, match="after 2 attempts"):
+        generate_json(lambda p: "not json", lambda: "BASE",
+                      lambda d: d, label="thing")
 
 
 @pytest.fixture

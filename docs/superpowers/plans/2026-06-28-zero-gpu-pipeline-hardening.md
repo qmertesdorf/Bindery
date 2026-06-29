@@ -83,12 +83,35 @@ audit first stated and is confined to the SDXL path we don't ship.
   guard just makes the contract enforced, not asserted.
 - (Stretch) fact-check the "one easy true thing" claim per subject.
 
-### P2 — Reroll-hint shaping + copy differentiation
-- Rephrase count/shape reject hints into positive directives
-  ("draw exactly five arms") before appending to the reroll prompt.
-- Widen the count-guard regex to catch "five-armed" / "a pair of" / `NOT`-shape
-  claims (manatee/shark cases).
-- Differentiate generated listing copy so catalog titles aren't near-duplicates.
+### ✅ DONE — Reroll-hint positive shaping
+- `art._shape_reroll_hint`: the count guard's negative report
+  ("wrong arms count: … says 8, image shows 6") is rewritten to a POSITIVE
+  directive ("draw exactly 8 arms") before it is fed back into the diffusion
+  prompt, so the wrong number isn't reinjected into a bag-of-words prompt.
+  Unrecognised issues pass through. Tests in `test_art.py`.
+
+### ✅ DONE — Error-feedback retry for content generation
+- `content.generate_json(generate_fn, build_prompt, parse_validate)`: on a
+  parse/validation failure it retries while FEEDING the rejection reason back into
+  the prompt (the old retries re-rolled the identical prompt blind, so a systematic
+  contract miss failed twice). Concept bible + story now route through it; the
+  paused standard/picture paths still use the old blind retry (easy follow-up — the
+  helper is generic). Tests in `test_content.py` + `test_concept_content.py`.
+
+### ✅ DONE — Pin the content-generation model
+- `content.CONTENT_MODEL` (env-overridable `BOOKGEN_CONTENT_MODEL`, default
+  `claude-opus-4-8`) is passed as `claude -p --model <pinned>`; validated to a
+  safe `[A-Za-z0-9._-]` token so the no-shell-injection property holds. Builds are
+  now reproducible instead of inheriting the box's default model. (Temperature /
+  max-tokens are NOT exposed by the CLI, so they remain out of scope.)
+
+### DEFERRED — count-guard regex widening; LLM-differentiated listing copy
+- Regex widening ("five-armed" / "a pair of" / `NOT`-shape): LOW marginal value —
+  the live configs already write the clean "exactly N <part>" form, and widening
+  risks the false-rejects the count guard is explicitly built to never produce.
+- `copy.py` is already templated-per-subject (WS6b), not raw boilerplate; true
+  LLM-differentiated copy is higher effort/risk and lower leverage with only a
+  couple of concept titles — revisit when the catalog grows.
 
 ## Test / run note
 Run the suite via the factory venv from `factory/`

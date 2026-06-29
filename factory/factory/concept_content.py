@@ -6,7 +6,7 @@ import json
 import re
 from typing import Callable
 from .config import BookConfig
-from .content import ContentError, _strip_fences
+from .content import ContentError, _strip_fences, generate_json
 from .readability import flesch_kincaid_grade
 
 _WORD_RE = re.compile(r"[a-z0-9']+", re.IGNORECASE)
@@ -115,38 +115,30 @@ def validate_concept_story(data: dict, expected_pages: int) -> None:
 
 def _generate_concept_bible(cfg: BookConfig,
                             generate_fn: Callable[[str], str]) -> dict:
-    raw = generate_fn(build_concept_bible_prompt(cfg))
-    try:
-        data = json.loads(_strip_fences(raw))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"concept bible is not valid JSON: {e}") from e
-    validate_concept_bible(data)
-    return data
+    def _pv(data):
+        validate_concept_bible(data)
+        return data
+    return generate_json(generate_fn, lambda: build_concept_bible_prompt(cfg),
+                         _pv, label="concept bible")
 
 
 def _generate_concept_story(cfg: BookConfig,
                             generate_fn: Callable[[str], str]) -> dict:
-    raw = generate_fn(build_concept_story_prompt(cfg))
-    try:
-        data = json.loads(_strip_fences(raw))
-    except json.JSONDecodeError as e:
-        raise ContentError(f"concept story is not valid JSON: {e}") from e
-    validate_concept_story(data, cfg.page_count)
-    return data
+    def _pv(data):
+        validate_concept_story(data, cfg.page_count)
+        return data
+    return generate_json(generate_fn, lambda: build_concept_story_prompt(cfg),
+                         _pv, label="concept story")
 
 
 def generate_concept_content(cfg: BookConfig,
                              generate_fn: Callable[[str], str]) -> dict:
-    # One retry each: a transient LLM blip should not nuke the whole build.
-    try:
-        bible = _generate_concept_bible(cfg, generate_fn)
-    except ContentError:
-        bible = _generate_concept_bible(cfg, generate_fn)
+    # Each artifact retries once, feeding the rejection reason back into the prompt
+    # (generate_json) so a transient blip OR a systematic contract miss self-corrects
+    # instead of failing identically twice.
+    bible = _generate_concept_bible(cfg, generate_fn)
     art_style = cfg.art_style or bible["art_style"]
-    try:
-        story = _generate_concept_story(cfg, generate_fn)
-    except ContentError:
-        story = _generate_concept_story(cfg, generate_fn)
+    story = _generate_concept_story(cfg, generate_fn)
     return {"art_style": art_style, "character_anchor": "",
             "dedication": bible["dedication"], "pages": story["pages"],
             "closing": story["closing"]}

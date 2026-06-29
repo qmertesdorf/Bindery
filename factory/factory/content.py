@@ -1,10 +1,18 @@
 """Stage 1: generate interior content via an injected LLM callable."""
 from __future__ import annotations
 import json
+import os
 import re
 import subprocess
 from typing import Callable
 from .config import BookConfig
+
+# Pin the content-generation model so builds are REPRODUCIBLE: without a pin,
+# claude_generate inherits whatever the box's default Claude model happens to be
+# that day, so the same config could yield different prose on a re-run. Override
+# per-environment with BOOKGEN_CONTENT_MODEL (e.g. a cheaper model for bulk
+# standard-book chapters). Validated below so it stays a safe shell token.
+CONTENT_MODEL = os.environ.get("BOOKGEN_CONTENT_MODEL", "claude-opus-4-8")
 
 REQUIRED_KEYS = ["intro", "how_to_use", "pet_profile_fields", "prompts",
                  "milestones", "section_microcopy", "letter_pages"]
@@ -43,6 +51,42 @@ def _strip_fences(text: str) -> str:
     return text
 
 
+def _retry_feedback(error: str) -> str:
+    """Suffix appended to a regenerated prompt telling the model exactly why its
+    last response was rejected — so a SYSTEMATIC contract/formatting miss isn't
+    repeated identically on the retry (the old retries re-rolled the same prompt
+    blind)."""
+    return (f"\n\nIMPORTANT: your previous response was REJECTED for this reason: "
+            f"{error}\nReturn a corrected response that fixes exactly this problem. "
+            f"Output ONLY the JSON and nothing else.")
+
+
+def generate_json(generate_fn: Callable[[str], str], build_prompt: Callable[[], str],
+                  parse_validate: Callable[[dict], object], *,
+                  attempts: int = 2, label: str = "content") -> object:
+    """Generate → strip fences → JSON-parse → ``parse_validate``, retrying on any
+    ContentError/JSON error while FEEDING the rejection reason back into the prompt.
+
+    ``build_prompt()`` returns the base prompt (no args); the feedback is appended
+    here on retries. ``parse_validate(data)`` validates and returns the usable
+    result (it may raise ContentError). Raises ContentError if every attempt fails."""
+    base = build_prompt()
+    last = None
+    for _ in range(attempts):
+        prompt = base if last is None else base + _retry_feedback(last)
+        raw = generate_fn(prompt)
+        try:
+            data = json.loads(_strip_fences(raw))
+        except json.JSONDecodeError as e:
+            last = f"{label} is not valid JSON: {e}"
+            continue
+        try:
+            return parse_validate(data)
+        except ContentError as e:
+            last = str(e)
+    raise ContentError(f"{label}: failed after {attempts} attempts; last error: {last}")
+
+
 def validate_content(data: dict, expected_prompts: int) -> None:
     if not isinstance(data, dict):
         raise ContentError("content is not a JSON object")
@@ -79,11 +123,15 @@ def claude_generate(prompt: str) -> str:
 
     Uses shell=True so the Windows `claude.cmd`/Unix shim resolves, and pipes the
     prompt via stdin so the multi-line text never needs shell quoting. The shell
-    string is the constant "claude -p" (no interpolated data), so there is no
-    injection surface.
+    string is the constant "claude -p --model <pinned>" — the model id is validated
+    to a safe `[A-Za-z0-9._-]` token, so there is still no interpolated user data
+    and no injection surface. Pinning the model keeps builds reproducible.
     """
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", CONTENT_MODEL):
+        raise ContentError(
+            f"BOOKGEN_CONTENT_MODEL {CONTENT_MODEL!r} is not a safe model token")
     proc = subprocess.run(
-        "claude -p",
+        f"claude -p --model {CONTENT_MODEL}",
         input=prompt,
         capture_output=True, text=True, timeout=300,
         shell=True,

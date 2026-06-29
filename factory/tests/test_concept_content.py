@@ -74,6 +74,34 @@ def test_couplet_issues_flags_identical_end_word_fake_rhyme():
     assert couplet_issues("A whale is blue,\nthe sea is blue.")
 
 
+def test_concept_generation_feeds_rejection_reason_into_retry():
+    # A first response that fails validation must be retried with the REASON fed back
+    # into the prompt (not a blind identical re-roll), so a systematic miss self-corrects.
+    bible = json.dumps({"art_style": "soft watercolour", "dedication": "For all."})
+    good_pages = [
+        {"subject": "a fox", "text": "A fox is red,\ncurled in its bed.",
+         "scene": "a fox in grass"},
+        {"subject": "an owl", "text": "An owl can fly,\nhigh in the sky.",
+         "scene": "an owl at dusk"},
+    ]
+    bad_story = json.dumps({"pages": good_pages[:1], "closing": "x"})   # too few pages
+    good_story = json.dumps({"pages": good_pages, "closing": "Bye!"})
+    seen = []
+    calls = {"n": 0}
+    def fn(prompt):
+        calls["n"] += 1
+        seen.append(prompt)
+        if calls["n"] == 1:
+            return bible
+        if calls["n"] == 2:
+            return bad_story          # first story attempt: wrong page count
+        return good_story             # retry succeeds
+    content = generate_concept_content(_cfg(page_count=2), fn)
+    assert len(content["pages"]) == 2
+    # the retry prompt (4th call slot is story-retry = index 2) carries the rejection reason
+    assert "REJECTED" in seen[2] and "exactly 2" in seen[2]
+
+
 def test_concept_story_validates_couplet_contract():
     # a single-line 'couplet' in a read-aloud learning book is a real defect
     bad = {"pages": [{"subject": "a fox", "text": "A fox is red.",

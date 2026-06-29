@@ -235,6 +235,43 @@ def test_run_audited_render_retries_with_fresh_seed_and_hints(tmp_path):
     assert "Fix these problems" in prompts[1]  # corrective hint appended on retry
     assert prompts[0] == "base prompt"         # first attempt is the clean prompt
 
+
+def test_shape_reroll_hint_rewrites_count_issue_positively():
+    from factory.art import _shape_reroll_hint
+    # the count guard's negative report becomes a positive directive (no "image shows")
+    out = _shape_reroll_hint(
+        "wrong arms count: scene/caption says 8, image shows 6")
+    assert out == "draw exactly 8 arms"
+    # hyphenated parts survive
+    assert _shape_reroll_hint(
+        "wrong eye-stalks count: scene/caption says 2, image shows 3"
+    ) == "draw exactly 2 eye-stalks"
+    # unrecognised issues pass through unchanged
+    assert _shape_reroll_hint("dog colour off") == "dog colour off"
+
+
+class _CountIssueAuditor:
+    """Fail once with a count-guard-style issue, then pass."""
+    def __init__(self): self.calls = 0
+    def audit(self, image_path, **kw):
+        self.calls += 1
+        if self.calls == 1:
+            return {"ok": False,
+                    "issues": ["wrong arms count: scene/caption says 8, image shows 6"]}
+        return {"ok": True, "issues": []}
+
+
+def test_reroll_prompt_feeds_positive_count_directive_not_the_wrong_number(tmp_path):
+    from factory.art import run_audited_render
+    prompts = []
+    def render(prompt, seed, out_path):
+        prompts.append(prompt); Path(out_path).write_bytes(b"x")
+    run_audited_render(render, "an octopus", out_path=tmp_path / "p.png",
+                       auditor=_CountIssueAuditor(), anchor="a", scene="s", seed=1,
+                       max_tries=3)
+    assert "draw exactly 8 arms" in prompts[1]   # positive directive on the reroll
+    assert "image shows" not in prompts[1]        # the wrong number is NOT reinjected
+
 def test_run_audited_render_raises_after_budget(tmp_path):
     from factory.art import run_audited_render
     def render(prompt, seed, out_path):
