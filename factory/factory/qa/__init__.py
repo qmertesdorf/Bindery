@@ -17,6 +17,7 @@ from .hadm import AnatomyDetector, AnatomyError, Defect
 from .selection import BestOfNSelector
 from .tifa import TifaProbe, TifaDecomposer, TifaEvaluator, TifaError
 from .count_guard import CountGuard, extract_count_claims
+from .corner_guard import CornerGuard
 from .ensemble import EnsembleAuditor, build_ensemble_auditor
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "BestOfNSelector",
     "TifaProbe", "TifaDecomposer", "TifaEvaluator", "TifaError",
     "CountGuard", "extract_count_claims",
+    "CornerGuard",
     "EnsembleAuditor", "build_ensemble_auditor",
 ]

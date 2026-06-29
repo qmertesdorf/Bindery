@@ -72,6 +72,7 @@ class BookConfig:
     qa_audit_aggregate: str = "any_fail"  # how to combine passes: "any_fail" (max recall, default) or "majority" (more precision; a lone dissent won't trigger a reroll)
     qa_describe_first: bool = False        # describe-then-judge: one spec-free observation pass feeds every judge pass (beats VLM text-prior bias); +1 vision call/audit
     qa_count_guard: bool = False           # deterministic exact-count gate: isolated per-part count probe + code integer-compare vs the scene/caption's stated counts (the VLM can't count the 6-arm starfish)
+    qa_corner_crops: bool = False          # full-res four-corner probe for stray text/signatures/watermarks + blank trim-margin paper invisible on the downscaled page; +4 vision calls/audit
     # Auto-subject-fallback (concept line): on a page that exhausts its render→audit
     # budget, swap to a fresh on-theme LLM-chosen subject and re-roll instead of
     # shipping a flagged defect. Default OFF → existing builds unchanged.
@@ -210,6 +211,7 @@ def load_config(path: str | Path) -> BookConfig:
         qa_audit_aggregate=str(data.get("qa_audit_aggregate", "any_fail")),
         qa_describe_first=bool(data.get("qa_describe_first", False)),
         qa_count_guard=bool(data.get("qa_count_guard", False)),
+        qa_corner_crops=bool(data.get("qa_corner_crops", False)),
         subject_fallback=bool(data.get("subject_fallback", False)),
         max_fallbacks=int(data.get("max_fallbacks", 3)),
     )

@@ -21,20 +21,24 @@ from .hadm import AnatomyDetector
 from .selection import BestOfNSelector
 from .tifa import TifaDecomposer, TifaEvaluator
 from .count_guard import CountGuard
+from .corner_guard import CornerGuard
 
 
 class EnsembleAuditor:
-    """Holistic auditor plus optional VQAScore, anatomy, TIFA, and count members."""
+    """Holistic auditor plus optional VQAScore, anatomy, TIFA, count, and corner
+    members."""
 
     def __init__(self, holistic, *, vqa: VQAScorer | None = None,
                  anatomy: AnatomyDetector | None = None,
                  tifa: TifaEvaluator | None = None,
-                 count_guard: CountGuard | None = None):
+                 count_guard: CountGuard | None = None,
+                 corner_guard: CornerGuard | None = None):
         self.holistic = holistic
         self.vqa = vqa
         self.anatomy = anatomy
         self.tifa = tifa
         self.count_guard = count_guard
+        self.corner_guard = corner_guard
 
     def selector(self) -> BestOfNSelector | None:
         """A best-of-N selector backed by the VQAScore member, or None when there
@@ -73,6 +77,15 @@ class EnsembleAuditor:
                 ok = False
                 issues.extend(cissues)
 
+        # Full-res four-corner gate: catches stray corner text/signatures and blank
+        # trim-margin paper that are sub-pixel (invisible) on the downscaled full
+        # page. Skipped on covers, which legitimately carry title/blurb text.
+        if self.corner_guard is not None and kind != "cover":
+            gissues = self.corner_guard.check(image_path)
+            if gissues:
+                ok = False
+                issues.extend(gissues)
+
         # HADM anatomy-defect gate; its boxes drive the WS2 repair pass.
         if self.anatomy is not None and kind != "cover":
             defects = self.anatomy.detect(image_path)
@@ -97,7 +110,8 @@ class EnsembleAuditor:
 
 def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
                            vqa_score_fn=None, anatomy_detect_fn=None,
-                           tifa_decompose_fn=None, count_fn=None):
+                           tifa_decompose_fn=None, count_fn=None,
+                           corner_probe_fn=None):
     """Assemble the auditor for a book from its config flags.
 
     Returns the bare holistic `ClaudeVisionAuditor` when no extra QA stage is
@@ -113,7 +127,8 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
     use_anatomy = getattr(cfg, "qa_anatomy", False)
     use_tifa = getattr(cfg, "qa_tifa", False)
     use_count = getattr(cfg, "qa_count_guard", False)
-    if not use_vqa and not use_anatomy and not use_tifa and not use_count:
+    use_corner = getattr(cfg, "qa_corner_crops", False)
+    if not (use_vqa or use_anatomy or use_tifa or use_count or use_corner):
         return holistic
     vqa = (VQAScorer(score_fn=vqa_score_fn,
                      threshold=getattr(cfg, "qa_vqa_threshold", 0.15))
@@ -129,5 +144,6 @@ def build_ensemble_auditor(cfg, *, holistic=None, judge_fn=None,
         tifa = TifaEvaluator(TifaDecomposer(decompose_fn=tifa_decompose_fn), scorer,
                              threshold=getattr(cfg, "qa_tifa_threshold", 0.4))
     count_guard = CountGuard(count_fn=count_fn) if use_count else None
+    corner_guard = CornerGuard(probe_fn=corner_probe_fn) if use_corner else None
     return EnsembleAuditor(holistic, vqa=vqa, anatomy=anatomy, tifa=tifa,
-                           count_guard=count_guard)
+                           count_guard=count_guard, corner_guard=corner_guard)
