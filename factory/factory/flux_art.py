@@ -120,7 +120,8 @@ GRIEF = {"sad", "lonely", "wistful", "grieving", "somber", "melancholy", "heavy"
 
 def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
                        steps: int = 28, width: int = 1152, height: int = 1152,
-                       upscale: int = 2560, upscale_model: str = "") -> dict:
+                       upscale: int = 2560, upscale_model: str = "",
+                       negative: str = "", neg_cfg: float = 2.5) -> dict:
     """Build a Flux + stacked-LoRA ComfyUI graph with prompt + seed baked in.
 
     `loras` is a list of (lora_name, strength) applied in series on the UNET
@@ -132,7 +133,16 @@ def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
     → ImageUpscaleWithModel) reconstructs detail before the final exact-size resize,
     giving sharper print than plain lanczos; "" keeps the lanczos-only path. The
     ESRGAN model enlarges by its own fixed factor, so we still ImageScale to the
-    exact `upscale` target px afterwards."""
+    exact `upscale` target px afterwards.
+
+    `negative` (opt-in real negative conditioning): Flux's `BasicGuider` is
+    positive-only (CFG=1), so forbidding text in the POSITIVE prompt ("no other
+    animals", "no signature") is something the model can't act on and may even
+    reinforce — the root cause of stray background creatures and fake watermarks.
+    When `negative` is set, a second CLIPTextEncode branch + a `CFGGuider` (at
+    `neg_cfg`, must be >1 for the negative to bite) let Flux actually SUPPRESS that
+    content. "" keeps the byte-identical positive-only path. The guider keeps the
+    node id "gd" either way so the sampler wiring is unchanged."""
     nodes = {
         "u": {"class_type": "UNETLoader",
               "inputs": {"unet_name": BASE_UNET, "weight_dtype": "fp8_e4m3fn"}},
@@ -169,6 +179,16 @@ def flux_lora_workflow(prompt: str, seed: int, *, loras, guidance: float,
         "dec": {"class_type": "VAEDecode",
                 "inputs": {"samples": ["sa", 0], "vae": ["v", 0]}},
     })
+    # Opt-in real negative conditioning: swap the positive-only BasicGuider for a
+    # CFGGuider driven by a negative CLIP branch, so forbidden content is actually
+    # suppressed instead of merely (uselessly) named in the positive prompt. Keeps
+    # the node id "gd" so the sampler wiring above is unchanged.
+    if negative:
+        nodes["neg"] = {"class_type": "CLIPTextEncode",
+                        "inputs": {"text": negative, "clip": ["c", 0]}}
+        nodes["gd"] = {"class_type": "CFGGuider",
+                       "inputs": {"model": [head, 0], "positive": ["fg", 0],
+                                  "negative": ["neg", 0], "cfg": neg_cfg}}
     # WS3b: optional learned (ESRGAN) upscale before the final exact-size resize.
     # Lanczos only interpolates; an ESRGAN model reconstructs high-frequency detail
     # for sharper print. The model enlarges by its own fixed factor, so we still
@@ -354,7 +374,9 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
         def render(p, s, op):
             comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
                                             upscale=art_px,
-                                            upscale_model=cfg.upscale_model),
+                                            upscale_model=cfg.upscale_model,
+                                            negative=getattr(cfg, "negative_prompt", ""),
+                                            neg_cfg=getattr(cfg, "negative_cfg", 2.5)),
                          out_path=op)
 
         # Render → audit, and (concept line, opt-in) auto-swap an un-renderable
@@ -478,8 +500,10 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
     def cover_render(p, s, op):
         comfy.submit(flux_lora_workflow(p, s, loras=[], guidance=guidance,
                                         upscale=art_px,
-                                            upscale_model=cfg.upscale_model),
-                         out_path=op)
+                                        upscale_model=cfg.upscale_model,
+                                        negative=getattr(cfg, "negative_prompt", ""),
+                                        neg_cfg=getattr(cfg, "negative_cfg", 2.5)),
+                     out_path=op)
 
     cover_anchor = (f"a {cfg.subject} scene in a soft storybook illustration style; "
                     f"no people, no text")

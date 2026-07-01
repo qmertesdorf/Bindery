@@ -90,6 +90,40 @@ def test_flux_workflow_inserts_esrgan_upscaler_when_model_given():
     assert wf["up"]["inputs"]["width"] == wf["up"]["inputs"]["height"] == 2625
     assert wf["save"]["inputs"]["images"] == ["up", 0]
 
+def test_flux_workflow_no_negative_keeps_positive_only_basicguider():
+    # Default (no negative) is byte-identical to the old positive-only graph.
+    wf = flux_lora_workflow("x", 1, loras=[], guidance=2.4)
+    assert wf["gd"]["class_type"] == "BasicGuider"
+    assert wf["gd"]["inputs"]["conditioning"] == ["fg", 0]
+    assert "neg" not in wf
+    assert "CFGGuider" not in [n["class_type"] for n in wf.values()]
+
+
+def test_flux_workflow_negative_adds_cfgguider_branch():
+    wf = flux_lora_workflow("a whale", 1, loras=[], guidance=2.4,
+                            negative="other fish, text, signature", neg_cfg=3.0)
+    # a real negative CLIP encode is added
+    assert wf["neg"]["class_type"] == "CLIPTextEncode"
+    assert wf["neg"]["inputs"]["text"] == "other fish, text, signature"
+    assert wf["neg"]["inputs"]["clip"] == ["c", 0]
+    # the guider node id stays "gd" (sampler wiring unchanged) but is now CFGGuider,
+    # wiring positive off FluxGuidance and negative off the new encode
+    assert wf["gd"]["class_type"] == "CFGGuider"
+    assert wf["gd"]["inputs"]["positive"] == ["fg", 0]
+    assert wf["gd"]["inputs"]["negative"] == ["neg", 0]
+    assert wf["gd"]["inputs"]["cfg"] == 3.0
+    assert wf["gd"]["inputs"]["model"] == ["u", 0]
+    # sampler still reads the guider from the same node id
+    assert wf["sa"]["inputs"]["guider"] == ["gd", 0]
+
+
+def test_flux_workflow_negative_respects_lora_head():
+    wf = flux_lora_workflow("x", 1, loras=[("boy.safetensors", 0.9)], guidance=2.4,
+                            negative="blurry")
+    assert wf["gd"]["class_type"] == "CFGGuider"
+    assert wf["gd"]["inputs"]["model"] == ["lora0", 0]   # guider on the last lora
+
+
 def test_flux_workflow_stacks_two_loras_in_series():
     wf = flux_lora_workflow("x", 1, guidance=2.4,
                             loras=[("boy.safetensors", 0.9), ("dog.safetensors", 0.85)])
