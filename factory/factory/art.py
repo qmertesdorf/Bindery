@@ -1,6 +1,7 @@
 """Stage 3: generate cover art via the local ComfyUI HTTP API."""
 from __future__ import annotations
 import copy
+import os
 import re
 import sys
 import time
@@ -252,6 +253,12 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
     LOCALIZED reject (auditor verdict carries `defects`) before a fresh-seed reroll."""
     out_path = Path(out_path)
     name = out_path.name
+    # Work against a __wip sibling and only PROMOTE to out_path on an audit accept
+    # (or the deliberate keep-best on exhaustion). If the process crashes mid-loop,
+    # the leftover on disk is page_NN__wip.png — which the resume/reuse path never
+    # matches — so a REJECTED render can no longer ride into a resumed build as a
+    # trusted finished page (live failure: wild-green-world owl, 2026-07-02).
+    wip = out_path.with_name(out_path.stem + "__wip" + out_path.suffix)
     issues: list[str] = []
     for attempt in range(max_tries):
         p = prompt
@@ -269,7 +276,7 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         # loudly rather than triggering a keep-best or a misguided subject swap.
         for r in range(_RENDER_RETRIES):
             try:
-                _render_best_of_n(render, p, seed + attempt * 1009, out_path,
+                _render_best_of_n(render, p, seed + attempt * 1009, wip,
                                   n_candidates=n_candidates, selector=selector,
                                   caption=caption)
                 break
@@ -279,7 +286,7 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
                 _log(f"  [render] {name}: render failed ({e}); "
                      f"retry {r + 1}/{_RENDER_RETRIES - 1} after backoff")
                 time.sleep(_RENDER_BACKOFF * (r + 1))
-        verdict = auditor.audit(out_path, anchor=anchor,
+        verdict = auditor.audit(wip, anchor=anchor,
                                 reference_path=reference_path, scene=scene,
                                 kind=audit_kind, caption=caption)
         # A deterministic post-check (e.g. has_white_border) is the reliable backstop
@@ -288,7 +295,7 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         # rerolls instead of shipping flagged ([[catch-defects-with-guards]]).
         if verdict.get("ok") and post_check is not None:
             try:
-                pc_issue = post_check(out_path)
+                pc_issue = post_check(wip)
             except Exception as e:   # a best-effort post-check must never abort a build
                 _log(f"  [audit] {name}: post-check errored ({e}); skipping")
                 pc_issue = None
@@ -299,6 +306,7 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         if verdict.get("ok"):
             _log(f"  [audit] {name}: OK"
                  + (f" on attempt {attempt + 1}/{max_tries}" if attempt else ""))
+            os.replace(wip, out_path)   # promote: audit accepted
             return out_path
         issues = verdict.get("issues", [])
         # WS2: a LOCALIZED reject (detector boxes) gets a masked inpaint repair and
@@ -306,20 +314,26 @@ def run_audited_render(render, prompt, *, out_path, auditor, anchor, scene,
         if repair_fn is not None and verdict.get("defects"):
             _log(f"  [repair] {name}: localized defect(s) — inpainting before reroll")
             try:
-                repair_fn(out_path, verdict["defects"], prompt=p)
+                repair_fn(wip, verdict["defects"], prompt=p)
             except Exception as e:  # repair is best-effort; fall back to a reroll
                 _log(f"  [repair] {name}: repair failed ({e}); rerolling")
             else:
-                rev = auditor.audit(out_path, anchor=anchor,
+                rev = auditor.audit(wip, anchor=anchor,
                                     reference_path=reference_path, scene=scene,
                                     kind=audit_kind, caption=caption)
                 if rev.get("ok"):
                     _log(f"  [repair] {name}: OK after inpaint repair")
+                    os.replace(wip, out_path)   # promote: audit accepted
                     return out_path
                 issues = rev.get("issues", issues)
         _log(f"  [audit] {name}: REJECT attempt {attempt + 1}/{max_tries} — "
              f"{'; '.join(issues) or 'no reason given'}"
              + ("; regenerating" if attempt + 1 < max_tries else ""))
+    # Deliberate keep-best on exhaustion: the caller flags this page for REVIEW,
+    # so the last attempt DOES belong at out_path (unlike a crash, which now
+    # strands only the __wip file that resume/reuse never picks up).
+    if wip.exists():
+        os.replace(wip, out_path)
     raise AuditExhaustedError(
         f"could not produce a consistent illustration for {name} "
         f"after {max_tries} tries; last issues: {issues}")

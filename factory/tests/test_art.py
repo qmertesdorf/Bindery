@@ -430,3 +430,51 @@ def test_repair_skipped_when_reject_has_no_defects(tmp_path):
                        auditor=_Auditor(fail_first=1), anchor="a", scene="s",
                        seed=0, max_tries=4, repair_fn=repair_fn)
     assert called == []   # holistic reject with no boxes -> straight to reroll
+
+
+def test_accepted_render_promotes_wip_and_leaves_no_leftover(tmp_path):
+    """Renders happen at page__wip.png and only PROMOTE to page.png on audit
+    accept, so a crash can never strand a REJECTED render at the trusted name
+    (live failure: a resumed build reused a rejected owl-ram hybrid, 2026-07-02)."""
+    from factory.art import run_audited_render
+    def render(prompt, seed, out_path):
+        Path(out_path).write_bytes(b"painted")
+    out = run_audited_render(render, "an owl", out_path=tmp_path / "p.png",
+                             auditor=_Auditor(), anchor="a", scene="s", seed=1,
+                             max_tries=2)
+    assert Path(out).read_bytes() == b"painted"
+    assert not (tmp_path / "p__wip.png").exists()
+
+
+def test_crash_mid_loop_strands_only_wip_not_out_path(tmp_path):
+    """A render infrastructure death (ArtError after retries) must leave nothing
+    at out_path — the previous attempt's REJECTED image stays at __wip where the
+    reuse path never finds it."""
+    from factory.art import run_audited_render, ArtError
+    calls = {"n": 0}
+    def render(prompt, seed, out_path):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            Path(out_path).write_bytes(b"rejected art")   # attempt 1: renders, audit fails
+        else:
+            raise ArtError("ComfyUI generation timed out")  # attempt 2: infra dies
+    with pytest.raises(ArtError):
+        run_audited_render(render, "an owl", out_path=tmp_path / "p.png",
+                           auditor=_Auditor(fail_first=99), anchor="a", scene="s",
+                           seed=1, max_tries=4)
+    assert not (tmp_path / "p.png").exists()          # nothing promoted
+    assert (tmp_path / "p__wip.png").exists()          # leftover is clearly WIP
+
+
+def test_exhausted_budget_still_keeps_best_at_out_path(tmp_path):
+    """Deliberate keep-best on exhaustion is preserved: the caller flags the page
+    for REVIEW and expects the last attempt at out_path."""
+    from factory.art import run_audited_render, AuditExhaustedError
+    def render(prompt, seed, out_path):
+        Path(out_path).write_bytes(b"best effort")
+    with pytest.raises(AuditExhaustedError):
+        run_audited_render(render, "an owl", out_path=tmp_path / "p.png",
+                           auditor=_Auditor(fail_first=99), anchor="a", scene="s",
+                           seed=1, max_tries=2)
+    assert (tmp_path / "p.png").read_bytes() == b"best effort"
+    assert not (tmp_path / "p__wip.png").exists()
