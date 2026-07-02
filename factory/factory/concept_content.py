@@ -74,7 +74,11 @@ Return ONLY valid JSON:
   the species instantly recognizable (e.g. a pufferfish's SPINES, a swordfish's long
   bill, a narwhal's tusk, an octopus's eight arms, the correct fins/tail shape) so a
   child could name the animal from the picture alone; never smooth away or omit a
-  defining feature. Keep
+  defining feature. The scene text is fed VERBATIM to the image model, so NEVER
+  describe a feature by comparing it to a feature the animal does NOT have (not
+  "ear tufts like horns", not "a tail like a fish") — the image model paints the
+  compared thing literally (real horns, a fish tail). Name only what the feature
+  actually IS ("two soft upright feather tufts on its head"). Keep
   the FACE and expression sweet and friendly (soft gentle eyes, a gentle smile), but
   keep the BODY true to the real animal — do NOT round every creature into the same
   chubby ball or blob: an elongated animal stays long and sleek, a flat animal stays
@@ -164,7 +168,11 @@ Return ONLY valid JSON:
   BUT FRIENDLY: describe its TRUE body shape, real proportions and the SIGNATURE
   features that make the species instantly recognizable (e.g. a pufferfish's spines, a
   swordfish's bill, a narwhal's tusk; the correct fins/tail/limb count) so a child
-  could name it from the picture — never smooth away or omit a defining feature; keep
+  could name it from the picture — never smooth away or omit a defining feature. The
+  scene text is fed VERBATIM to the image model, so NEVER describe a feature by
+  comparing it to a feature the animal does NOT have (not "ear tufts like horns",
+  not "a tail like a fish") — the image model paints the compared thing literally;
+  name only what the feature actually IS. Keep
   the FACE sweet and friendly (soft gentle eyes,
   a gentle smile) but keep the BODY true to the animal — do NOT round it into a chubby
   ball or blob (an elongated animal stays long and sleek, a flat animal stays flat).

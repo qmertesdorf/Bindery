@@ -131,3 +131,13 @@ def test_concept_story_prompt_requires_accurate_but_friendly_body():
     # signature/defining features so the animal is recognizable (the spineless-puffer gap)
     assert "signature" in low and "recogniz" in low
     assert "spine" in low or "tusk" in low or "bill" in low
+
+
+def test_scene_prompts_forbid_wrong_feature_similes():
+    """'ear tufts like horns' in a scene begets literal ram horns (live defect,
+    wild-green-world owl 2026-07-02): both scene-writing prompts must carry the
+    anti-simile rule since scene text feeds the image model verbatim."""
+    from factory.concept_content import build_concept_page_prompt
+    rule = "NEVER describe a feature by comparing"
+    assert rule in build_concept_story_prompt(_cfg())
+    assert rule in build_concept_page_prompt(_cfg(), "a great horned owl")
