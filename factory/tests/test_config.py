@@ -368,3 +368,24 @@ def test_subject_fallback_flags_default_off_and_parse(tmp_path):
     cfg = load_config(p)
     assert cfg.subject_fallback is True
     assert cfg.max_fallbacks == 5
+
+
+def test_negative_prompt_default_keyword_expands(tmp_path):
+    """negative_prompt: "default" is sugar for the engine's vetted concept
+    negative (validated live on deep-blue-world v5+v6). Explicit strings and
+    omission are untouched, so existing configs stay byte-identical."""
+    from factory.config import DEFAULT_CONCEPT_NEGATIVE
+    p = tmp_path / "c.json"
+
+    p.write_text(json.dumps(_concept_data(negative_prompt="default")), encoding="utf-8")
+    cfg = load_config(p)
+    assert cfg.negative_prompt == DEFAULT_CONCEPT_NEGATIVE
+    # the vetted negative must keep its load-bearing clauses
+    for phrase in ("watermark", "extra", "border", "oversaturated"):
+        assert phrase in DEFAULT_CONCEPT_NEGATIVE
+
+    p.write_text(json.dumps(_concept_data(negative_prompt="just my terms")), encoding="utf-8")
+    assert load_config(p).negative_prompt == "just my terms"   # pass-through
+
+    p.write_text(json.dumps(_concept_data()), encoding="utf-8")
+    assert load_config(p).negative_prompt == ""                # omitted = off

@@ -7,6 +7,27 @@ from pathlib import Path
 REQUIRED = ["slug", "title", "subtitle", "author", "art_prompt"]
 BOOK_TYPES = ("journal", "standard", "picture", "concept")
 
+# The vetted concept-book negative, validated live across deep-blue-world v5+v6
+# (kills in-image text/signatures, stray extra animals, white borders/vignettes,
+# washout, head-growth sprigs and sparkle/star-field glitter drift, and holds the
+# soft watercolour style at negative_cfg 2.0). Opt in with negative_prompt:
+# "default"; any other string passes through verbatim, "" stays positive-only.
+DEFAULT_CONCEPT_NEGATIVE = (
+    "text, words, letters, numbers, captions, watermark, signature, artist "
+    "signature, logo, initials, frame, border, white paper border, blank white "
+    "margins, unpainted paper edges, vignette, faded edges, washed-out pale sky, "
+    "blown-out overexposed highlights, bleached faded colours, empty sparse "
+    "composition, large blank empty background area, tiny subject, subject stuck "
+    "in a corner, deformed, malformed anatomy, extra limbs, blurry, low quality, "
+    "photorealistic, photograph, 3d render, glossy plastic, harsh outlines, heavy "
+    "black outlines, stray background creatures, extra unrelated animals, random "
+    "extra animals in the background, sprig, branch, twig, leaves, berries, "
+    "flower or any growth sprouting from the head or back, antennae, "
+    "oversaturated colours, neon glow, garish vivid high-saturation palette, "
+    "harsh contrast, glitter, sparkle glyphs, four-pointed star sparkles, "
+    "star-field of tiny white speckles, snowflake speckles, starry glitter dust "
+    "on the animal's body")
+
 
 class ConfigError(ValueError):
     pass
@@ -213,7 +234,9 @@ def load_config(path: str | Path) -> BookConfig:
         qa_select=str(data.get("qa_select", "claude")),
         qa_select_anchor=str(data.get("qa_select_anchor", "")),
         qa_select_floor=float(data.get("qa_select_floor", 0.10)),
-        negative_prompt=str(data.get("negative_prompt", "")),
+        negative_prompt=(DEFAULT_CONCEPT_NEGATIVE
+                         if str(data.get("negative_prompt", "")) == "default"
+                         else str(data.get("negative_prompt", ""))),
         negative_cfg=float(data.get("negative_cfg", 2.5)),
         qa_repair=bool(data.get("qa_repair", False)),
         qa_reaudit_reused=bool(data.get("qa_reaudit_reused", False)),
