@@ -119,8 +119,13 @@ def generate_content(cfg: BookConfig, generate_fn: Callable[[str], str]) -> dict
     return data
 
 
+_USAGE_LIMIT_RE = re.compile(r"(session|usage|rate)\s+limit", re.IGNORECASE)
+
+
 def run_claude_cli(shell_cmd: str, prompt: str, *, timeout: int = 300,
-                   attempts: int = 3, backoff: float = 3.0) -> str:
+                   attempts: int = 3, backoff: float = 3.0,
+                   limit_poll: float = 300.0,
+                   limit_wait_max: float | None = None) -> str:
     """Run the Claude Code CLI in print mode, RETRYING transient failures.
 
     A single non-zero exit (or an empty reply) from the CLI is almost always a
@@ -131,12 +136,23 @@ def run_claude_cli(shell_cmd: str, prompt: str, *, timeout: int = 300,
     survives transient CLI errors but still fails loudly on a real outage
     ([[catch-defects-with-guards]]).
 
+    A USAGE/SESSION-LIMIT error is a third case: not transient (backoff can't fix
+    it) and not permanent (it lifts on a schedule — an overnight build died at
+    3:30am on "You've hit your session limit — resets 4:10am", 2026-07-02). Those
+    waits sleep `limit_poll` at a time WITHOUT consuming the normal attempts,
+    bounded by `limit_wait_max` (default env BOOKGEN_LIMIT_WAIT_MAX or 5h) so a
+    never-lifting limit still fails loudly.
+
     `shell_cmd` is a CONSTANT string at every call site (no interpolated user
     data), preserving the existing no-injection-surface property.
     """
+    if limit_wait_max is None:
+        limit_wait_max = float(os.environ.get("BOOKGEN_LIMIT_WAIT_MAX", 5 * 3600))
     last = ""
     rc = -1
-    for i in range(attempts):
+    tries = 0
+    limit_waited = 0.0
+    while tries < attempts:
         proc = subprocess.run(
             shell_cmd, input=prompt, capture_output=True, text=True,
             timeout=timeout, shell=True, encoding="utf-8", errors="replace")
@@ -144,8 +160,16 @@ def run_claude_cli(shell_cmd: str, prompt: str, *, timeout: int = 300,
             return proc.stdout
         rc = proc.returncode
         last = (proc.stderr or proc.stdout or "").strip()[:500]
-        if i < attempts - 1:
-            time.sleep(backoff * (i + 1))
+        if _USAGE_LIMIT_RE.search(last) and limit_waited < limit_wait_max:
+            print(f"[claude-cli] usage limit hit — waiting {limit_poll:.0f}s "
+                  f"({limit_waited:.0f}s/{limit_wait_max:.0f}s cap used): "
+                  f"{last[:120]}", flush=True)
+            time.sleep(limit_poll)
+            limit_waited += limit_poll
+            continue                     # limit waits don't burn attempts
+        tries += 1
+        if tries < attempts:
+            time.sleep(backoff * tries)
     raise ContentError(
         f"claude CLI failed after {attempts} attempts (exit {rc}): {last}")
 

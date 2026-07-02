@@ -121,3 +121,31 @@ def test_generate_content_dispatches_picture():
         return json.dumps(bible) if "STORY BIBLE" in prompt else json.dumps(story)
     out = generate_content(cfg, generate_fn=fake_llm)
     assert len(out["pages"]) == 4 and out["character_anchor"].startswith("a child")
+
+
+def test_run_claude_cli_waits_out_usage_limit_without_burning_attempts(monkeypatch):
+    """A usage/session-limit error is neither transient (backoff won't fix it)
+    nor permanent (it resets on a schedule): the build overnight-killed at 3:30am
+    on 'You've hit your session limit - resets 4:10am' (2026-07-02). The helper
+    must SLEEP through the limit (without consuming its normal attempts) and
+    succeed after it lifts."""
+    limit = _FakeProc(1, stderr="You've hit your session limit - resets 4:10am (America/Los_Angeles)")
+    seq = iter([limit, limit, limit, _FakeProc(0, stdout="OK\n")])
+    sleeps = []
+    monkeypatch.setattr("factory.content.subprocess.run", lambda cmd, **kw: next(seq))
+    monkeypatch.setattr("factory.content.time.sleep", lambda s: sleeps.append(s))
+    out = run_claude_cli("claude -p", "hi", attempts=2, limit_poll=300.0)
+    assert out == "OK\n"
+    assert sleeps == [300.0, 300.0, 300.0]   # limit waits, not attempt backoffs
+
+
+def test_run_claude_cli_usage_limit_wait_is_capped(monkeypatch):
+    """If the limit never lifts, the capped wait budget expires and the call
+    fails loudly instead of sleeping forever."""
+    monkeypatch.setattr(
+        "factory.content.subprocess.run",
+        lambda cmd, **kw: _FakeProc(1, stderr="You've hit your usage limit"))
+    monkeypatch.setattr("factory.content.time.sleep", lambda *_: None)
+    with pytest.raises(ContentError, match="after 2 attempts"):
+        run_claude_cli("claude -p", "hi", attempts=2,
+                       limit_poll=300.0, limit_wait_max=900.0)
