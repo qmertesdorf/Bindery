@@ -139,5 +139,6 @@ def test_scene_prompts_forbid_wrong_feature_similes():
     anti-simile rule since scene text feeds the image model verbatim."""
     from factory.concept_content import build_concept_page_prompt
     rule = "NEVER describe a feature by comparing"
-    assert rule in build_concept_story_prompt(_cfg())
-    assert rule in build_concept_page_prompt(_cfg(), "a great horned owl")
+    flat = lambda s: " ".join(s.split())   # the prompts hard-wrap mid-sentence
+    assert rule in flat(build_concept_story_prompt(_cfg()))
+    assert rule in flat(build_concept_page_prompt(_cfg(), "a great horned owl"))
