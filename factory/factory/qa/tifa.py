@@ -23,7 +23,6 @@ per-book provenance log.
 from __future__ import annotations
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -100,15 +99,16 @@ def parse_probes(raw: str) -> list[TifaProbe]:
 
 
 def _claude_decompose(caption: str) -> list[TifaProbe]:
-    """Default adapter: shell to the Claude CLI to decompose the caption. Constant
-    shell string 'claude -p' — no injection surface (mirrors audit._claude_vision)."""
-    proc = subprocess.run(
-        "claude -p", input=build_decompose_prompt(caption), capture_output=True,
-        text=True, timeout=120, shell=True, encoding="utf-8", errors="replace")
-    if proc.returncode != 0:
-        raise TifaError(f"claude decompose failed (exit {proc.returncode}): "
-                        f"{proc.stderr[:500]}")
-    return parse_probes(proc.stdout)
+    """Default adapter: decompose the caption via audit's Claude adapter, so it
+    shares the pinned judge model (BOOKGEN_VISION_MODEL, Opus by default — the
+    prompt was tuned against it), the transient-failure retries, and the
+    usage-limit waits of every other build-critical Claude call."""
+    from ..audit import _claude_vision, AuditError
+    try:
+        raw = _claude_vision(build_decompose_prompt(caption))
+    except AuditError as e:
+        raise TifaError(f"claude decompose failed: {e}") from e
+    return parse_probes(raw)
 
 
 class TifaDecomposer:

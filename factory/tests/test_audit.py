@@ -411,6 +411,108 @@ def test_concept_and_cover_check_physics_consistency():
         assert "reflection" in low or "perspective" in low
 
 
+def test_claude_vision_pins_the_judge_model(monkeypatch):
+    # The vision judge must NOT inherit the box's default CLI model: every audit
+    # prompt was tuned/validated against Opus, and the default can change any day
+    # (it just did — the box default moved to a different model family). The real
+    # adapter must pin the model exactly like content generation does.
+    seen = {}
+    def fake_run(shell_cmd, prompt, **kw):
+        seen["cmd"] = shell_cmd
+        return '{"ok": true, "issues": []}'
+    monkeypatch.setattr("factory.audit.run_claude_cli", fake_run)
+    monkeypatch.delenv("BOOKGEN_VISION_MODEL", raising=False)
+    from factory.audit import _claude_vision
+    _claude_vision("judge this")
+    assert "--model claude-opus-4-8" in seen["cmd"]
+
+
+def test_claude_vision_model_env_override(monkeypatch):
+    # Per-environment override mirrors BOOKGEN_CONTENT_MODEL (read at call time so
+    # a build script can set it without re-importing the world).
+    seen = {}
+    def fake_run(shell_cmd, prompt, **kw):
+        seen["cmd"] = shell_cmd
+        return '{"ok": true, "issues": []}'
+    monkeypatch.setattr("factory.audit.run_claude_cli", fake_run)
+    monkeypatch.setenv("BOOKGEN_VISION_MODEL", "claude-sonnet-4-6")
+    from factory.audit import _claude_vision
+    _claude_vision("judge this")
+    assert "--model claude-sonnet-4-6" in seen["cmd"]
+
+
+def test_claude_vision_rejects_unsafe_model_token(monkeypatch):
+    # The model id is interpolated into a shell string; keep the no-injection
+    # property by refusing anything outside [A-Za-z0-9._-]. run_claude_cli is
+    # faked as a belt so a validation regression can never shell out for real
+    # from this test — the fake's reply parses, so reaching it fails the raises.
+    monkeypatch.setattr("factory.audit.run_claude_cli",
+                        lambda cmd, prompt, **kw: '{"ok": true, "issues": []}')
+    monkeypatch.setenv("BOOKGEN_VISION_MODEL", "opus; rm -rf /")
+    from factory.audit import _claude_vision
+    with pytest.raises(AuditError, match="model"):
+        _claude_vision("judge this")
+
+
+def _tag_spans(prompt: str, tag: str) -> tuple[int, int]:
+    """Assert <tag>...</tag> appears exactly once and well-ordered; return span."""
+    open_t, close_t = f"<{tag}>", f"</{tag}>"
+    assert prompt.count(open_t) == 1, f"{open_t} must appear exactly once"
+    assert prompt.count(close_t) == 1, f"{close_t} must appear exactly once"
+    s, e = prompt.index(open_t), prompt.index(close_t)
+    assert s < e, f"{open_t} must open before it closes"
+    return s, e
+
+
+def test_audit_prompts_are_xml_sectioned_for_the_judge():
+    # Claude judges attend to XML-delimited sections far more reliably than to a
+    # 1,200-word wall of prose — the reject list and the accept list in particular
+    # must be structurally separated so 'generous on variation' can never bleed
+    # into 'strict on defects'. Wrap the battle-tested wording; do not reword it.
+    concept = build_concept_audit_prompt(
+        anchor="a fox", scene="a fox in grass", image_path=Path("/o/p.png"),
+        caption="The fox sits.")
+    character = build_audit_prompt(anchor="a boy + dog", scene="x",
+                                   image_path=Path("/o/p.png"),
+                                   reference_path=Path("/o/r.png"))
+    cover = build_cover_audit_prompt(image_path=Path("/o/c.png"))
+
+    for prompt in (concept, character):
+        spec_s, spec_e = _tag_spans(prompt, "page_spec")
+        rej_s, rej_e = _tag_spans(prompt, "reject_defects")
+        acc_s, acc_e = _tag_spans(prompt, "accept_variation")
+        out_s, _ = _tag_spans(prompt, "output_format")
+        # spec -> reject -> accept -> output, in that order
+        assert spec_e < rej_s < rej_e < acc_s < acc_e < out_s
+
+    # the cover prompt has no per-page spec, but shares the other three sections
+    rej_s, rej_e = _tag_spans(cover, "reject_defects")
+    acc_s, acc_e = _tag_spans(cover, "accept_variation")
+    out_s, _ = _tag_spans(cover, "output_format")
+    assert rej_e < acc_s and acc_e < out_s
+
+    # the content lives INSIDE its section (concept prompt's own spans)
+    c_rej_s, c_rej_e = _tag_spans(concept, "reject_defects")
+    c_acc_s, c_acc_e = _tag_spans(concept, "accept_variation")
+    assert c_rej_s < concept.index("WRONG subject") < c_rej_e
+    assert c_acc_s < concept.index("different pose") < c_acc_e
+    assert concept.index("This page should show") > concept.index("<page_spec>")
+    assert concept.index("Return ONLY JSON") > concept.index("<output_format>")
+
+
+def test_xml_sections_do_not_reword_the_tuned_contracts():
+    # Tagging must be purely structural: every battle-tested clause the older
+    # contract tests pin down still appears verbatim (spot-check the critical ones).
+    low = build_concept_audit_prompt(
+        anchor="a fox", scene="a fox", image_path=Path("/o/p.png"),
+        caption="The fox sits.").lower()
+    for clause in ("focused fidelity check", "caption mismatch", "body plan",
+                   "exactly five arms", "exactly eight arms", "paddle tail",
+                   "anatomically correct", "fill the page", "actually see",
+                   "only from the pixels", "borderline", "name where"):
+        assert clause in low, f"tuned clause lost in restructure: {clause!r}"
+
+
 def test_auditor_kind_selects_concept_prompt():
     captured = {}
     def judge(prompt):

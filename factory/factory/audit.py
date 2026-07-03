@@ -6,9 +6,10 @@ files in print mode and return a JSON verdict.
 """
 from __future__ import annotations
 import json
+import os
 from pathlib import Path
 from typing import Callable
-from .content import _strip_fences, run_claude_cli, ContentError
+from .content import _strip_fences, run_claude_cli, safe_model_token, ContentError
 
 
 class AuditError(RuntimeError):
@@ -66,11 +67,14 @@ def build_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a children's
 picture book.{ref}
 
-{_PIXELS_FIRST}The recurring character(s) should look like: {anchor}.{scene_line}
+{_PIXELS_FIRST}<page_spec>
+The recurring character(s) should look like: {anchor}.{scene_line}
+</page_spec>
 
 This is a soft, stylised storybook, so judge GENEROUSLY on incidental variation.
 Apply a two-tier bar.{_STRICT_RULE}
 
+<reject_defects>
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the character is the WRONG character, or characters are CONFLATED (e.g. a
   different person/animal, an animal wearing the child's clothes, or an extra
@@ -87,7 +91,9 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the child's expression clearly CONTRADICTS the mood the scene calls for — in
   particular a smiling, grinning, or visibly happy child on a sad, lonely,
   wistful, or grieving page (the face must read at least quiet/subdued there).
+</reject_defects>
 
+<accept_variation>
 ACCEPT (set ok=true) — do NOT reject — for natural variation that keeps the
 character recognisable:
 - different hairstyle detail, pose, camera angle, or framing;
@@ -95,12 +101,15 @@ character recognisable:
   fine), or a warm one on a happy page;
 - a different or simpler background, lighting, or time of day;
 - missing or rearranged minor scene props; the scene only needs to be roughly right.
+</accept_variation>
 
 When the character is recognisable and the art is clean, set ok=true even if such
 details differ. Reserve issues for genuine defects.{_EVIDENCE_RULE}
 
+<output_format>
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
-Output the JSON and nothing else."""
+Output the JSON and nothing else.
+</output_format>"""
 
 
 def build_concept_audit_prompt(*, anchor: str, scene: str | None,
@@ -164,7 +173,9 @@ def build_concept_audit_prompt(*, anchor: str, scene: str | None,
     return f"""Read the image file at {image_path} and judge it for a character-free
 children's picture book.{ref}
 
-{_PIXELS_FIRST}This page should show: {anchor}.{scene_line}{caption_line}{focused}
+{_PIXELS_FIRST}<page_spec>
+This page should show: {anchor}.{scene_line}{caption_line}
+</page_spec>{focused}
 
 This is a soft, stylised storybook. Judge GENEROUSLY on incidental variation (pose,
 crop, palette, background, time of day), but be STRICT that every page shares ONE
@@ -175,6 +186,7 @@ species, scan ALL FOUR CORNERS for stray marks AND for blank white paper, and
 check that the medium and finish match the rest of the book. Apply a two-tier
 bar.{_STRICT_RULE}
 
+<reject_defects>
 REJECT (set ok=false) ONLY for a real defect that would break the book:
 - the WRONG subject (a clearly different animal or thing than described above);
 - ANY people or human figures appear (this book has no people);
@@ -243,7 +255,9 @@ REJECT (set ok=false) ONLY for a real defect that would break the book:
   all four edges. This is a print defect (uneven white margins at the trim). A soft
   painterly fade INTO colour is fine; a corner or edge of plain unpainted paper is
   not;{_PHYSICS_REJECT}{caption_reject}{cohesion_reject}
+</reject_defects>
 
+<accept_variation>
 ACCEPT (set ok=true) — do NOT reject — for natural variation:
 - different pose, camera angle, crop, or composition (as long as the painted art
   still fills the page edge to edge — see the blank-paper-border defect above);
@@ -252,12 +266,15 @@ ACCEPT (set ok=true) — do NOT reject — for natural variation:
 - loose, painterly, flat, or simplified rendering — that illustrated look is GOOD;
 - stylistic differences that still read as the same soft storybook look (but NOT a
   shift in medium or finish, e.g. matte watercolour vs glossy 3D — see cohesion).
+</accept_variation>
 
 When the subject is right and the art is clean, set ok=true even if such details
 differ. Reserve issues for genuine defects.{_EVIDENCE_RULE}
 
+<output_format>
 Return ONLY JSON: {{"ok": true|false, "issues": ["short reason", ...]}}
-Output the JSON and nothing else."""
+Output the JSON and nothing else.
+</output_format>"""
 
 
 def build_describe_prompt(image_path: Path) -> str:
@@ -294,8 +311,10 @@ def build_cover_audit_prompt(*, image_path: Path) -> str:
 picture-book cover laid flat: the BACK cover is the LEFT half, a thin SPINE runs
 down the middle, and the FRONT cover is the RIGHT half.
 
-{_PIXELS_FIRST}Judge it for defects a publisher would fix. REJECT (set ok=false) for
-any real problem:{_STRICT_RULE}
+{_PIXELS_FIRST}Judge it for defects a publisher would fix.{_STRICT_RULE}
+
+<reject_defects>
+REJECT (set ok=false) for any real problem:
 - TEXT LEGIBILITY: any text hard to read — low contrast against the art behind it
   (e.g. pale or white text over a bright, light, or busy area), washed out, or too
   faint. The back-cover blurb must be clearly readable from its first line to its
@@ -320,13 +339,18 @@ any real problem:{_STRICT_RULE}
   falling in different directions, or a shadow with no light source), impossible
   reflections, or broken perspective / scale — machine-render tells a publisher
   would catch.
+</reject_defects>
 
+<accept_variation>
 ACCEPT (set ok=true) if the front title/author and the entire back blurb are clearly
 legible, the layout is clean, AND the front-cover animals are free of growths/
 malformations/stray-object defects — natural art-style variation is fine.{_EVIDENCE_RULE}
+</accept_variation>
 
+<output_format>
 Return ONLY JSON: {{"ok": true|false, "issues": ["short issue", ...]}}
-Output the JSON and nothing else."""
+Output the JSON and nothing else.
+</output_format>"""
 
 
 def parse_verdict(raw: str) -> dict:
@@ -342,14 +366,34 @@ def parse_verdict(raw: str) -> dict:
     return {"ok": bool(data["ok"]), "issues": [str(i) for i in issues]}
 
 
+# Pin the vision-judge model exactly like content generation pins its model
+# (content.CONTENT_MODEL): every audit prompt in this file was tuned and validated
+# against Opus, and an unpinned `claude -p` inherits whatever the box's default CLI
+# model happens to be that day — so a default-model change would silently swap the
+# judge all that tuning targeted. Override per-environment with BOOKGEN_VISION_MODEL.
+DEFAULT_VISION_MODEL = "claude-opus-4-8"
+
+
+def _vision_cmd() -> str:
+    """The pinned judge shell command. Reads BOOKGEN_VISION_MODEL at call time (so
+    a build script can override per-run without re-imports); the token is validated
+    so the shell string stays constant-shaped with no injection surface."""
+    model = os.environ.get("BOOKGEN_VISION_MODEL", DEFAULT_VISION_MODEL)
+    try:
+        return f"claude -p --model {safe_model_token(model)}"
+    except ContentError as e:
+        raise AuditError(f"BOOKGEN_VISION_MODEL: {e}") from e
+
+
 def _claude_vision(prompt: str) -> str:
     """Real adapter: shell to the Claude CLI in print mode (it can Read the image
-    path in the prompt). Constant shell string 'claude -p' — no injection surface.
+    path in the prompt), pinned to the vision-judge model (see _vision_cmd).
 
     Retries transient CLI failures (see run_claude_cli): a lone exit-1 blip on any
     of a build's hundreds of vision calls must not abort the whole run."""
+    cmd = _vision_cmd()
     try:
-        return run_claude_cli("claude -p", prompt)
+        return run_claude_cli(cmd, prompt)
     except ContentError as e:
         raise AuditError(str(e).replace("claude CLI", "claude vision")) from e
 

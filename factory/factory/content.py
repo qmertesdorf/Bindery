@@ -174,6 +174,15 @@ def run_claude_cli(shell_cmd: str, prompt: str, *, timeout: int = 300,
         f"claude CLI failed after {attempts} attempts (exit {rc}): {last}")
 
 
+def safe_model_token(model: str) -> str:
+    """Validate a model id for interpolation into the constant `claude -p` shell
+    string: anything outside `[A-Za-z0-9._-]` is refused, so a pinned command
+    stays free of interpolated user data (no injection surface)."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", model):
+        raise ContentError(f"{model!r} is not a safe model token")
+    return model
+
+
 def claude_generate(prompt: str) -> str:
     """Real adapter: shell out to the installed Claude Code CLI in print mode.
 
@@ -183,7 +192,5 @@ def claude_generate(prompt: str) -> str:
     to a safe `[A-Za-z0-9._-]` token, so there is still no interpolated user data
     and no injection surface. Pinning the model keeps builds reproducible.
     """
-    if not re.fullmatch(r"[A-Za-z0-9._-]+", CONTENT_MODEL):
-        raise ContentError(
-            f"BOOKGEN_CONTENT_MODEL {CONTENT_MODEL!r} is not a safe model token")
-    return run_claude_cli(f"claude -p --model {CONTENT_MODEL}", prompt)
+    return run_claude_cli(
+        f"claude -p --model {safe_model_token(CONTENT_MODEL)}", prompt)

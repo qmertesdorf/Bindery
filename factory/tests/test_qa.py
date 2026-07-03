@@ -287,6 +287,25 @@ def test_tifa_parse_probes_rejects_non_json():
     with pytest.raises(TifaError):
         parse_probes("the caption shows a fox")
 
+def test_tifa_real_decompose_pins_the_model(monkeypatch):
+    # The real decompose adapter must pin its model (via the shared vision pin)
+    # instead of inheriting whatever the box's default CLI model is that day —
+    # and route through run_claude_cli so it gets the same transient-failure
+    # retries and usage-limit waits as every other build-critical Claude call.
+    seen = {}
+    def fake_run(shell_cmd, prompt, **kw):
+        seen["cmd"] = shell_cmd
+        seen["prompt"] = prompt
+        return '[{"category":"count","element":"eight arms"}]'
+    monkeypatch.setattr("factory.audit.run_claude_cli", fake_run)
+    monkeypatch.delenv("BOOKGEN_VISION_MODEL", raising=False)
+    from factory.qa.tifa import _claude_decompose
+    probes = _claude_decompose("an octopus with eight curly arms")
+    assert "--model claude-opus-4-8" in seen["cmd"]
+    assert "eight curly arms" in seen["prompt"]
+    assert [(p.element, p.category) for p in probes] == [("eight arms", "count")]
+
+
 def test_tifa_decomposer_caches_per_caption():
     # a caption is re-audited across reroll attempts; decompose it (a real LLM
     # call) only once per distinct caption.
