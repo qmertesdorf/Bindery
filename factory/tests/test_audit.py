@@ -411,11 +411,11 @@ def test_concept_and_cover_check_physics_consistency():
         assert "reflection" in low or "perspective" in low
 
 
-def test_claude_vision_pins_the_judge_model(monkeypatch):
-    # The vision judge must NOT inherit the box's default CLI model: every audit
-    # prompt was tuned/validated against Opus, and the default can change any day
-    # (it just did — the box default moved to a different model family). The real
-    # adapter must pin the model exactly like content generation does.
+def test_claude_vision_follows_cli_default_model(monkeypatch):
+    # By design the vision judge follows whatever model the box's Claude CLI is
+    # set to (the operator picks the model; in practice that is expected to be
+    # Opus, which the prompts were tuned against). No --model flag unless the
+    # BOOKGEN_VISION_MODEL override below asks for a specific pin.
     seen = {}
     def fake_run(shell_cmd, prompt, **kw):
         seen["cmd"] = shell_cmd
@@ -424,12 +424,12 @@ def test_claude_vision_pins_the_judge_model(monkeypatch):
     monkeypatch.delenv("BOOKGEN_VISION_MODEL", raising=False)
     from factory.audit import _claude_vision
     _claude_vision("judge this")
-    assert "--model claude-opus-4-8" in seen["cmd"]
+    assert seen["cmd"] == "claude -p"
 
 
 def test_claude_vision_model_env_override(monkeypatch):
-    # Per-environment override mirrors BOOKGEN_CONTENT_MODEL (read at call time so
-    # a build script can set it without re-importing the world).
+    # Opt-in pin: BOOKGEN_VISION_MODEL pins the judge for a reproducible build
+    # (read at call time so a build script can set it without re-importing).
     seen = {}
     def fake_run(shell_cmd, prompt, **kw):
         seen["cmd"] = shell_cmd

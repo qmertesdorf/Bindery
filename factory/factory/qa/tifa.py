@@ -100,9 +100,9 @@ def parse_probes(raw: str) -> list[TifaProbe]:
 
 def _claude_decompose(caption: str) -> list[TifaProbe]:
     """Default adapter: decompose the caption via audit's Claude adapter, so it
-    shares the pinned judge model (BOOKGEN_VISION_MODEL, Opus by default — the
-    prompt was tuned against it), the transient-failure retries, and the
-    usage-limit waits of every other build-critical Claude call."""
+    shares the judge model choice (the CLI default, or the BOOKGEN_VISION_MODEL
+    pin), the transient-failure retries, and the usage-limit waits of every
+    other build-critical Claude call."""
     from ..audit import _claude_vision, AuditError
     try:
         raw = _claude_vision(build_decompose_prompt(caption))

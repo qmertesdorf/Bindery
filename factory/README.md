@@ -8,10 +8,10 @@ The factory orchestrates three external tools (it does not bundle them):
 1. **Claude Code CLI** (`claude`) — generates the journal copy. Stage ① shells out to
    `claude -p`, so the CLI must be installed and on your `PATH`. See
    https://docs.claude.com/en/docs/claude-code. No separate API key is needed.
-   Both the content model and the vision-audit model are PINNED (they do not follow
-   your CLI's default model): override with `BOOKGEN_CONTENT_MODEL` /
-   `BOOKGEN_VISION_MODEL` (both default to `claude-opus-4-8`, which the prompts
-   were tuned against).
+   The content model is pinned (`BOOKGEN_CONTENT_MODEL`, default `claude-opus-4-8`)
+   for reproducible prose; the vision-audit model follows your CLI's default model
+   (the prompts were tuned against Opus, so that's the expected default) — set
+   `BOOKGEN_VISION_MODEL` to pin a specific judge for a reproducible build.
 2. **A headless-Chromium PDF renderer** (`browse`) — renders the HTML/CSS interior and
    cover to print-spec PDF. Any CLI exposing `goto <url>`, `pdf`, `viewport`, and
    `screenshot` subcommands works (see `factory/browsepdf.py` for the exact calls). This

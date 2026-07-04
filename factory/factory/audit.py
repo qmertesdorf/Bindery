@@ -366,19 +366,21 @@ def parse_verdict(raw: str) -> dict:
     return {"ok": bool(data["ok"]), "issues": [str(i) for i in issues]}
 
 
-# Pin the vision-judge model exactly like content generation pins its model
-# (content.CONTENT_MODEL): every audit prompt in this file was tuned and validated
-# against Opus, and an unpinned `claude -p` inherits whatever the box's default CLI
-# model happens to be that day — so a default-model change would silently swap the
-# judge all that tuning targeted. Override per-environment with BOOKGEN_VISION_MODEL.
-DEFAULT_VISION_MODEL = "claude-opus-4-8"
+# The vision judge follows the box's default Claude CLI model BY DESIGN: the
+# operator picks the model they're running (in practice Opus, which every audit
+# prompt here was tuned and validated against). Set BOOKGEN_VISION_MODEL to pin a
+# specific judge for a reproducible build — the opt-in mirror of
+# content.CONTENT_MODEL, not a default.
 
 
 def _vision_cmd() -> str:
-    """The pinned judge shell command. Reads BOOKGEN_VISION_MODEL at call time (so
-    a build script can override per-run without re-imports); the token is validated
-    so the shell string stays constant-shaped with no injection surface."""
-    model = os.environ.get("BOOKGEN_VISION_MODEL", DEFAULT_VISION_MODEL)
+    """The judge shell command: bare `claude -p` (CLI default model) unless
+    BOOKGEN_VISION_MODEL pins one. Read at call time (so a build script can set it
+    per-run without re-imports); the token is validated so the shell string stays
+    constant-shaped with no injection surface."""
+    model = os.environ.get("BOOKGEN_VISION_MODEL", "")
+    if not model:
+        return "claude -p"
     try:
         return f"claude -p --model {safe_model_token(model)}"
     except ContentError as e:
@@ -387,7 +389,7 @@ def _vision_cmd() -> str:
 
 def _claude_vision(prompt: str) -> str:
     """Real adapter: shell to the Claude CLI in print mode (it can Read the image
-    path in the prompt), pinned to the vision-judge model (see _vision_cmd).
+    path in the prompt) on the judge model (see _vision_cmd).
 
     Retries transient CLI failures (see run_claude_cli): a lone exit-1 blip on any
     of a build's hundreds of vision calls must not abort the whole run."""

@@ -287,21 +287,21 @@ def test_tifa_parse_probes_rejects_non_json():
     with pytest.raises(TifaError):
         parse_probes("the caption shows a fox")
 
-def test_tifa_real_decompose_pins_the_model(monkeypatch):
-    # The real decompose adapter must pin its model (via the shared vision pin)
-    # instead of inheriting whatever the box's default CLI model is that day —
-    # and route through run_claude_cli so it gets the same transient-failure
-    # retries and usage-limit waits as every other build-critical Claude call.
+def test_tifa_real_decompose_uses_shared_vision_adapter(monkeypatch):
+    # The real decompose adapter routes through audit's Claude adapter so it
+    # shares the model choice (CLI default, or the BOOKGEN_VISION_MODEL pin)
+    # and gets the same transient-failure retries and usage-limit waits as
+    # every other build-critical Claude call.
     seen = {}
     def fake_run(shell_cmd, prompt, **kw):
         seen["cmd"] = shell_cmd
         seen["prompt"] = prompt
         return '[{"category":"count","element":"eight arms"}]'
     monkeypatch.setattr("factory.audit.run_claude_cli", fake_run)
-    monkeypatch.delenv("BOOKGEN_VISION_MODEL", raising=False)
+    monkeypatch.setenv("BOOKGEN_VISION_MODEL", "claude-opus-4-8")
     from factory.qa.tifa import _claude_decompose
     probes = _claude_decompose("an octopus with eight curly arms")
-    assert "--model claude-opus-4-8" in seen["cmd"]
+    assert "--model claude-opus-4-8" in seen["cmd"]  # follows the shared pin
     assert "eight curly arms" in seen["prompt"]
     assert [(p.element, p.category) for p in probes] == [("eight arms", "count")]
 
