@@ -78,7 +78,13 @@ Return ONLY valid JSON:
   describe a feature by comparing it to a feature the animal does NOT have (not
   "ear tufts like horns", not "a tail like a fish") — the image model paints the
   compared thing literally (real horns, a fish tail). Name only what the feature
-  actually IS ("two soft upright feather tufts on its head"). Keep
+  actually IS ("two soft upright feather tufts on its head"). VARY THE BACKDROPS:
+  across the book the pages must NOT share one repeated backdrop — vary the
+  micro-setting, time of day, light, weather, season hints, colour accents and
+  camera distance from page to page (a pond, a mossy clearing, dense canopy, a
+  stream bank, a burrow entrance, dawn mist, golden dusk, after-rain freshness, a
+  close-up on bark or leaves...), while keeping one cohesive art style and
+  palette family. No two consecutive pages should read as the same place. Keep
   the FACE and expression sweet and friendly (soft gentle eyes, a gentle smile), but
   keep the BODY true to the real animal — do NOT round every creature into the same
   chubby ball or blob: an elongated animal stays long and sleek, a flat animal stays

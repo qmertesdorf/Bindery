@@ -142,3 +142,12 @@ def test_scene_prompts_forbid_wrong_feature_similes():
     flat = lambda s: " ".join(s.split())   # the prompts hard-wrap mid-sentence
     assert rule in flat(build_concept_story_prompt(_cfg()))
     assert rule in flat(build_concept_page_prompt(_cfg(), "a great horned owl"))
+
+
+def test_story_prompt_demands_backdrop_variety():
+    """20 forest pages converged to one repeated glowing-glade backdrop (user
+    flag, wild-green-world 2026-07-02): the story prompt must explicitly demand
+    per-page setting/light/framing variety within one cohesive style."""
+    flat = " ".join(build_concept_story_prompt(_cfg()).split())
+    assert "VARY THE BACKDROPS" in flat
+    assert "No two consecutive pages" in flat
