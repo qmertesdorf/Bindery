@@ -15,6 +15,18 @@ def test_build_subject_prompt_includes_theme_used_failed_and_avoidance():
     assert "avoid" in low and ("flat" in low or "eel" in low)
 
 
+def test_build_subject_prompt_prefers_iconic_species():
+    """The chooser swapped a failed elephant page for a SERVAL (live defect,
+    wild-golden-world 2026-07-07): an obscure species the image model barely knows,
+    so its signature short tail / huge ears were ignored and it failed 8/8 audits
+    too. The prompt must steer toward well-known iconic animals and away from
+    obscure species."""
+    p = build_subject_prompt("savanna animals", ["a lion cub"], "an elephant calf")
+    low = " ".join(p.split()).lower()
+    assert "well-known" in low or "iconic" in low
+    assert "obscure" in low
+
+
 def test_build_subject_prompt_forbids_duplicates_relatives_and_offpalette():
     # The chooser must avoid a duplicate/relative/life-stage of an already-used animal
     # (the book teaches DISTINCT animals) and stay in the book's bright daytime palette

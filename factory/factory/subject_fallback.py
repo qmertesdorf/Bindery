@@ -109,8 +109,12 @@ Use your best judgment to AVOID subjects that are hard to render correctly: avoi
 flat / ray-like bodies (rays, skates, flatfish), long eel-like bodies (eels), animals
 with curling or prehensile tails (seahorses, pipefish), hard-shelled crustaceans
 (crabs, lobsters, shrimp), snails and slugs, and any animal with odd or easily-mangled
-tails or limb counts. Prefer simple, plump, rounded, friendly animals (a seal, a
-penguin, a puffin, an otter and the like).
+tails or limb counts. Pick a WELL-KNOWN, iconic animal that every child recognizes
+and that illustrators draw constantly — NEVER an obscure or lesser-known species
+(a serval, a genet, an okapi, a dik-dik and the like): the image model barely knows
+those and paints a generic look-alike whose signature features fail the audit.
+Prefer simple, plump, rounded, friendly animals (a seal, a penguin, a puffin, an
+otter and the like).
 
 Output ONLY the subject as a short noun phrase of 2 to 5 words on a SINGLE line — no
 explanation, no reasoning, no preamble, no extra words and no punctuation. For example:

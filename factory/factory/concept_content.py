@@ -66,8 +66,12 @@ Return ONLY valid JSON:
 - "subject": the single subject of this spread (e.g. an animal name).
 - "text": a SHORT rhyming couplet — exactly TWO lines that rhyme (AABB), separated
   by a single newline ("\\n") — that an early reader can read aloud. Keep it gentle,
-  simple and concrete, weaving in one easy true thing about the subject. The rhyme
-  must be natural, never forced or nonsensical. Vary the rhymes across pages.
+  simple and concrete, weaving in one easy true thing about the subject. State the
+  fact as a TIMELESS truth about the animal ("Its long trunk can reach the stream"),
+  NEVER as a precise action happening right now ("drinks with its trunk") — the
+  finished picture is audited against these words, and the image model cannot
+  reliably paint an exact action moment, so a happening-now claim fails the page.
+  The rhyme must be natural, never forced or nonsensical. Vary the rhymes across pages.
 - "scene": a RICH, concrete visual of the subject in its natural setting — what it
   looks like and where it is. ACCURATE BUT FRIENDLY: describe the subject's TRUE body
   shape, real proportions and — most importantly — the SIGNATURE features that make
@@ -78,7 +82,12 @@ Return ONLY valid JSON:
   describe a feature by comparing it to a feature the animal does NOT have (not
   "ear tufts like horns", not "a tail like a fish") — the image model paints the
   compared thing literally (real horns, a fish tail). Name only what the feature
-  actually IS ("two soft upright feather tufts on its head"). VARY THE BACKDROPS:
+  actually IS ("two soft upright feather tufts on its head"). PAINTABLE POSE ONLY:
+  give the subject ONE simple, calm, easy pose (standing, sitting, resting, perched,
+  floating, grazing) and never a precise contact action the picture must then prove
+  (a trunk touching the water to drink, catching or carrying a thing, licking,
+  leaping over an object) — the image model misses the exact contact point and the
+  page fails its audit. VARY THE BACKDROPS:
   across the book the pages must NOT share one repeated backdrop — vary the
   micro-setting, time of day, light, weather, season hints, colour accents and
   camera distance from page to page (a pond, a mossy clearing, dense canopy, a
@@ -169,7 +178,10 @@ Return ONLY valid JSON:
 - "subject": the subject of this spread ({subject}).
 - "text": a SHORT rhyming couplet — exactly TWO lines that rhyme (AABB), separated by
   a single newline ("\\n") — an early reader can read aloud. Gentle, simple, concrete,
-  weaving in one easy true thing about the subject. Natural rhyme, never forced.
+  weaving in one easy true thing about the subject. State the fact as a TIMELESS truth
+  ("Its long trunk can reach the stream"), NEVER as a precise action happening right
+  now ("drinks with its trunk") — the picture is audited against these words and the
+  image model cannot reliably paint an exact action moment. Natural rhyme, never forced.
 - "scene": a RICH, concrete visual of the subject in its natural setting. ACCURATE
   BUT FRIENDLY: describe its TRUE body shape, real proportions and the SIGNATURE
   features that make the species instantly recognizable (e.g. a pufferfish's spines, a
@@ -178,7 +190,11 @@ Return ONLY valid JSON:
   scene text is fed VERBATIM to the image model, so NEVER describe a feature by
   comparing it to a feature the animal does NOT have (not "ear tufts like horns",
   not "a tail like a fish") — the image model paints the compared thing literally;
-  name only what the feature actually IS. Keep
+  name only what the feature actually IS. PAINTABLE POSE ONLY: give the subject ONE
+  simple, calm, easy pose (standing, sitting, resting, perched, floating, grazing)
+  and never a precise contact action the picture must then prove (a trunk touching
+  the water to drink, catching or carrying a thing, licking, leaping over an object)
+  — the image model misses the exact contact point and the page fails its audit. Keep
   the FACE sweet and friendly (soft gentle eyes,
   a gentle smile) but keep the BODY true to the animal — do NOT round it into a chubby
   ball or blob (an elongated animal stays long and sleek, a flat animal stays flat).

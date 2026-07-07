@@ -144,6 +144,21 @@ def test_scene_prompts_forbid_wrong_feature_similes():
     assert rule in flat(build_concept_page_prompt(_cfg(), "a great horned owl"))
 
 
+def test_scene_prompts_forbid_unpaintable_contact_actions():
+    """'The baby elephant drinks with its trunk' failed 8/8 audits (live defect,
+    wild-golden-world 2026-07-07): Flux never painted the trunk touching the water,
+    so the caption audit could never pass. Both content prompts must steer couplets
+    toward timeless facts and scenes toward simple calm poses, never a precise
+    happening-right-now contact action the picture must then prove."""
+    from factory.concept_content import build_concept_page_prompt
+    flat = lambda s: " ".join(s.split()).lower()
+    for p in (flat(build_concept_story_prompt(_cfg())),
+              flat(build_concept_page_prompt(_cfg(), "an elephant calf"))):
+        assert "paintable" in p
+        assert "contact" in p
+        assert "timeless" in p
+
+
 def test_story_prompt_demands_backdrop_variety():
     """20 forest pages converged to one repeated glowing-glade backdrop (user
     flag, wild-green-world 2026-07-02): the story prompt must explicitly demand
