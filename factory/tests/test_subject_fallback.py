@@ -15,6 +15,17 @@ def test_build_subject_prompt_includes_theme_used_failed_and_avoidance():
     assert "avoid" in low and ("flat" in low or "eel" in low)
 
 
+def test_build_subject_prompt_forbids_scary_animals():
+    """The chooser repeatedly picked a spotted hyena as a fallback (live behaviour,
+    wild-golden-world 2026-07-07) — iconic, but menacing and off-brand for a gentle
+    'never scary' picture book. The prompt must forbid scary/menacing/fearsome
+    animals so a swap stays on-brand."""
+    p = build_subject_prompt("savanna animals", ["a lion cub"], "a secretary bird")
+    low = " ".join(p.split()).lower()
+    assert "scary" in low or "menacing" in low or "fearsome" in low
+    assert "gentle" in low
+
+
 def test_build_subject_prompt_prefers_iconic_species():
     """The chooser swapped a failed elephant page for a SERVAL (live defect,
     wild-golden-world 2026-07-07): an obscure species the image model barely knows,

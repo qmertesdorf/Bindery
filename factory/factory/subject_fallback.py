@@ -105,6 +105,10 @@ Pick a NEW subject that is:
 - a natural fit for the book's established look and setting: the same bright, friendly,
   sunlit daytime palette as the rest of the book. Do NOT pick an animal whose natural
   scene would force a night-time, dark, gloomy or strongly off-palette setting.
+- GENTLE and friendly, never a scary, menacing, fearsome or intimidating animal: this
+  is a soft, sweet, "never scary" picture book, so avoid animals a young child would
+  find frightening (a hyena, a jackal, a vulture, a wild dog and the like), even if
+  they are iconic. A cute baby of a big animal is fine; a fearsome-looking one is not.
 Use your best judgment to AVOID subjects that are hard to render correctly: avoid
 flat / ray-like bodies (rays, skates, flatfish), long eel-like bodies (eels), animals
 with curling or prehensile tails (seahorses, pipefish), hard-shelled crustaceans
