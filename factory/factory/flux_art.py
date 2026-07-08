@@ -452,6 +452,14 @@ def generate_concept_art(cfg, content, out_dir, comfy, *, seed, auditor,
                     break
                 _log(f"[concept] page {i}: subject fallback #{fallbacks}: "
                      f"'{old_subject}' -> '{new_subject}'")
+                # The exhaustion path promoted the REJECTED keep-best to the final
+                # path; we're now committed to re-rendering a NEW subject, so demote
+                # it — a crash/stop during the swap must not leave a rejected image
+                # where resume/reuse trusts finished pages (live leak: wild-golden-
+                # world p6, 2026-07-07). If the swap itself exhausts, art.py
+                # re-promotes ITS keep-best, so the flag paths above still find a
+                # file at op.
+                Path(op).unlink(missing_ok=True)
                 page.clear()
                 page.update(new_page)
                 # loop: re-render the swapped subject (op is overwritten)

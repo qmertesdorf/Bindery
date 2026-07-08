@@ -352,6 +352,46 @@ def test_subject_fallback_swaps_stubborn_page(tmp_path):
     assert "a manatee" in seen["used"]                            # old subject blocked
 
 
+def test_subject_fallback_demotes_rejected_keepbest_before_reroll(tmp_path):
+    """On exhaustion art.py promotes the REJECTED keep-best to page_NN.png; the
+    fallback path then swaps subjects and re-renders. A crash/stop during that swap
+    left the rejected render sitting at the trusted path for a resumed build to
+    reuse as finished (live leak: wild-golden-world p6 rhino→hyena swap,
+    2026-07-07). Once a swap is committed, the promoted path must be demoted until
+    the new subject's render is accepted."""
+    comfy = _Comfy()
+    seen = {}
+
+    class _ManateeFails:
+        def audit(self, image_path, *, anchor, reference_path=None, scene=None,
+                  kind="character", caption=None):
+            if "manatee" in anchor.lower():
+                return {"ok": False, "issues": ["forked tail"]}
+            # Auditing the swapped subject: the rejected keep-best must be gone
+            # from the promoted path while the swap is still unproven.
+            promoted = Path(image_path).with_name(
+                Path(image_path).name.replace("__wip", ""))
+            seen.setdefault("promoted_exists_during_swap", promoted.exists())
+            return {"ok": True, "issues": []}
+
+    def fake_generate(prompt):
+        return _json.dumps({"subject": "a sea turtle",
+                            "text": "A turtle swims by,\nunder the sky.",
+                            "scene": "a green sea turtle in clear blue water"})
+
+    content = {"art_style": "x", "character_anchor": "", "dedication": "d",
+               "pages": [{"subject": "a manatee", "text": "t",
+                          "scene": "a manatee with a paddle tail"}],
+               "closing": "c"}
+    art = generate_concept_art(
+        _cfg(page_count=1, subject_fallback=True, max_fallbacks=2,
+             max_reading_grade=0),
+        content, tmp_path, comfy, seed=1, auditor=_ManateeFails(), max_tries=2,
+        generate_fn=fake_generate, suggest_fn=lambda **k: "a sea turtle")
+    assert art["flagged"] == []
+    assert seen["promoted_exists_during_swap"] is False
+
+
 def test_subject_fallback_off_keeps_best_and_flags(tmp_path):
     # Default (flag off): a stubborn page is kept-best + flagged, content untouched,
     # and NO suggest/regenerate LLM calls happen.
