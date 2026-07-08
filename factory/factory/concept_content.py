@@ -86,7 +86,11 @@ Return ONLY valid JSON:
   describe a feature by comparing it to a feature the animal does NOT have (not
   "ear tufts like horns", not "a tail like a fish") — the image model paints the
   compared thing literally (real horns, a fish tail). Name only what the feature
-  actually IS ("two soft upright feather tufts on its head"). PAINTABLE POSE ONLY:
+  actually IS ("two soft upright feather tufts on its head"). For the SAME reason
+  never NEGATE a feature in the scene ("a plain tail, NOT ringed", "no stripes") —
+  the image model cannot process "not" and paints the negated thing (a ringed tail);
+  describe only the positive appearance you DO want ("a thin smooth plain tan tail").
+  PAINTABLE POSE ONLY:
   give the subject ONE simple, calm, easy pose (standing, sitting, resting, perched,
   floating, grazing) and never a precise contact action the picture must then prove
   (a trunk touching the water to drink, catching or carrying a thing, licking,
@@ -194,7 +198,10 @@ Return ONLY valid JSON:
   scene text is fed VERBATIM to the image model, so NEVER describe a feature by
   comparing it to a feature the animal does NOT have (not "ear tufts like horns",
   not "a tail like a fish") — the image model paints the compared thing literally;
-  name only what the feature actually IS. PAINTABLE POSE ONLY: give the subject ONE
+  name only what the feature actually IS. For the same reason never NEGATE a feature
+  ("a plain tail, NOT ringed", "no stripes") — the image model cannot process "not"
+  and paints the negated thing; describe only the positive appearance you DO want.
+  PAINTABLE POSE ONLY: give the subject ONE
   simple, calm, easy pose (standing, sitting, resting, perched, floating, grazing)
   and never a precise contact action the picture must then prove (a trunk touching
   the water to drink, catching or carrying a thing, licking, leaping over an object)

@@ -159,6 +159,20 @@ def test_scene_prompts_forbid_unpaintable_contact_actions():
         assert "timeless" in p
 
 
+def test_scene_prompts_forbid_negated_features():
+    """A scene saying 'a plain tail, NOT ringed' made Flux paint a ringed tail (live
+    defect, wild-golden-world meerkat 2026-07-07): the image model can't process
+    'not' and paints the negated thing. Both scene prompts must forbid feature
+    negation and demand positive-only description (same root as the anti-simile rule,
+    since scene text feeds the model verbatim)."""
+    from factory.concept_content import build_concept_page_prompt
+    flat = lambda s: " ".join(s.split())
+    for p in (flat(build_concept_story_prompt(_cfg())),
+              flat(build_concept_page_prompt(_cfg(), "a meerkat"))):
+        assert "never NEGATE" in p
+        assert "positive appearance" in p
+
+
 def test_story_prompt_corrects_wrong_fact_counts_in_topics():
     """A config topic said 'one large horn' on a rhino — real rhinos have two, Flux
     painted two, and the count guard rejected 8/8 (live defect, wild-golden-world
