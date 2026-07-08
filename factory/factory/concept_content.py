@@ -78,7 +78,11 @@ Return ONLY valid JSON:
   the species instantly recognizable (e.g. a pufferfish's SPINES, a swordfish's long
   bill, a narwhal's tusk, an octopus's eight arms, the correct fins/tail shape) so a
   child could name the animal from the picture alone; never smooth away or omit a
-  defining feature. The scene text is fed VERBATIM to the image model, so NEVER
+  defining feature. If a provided subject line MIS-STATES a real body fact (the wrong
+  horn, limb, tail or feature count — e.g. "one horn" on a two-horned rhino), write
+  the scene and couplet with the TRUE fact instead: the finished picture is audited
+  against the words AND against real anatomy, so a wrong count can never pass. The
+  scene text is fed VERBATIM to the image model, so NEVER
   describe a feature by comparing it to a feature the animal does NOT have (not
   "ear tufts like horns", not "a tail like a fish") — the image model paints the
   compared thing literally (real horns, a fish tail). Name only what the feature

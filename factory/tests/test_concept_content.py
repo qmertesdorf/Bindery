@@ -159,6 +159,16 @@ def test_scene_prompts_forbid_unpaintable_contact_actions():
         assert "timeless" in p
 
 
+def test_story_prompt_corrects_wrong_fact_counts_in_topics():
+    """A config topic said 'one large horn' on a rhino — real rhinos have two, Flux
+    painted two, and the count guard rejected 8/8 (live defect, wild-golden-world
+    2026-07-07). The story prompt must tell the writer to correct a mis-stated body
+    fact from a provided topic rather than copy it verbatim."""
+    flat = " ".join(build_concept_story_prompt(_cfg()).split()).lower()
+    assert "mis-state" in flat
+    assert "true fact" in flat
+
+
 def test_story_prompt_demands_backdrop_variety():
     """20 forest pages converged to one repeated glowing-glade backdrop (user
     flag, wild-green-world 2026-07-02): the story prompt must explicitly demand
