@@ -25,6 +25,23 @@ def test_extract_single_means_one_and_skips_unnumbered():
     # a bare plural with no number is not a count claim
     assert "legs" not in dict(extract_count_claims("a dog with legs"))
 
+def test_extract_drops_pose_count_of_one_on_paired_parts():
+    """'one leg lifted mid-step' on a flamingo made the guard claim legs==1 and
+    reject all 8 anatomically-correct (two-legged) renders (live defect,
+    wild-golden-world 2026-07-07). A count of 1 for a part that comes in pairs or
+    more (legs, arms, wings, ears, flippers) is a POSE ('one wing spread'), never an
+    anatomical total, so it must not become a count claim."""
+    assert "legs" not in dict(extract_count_claims(
+        "a pink flamingo with long thin legs, one leg lifted mid-step"))
+    assert "wings" not in dict(extract_count_claims("a bird with one wing spread wide"))
+    assert "arms" not in dict(extract_count_claims("a monkey with one arm raised high"))
+    # but a genuinely-singular part keeps its count-of-one claim
+    assert dict(extract_count_claims("a narwhal with one long tusk"))["tusks"] == 1
+    assert dict(extract_count_claims("a single paddle tail"))["tails"] == 1
+    # a real multi-count leg claim is still verified
+    assert dict(extract_count_claims("a spider with eight legs"))["legs"] == 8
+
+
 def test_extract_eye_stalks_with_adjective_and_canonicalises():
     claims = dict(extract_count_claims("two upper eye-stalks, each with one eye"))
     assert claims["eye-stalks"] == 2

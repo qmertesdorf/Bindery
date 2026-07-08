@@ -33,6 +33,13 @@ _PART_PATTERN = (
     r"eye-?stalks?|arms?|legs?|eyes?|fins?|tails?|wings?|"
     r"antennae|antennas?|antenna|tentacles?|ears?|horns?|tusks?|flippers?|points?")
 
+# Parts that anatomically come in pairs or more, so a stated count of exactly 1 is a
+# pose ("one leg lifted"), not an anatomical total. 'eyes' is deliberately EXCLUDED:
+# a profile view legitimately shows one eye, and a crab's eye-stalk carries one eye
+# each — both real count-of-one claims. 'fins'/'horns'/'tusks'/'tails' are excluded
+# too (one dorsal fin, one horn, a narwhal's single tusk, one tail are valid totals).
+_PAIRED_PARTS = {"arms", "legs", "wings", "ears", "flippers", "tentacles"}
+
 _NUMBER_WORDS = {
     "one": 1, "single": 1, "two": 2, "three": 3, "four": 4, "five": 5,
     "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
@@ -81,6 +88,14 @@ def extract_count_claims(scene: str | None,
             found.setdefault(part, n)
     for p in conflict:
         found.pop(p, None)
+    # A count of 1 for a part that anatomically comes in pairs or more is never a
+    # total — it is a POSE reference ("one leg lifted", "one wing spread", "one paw
+    # raised") that would false-reject every correct render (live defect: the
+    # one-legged-flamingo pose, wild-golden-world 2026-07-07). Drop it. Genuinely-
+    # singular parts (a tail, a horn, a narwhal's one tusk) keep their count of 1.
+    for p in _PAIRED_PARTS:
+        if found.get(p) == 1:
+            found.pop(p, None)
     return sorted(found.items())
 
 
