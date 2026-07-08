@@ -38,6 +38,23 @@ _GENERIC = {
 }
 
 
+# Species the chooser keeps proposing despite the prompt that either (a) are
+# obscure/subspecies whose signature features the image model collapses into a
+# common look-alike, so they fail the audit (a pangolin's scales, a serval's short
+# tail, a secretary bird's quill crest — all seen 8/8-rejected), or (b) read as
+# scary/menacing and break the gentle "never scary" brand. Enforced in code because
+# prompt guidance alone did not stop them ([[catch-defects-with-guards]]). Matched by
+# the candidate's species-identifying tokens, so "a giant pangolin" is still caught.
+_HARD_OR_OFFBRAND = {
+    # obscure / Flux-hard (signature collapses to a look-alike)
+    "pangolin", "serval", "genet", "okapi", "aardvark", "aardwolf", "caracal",
+    "civet", "hyrax", "gerenuk", "klipspringer", "oribi", "bushbaby", "galago",
+    "colobus", "springhare", "dik", "duiker", "bongo", "sitatunga", "quagga",
+    # menacing / off-brand for a gentle picture book
+    "hyena", "jackal", "vulture", "marabou",
+}
+
+
 def _singular(t: str) -> str:
     """Crude singulariser so a plural subject and its singular match ("dolphins" vs
     "a dolphin", "penguins" vs "a penguin"). Leaves Latin-ish -us/-is/-ss words alone
@@ -147,6 +164,8 @@ def suggest_subject(generate_fn: Callable[[str], str], theme: str,
         cand_tokens = _content_tokens(cand)
         if cand_tokens and any(cand_tokens & t for t in taken_tokens):
             continue  # near-duplicate: shares an animal word with an existing subject
+        if cand_tokens & _HARD_OR_OFFBRAND:
+            continue  # obscure/Flux-hard or menacing: re-ask (prompt alone didn't stop it)
         return cand
     raise SubjectFallbackError(
         f"no new subject offered for theme {theme!r} (failed={failed!r})")

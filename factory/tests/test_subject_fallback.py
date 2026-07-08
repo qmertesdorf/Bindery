@@ -64,6 +64,19 @@ def test_suggest_subject_reasks_on_duplicate():
     assert out == "a sea otter"
 
 
+def test_suggest_subject_rejects_hard_and_offbrand_species_in_code():
+    """Prompt guidance alone kept yielding a pangolin and a spotted hyena as
+    fallbacks (live behaviour, wild-golden-world 2026-07-07) — obscure/Flux-hard or
+    menacing species that fail the audit or break the gentle brand. Like the
+    near-duplicate guard, a code-level blocklist rejects them and re-asks even
+    though the LLM ignored the prompt."""
+    seq = iter(["a pangolin", "a spotted hyena", "a zebra foal"])
+    out = suggest_subject(lambda prompt: next(seq), theme="savanna animals",
+                          used=["a lion cub"], failed="a secretary bird",
+                          max_retries=3)
+    assert out == "a zebra foal"     # pangolin (hard) + hyena (scary) skipped in code
+
+
 def test_suggest_subject_rejects_near_duplicate_relative():
     # The real failures from the first live run: the chooser proposed a relative /
     # life-stage of an existing animal (a "harbor seal" when a "harbor seal pup" is
