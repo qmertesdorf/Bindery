@@ -76,6 +76,31 @@ def test_parse_verdict_rejects_missing_ok():
     with pytest.raises(AuditError):
         parse_verdict('{"issues": []}')
 
+def test_parse_verdict_tolerates_trailing_prose():
+    # A stochastic judge sometimes appends prose after the JSON ("Extra data") — this
+    # crashed a multi-hour build (wild-golden-world page 10). Salvage the first object.
+    v = parse_verdict('{"ok": true, "issues": []} The image looks great overall.')
+    assert v == {"ok": True, "issues": []}
+
+def test_parse_verdict_tolerates_leading_prose():
+    v = parse_verdict('Here is my verdict: {"ok": false, "issues": ["extra tail"]}')
+    assert v["ok"] is False and v["issues"] == ["extra tail"]
+
+def test_parse_verdict_raises_when_no_json_object():
+    with pytest.raises(AuditError):
+        parse_verdict('the picture is fine, no defects')
+
+def test_judge_pass_retries_unparseable_then_succeeds():
+    # A lone malformed judge reply must retry, not abort the build.
+    calls = {"n": 0}
+    def flaky_judge(prompt):
+        calls["n"] += 1
+        return "not json at all" if calls["n"] == 1 else '{"ok": true, "issues": []}'
+    auditor = ClaudeVisionAuditor(judge_fn=flaky_judge)
+    v = auditor.audit(Path("/out/page_10.png"), anchor="a warthog", scene="plain",
+                      kind="concept")
+    assert v["ok"] is True and calls["n"] == 2
+
 def test_auditor_uses_injected_judge_fn():
     seen = {}
     def fake_judge(prompt):

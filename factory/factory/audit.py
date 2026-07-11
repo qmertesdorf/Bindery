@@ -353,9 +353,25 @@ Output the JSON and nothing else.
 </output_format>"""
 
 
+def _loads_first_object(raw: str) -> dict:
+    """Parse the FIRST JSON object out of a judge response, tolerating leading or
+    trailing prose. The vision judge is told to emit ONLY JSON, but a stochastic
+    LLM occasionally wraps it ("Here is the verdict: {...}. Looks good.") — a plain
+    json.loads then dies with 'Extra data' and, uncaught, aborts a multi-hour build
+    (live crash: wild-golden-world reroll page 10, 2026-07-10). Locate the first
+    '{' and use raw_decode, which reads one value and ignores any trailing text
+    ([[catch-defects-with-guards]])."""
+    s = _strip_fences(raw)
+    start = s.find("{")
+    if start == -1:
+        raise json.JSONDecodeError("no JSON object in response", s, 0)
+    obj, _ = json.JSONDecoder().raw_decode(s[start:])
+    return obj
+
+
 def parse_verdict(raw: str) -> dict:
     try:
-        data = json.loads(_strip_fences(raw))
+        data = _loads_first_object(raw)
     except json.JSONDecodeError as e:
         raise AuditError(f"auditor did not return valid JSON: {e}") from e
     if not isinstance(data, dict) or "ok" not in data:
@@ -459,5 +475,18 @@ class ClaudeVisionAuditor:
         if self.describe_first:
             observed = self.judge_fn(build_describe_prompt(Path(image_path)))
             prompt = _OBSERVED_PREFIX.format(observed=observed.strip()) + prompt
-        verdicts = [parse_verdict(self.judge_fn(prompt)) for _ in range(self.passes)]
+        verdicts = [self._judge_pass(prompt) for _ in range(self.passes)]
         return _merge_verdicts(verdicts, mode=self.aggregate)
+
+    def _judge_pass(self, prompt: str, *, tries: int = 3) -> dict:
+        """One vision pass, re-calling the judge on an unparseable reply. The judge
+        is stochastic — a lone malformed response (prose instead of JSON) must not
+        abort the whole build, so retry a few times before surfacing the error
+        ([[catch-defects-with-guards]])."""
+        last: AuditError | None = None
+        for _ in range(max(1, tries)):
+            try:
+                return parse_verdict(self.judge_fn(prompt))
+            except AuditError as e:
+                last = e
+        raise last  # type: ignore[misc]
